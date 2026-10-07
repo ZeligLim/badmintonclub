@@ -21,16 +21,10 @@ type AuthEmailEvent = {
   };
 };
 
-const actionSubjects: Record<string, string> = {
-  signup: "Confirm your Badminton Club email",
-  invite: "Your Badminton Club invitation",
-  magiclink: "Your Badminton Club sign-in link",
-  recovery: "Reset your Badminton Club password",
-  email_change: "Confirm your new email address",
-  email: "Your Badminton Club verification code",
-  reauthentication: "Your Badminton Club verification code",
-};
-
+const authEmailTemplateId = 8414851;
+const authEmailTemplateSubject = "Sign in to ATU Galway Badminton Club";
+const mailjetSenderEmail = "badmintonclubwebapp@gmail.com";
+const mailjetSenderName = "ATU Galway Badminton Club";
 const appConfirmationTypes = new Set(["magiclink", "signup", "email"]);
 
 Deno.serve(async (request) => {
@@ -98,9 +92,7 @@ async function sendAuthEmails(
   }
 
   const { email_data: emailData, user } = event;
-  const subject =
-    actionSubjects[emailData.email_action_type] ??
-    "Your Badminton Club account";
+  const subject = authEmailTemplateSubject;
 
   if (emailData.email_action_type === "email_change") {
     const messages: MailjetEmail[] = [];
@@ -164,20 +156,22 @@ async function createAuthEmail(
 ): Promise<MailjetEmail> {
   if (!token || !tokenHash) {
     await logAuthEmailLinkDiagnostic(emailData, token, tokenHash);
-    return {
-      to,
-      subject,
-      text: "This is an account security notification from Badminton Club.",
-    };
+    throw new Error("The Auth email payload has no verification token.");
   }
 
-  const verifyUrl = createVerificationUrl(apiUrl, emailData, tokenHash);
-  await logAuthEmailLinkDiagnostic(emailData, token, tokenHash, verifyUrl);
+  const verificationUrl = createVerificationUrl(apiUrl, emailData, tokenHash);
+  await logAuthEmailLinkDiagnostic(emailData, token, tokenHash, verificationUrl);
 
   return {
     to,
     subject,
-    text: `Use this one-time code: ${token}\n\nOr open this one-time link to continue:\n${verifyUrl}`,
+    template: {
+      id: authEmailTemplateId,
+      language: true,
+      variables: {
+        verification_url: verificationUrl.toString(),
+      },
+    },
   };
 }
 
@@ -261,19 +255,20 @@ function safeLogLocation(location: string): string {
 function getMailjetConfig() {
   const apiKey = Deno.env.get("MAILJET_API_KEY");
   const apiSecret = Deno.env.get("MAILJET_API_SECRET");
-  const senderEmail = Deno.env.get("MAILJET_SENDER_EMAIL");
-  const senderName = Deno.env.get("MAILJET_SENDER_NAME");
   if (
     !apiKey ||
     !apiSecret ||
-    !senderEmail ||
-    !senderName ||
-    [apiKey, apiSecret, senderEmail, senderName].some((value) => value.startsWith("your-"))
+    [apiKey, apiSecret].some((value) => value.startsWith("your-"))
   ) {
     return null;
   }
 
-  return { apiKey, apiSecret, senderEmail, senderName };
+  return {
+    apiKey,
+    apiSecret,
+    senderEmail: mailjetSenderEmail,
+    senderName: mailjetSenderName,
+  };
 }
 
 function isAuthEmailEvent(value: unknown): value is AuthEmailEvent {

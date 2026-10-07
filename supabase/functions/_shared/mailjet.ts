@@ -2,8 +2,19 @@ export type MailjetEmail = {
   to: string;
   toName?: string;
   subject: string;
-  text: string;
-};
+} & (
+  | { text: string; html?: never }
+  | { html: string; text?: never }
+  | {
+      template: {
+        id: number;
+        language: true;
+        variables: Record<string, string>;
+      };
+      text?: never;
+      html?: never;
+    }
+);
 
 export type MailjetConfig = {
   apiKey: string;
@@ -41,7 +52,7 @@ export async function sendMailjetEmails(
         From: { Email: config.senderEmail, Name: config.senderName },
         To: [{ Email: email.to, ...(email.toName ? { Name: email.toName } : {}) }],
         Subject: email.subject,
-        TextPart: email.text,
+        ...getEmailContent(email),
       })),
     }),
     signal: AbortSignal.timeout(4000),
@@ -75,6 +86,22 @@ export async function sendMailjetEmails(
     ...getMailjetResponseLogDetails(result),
   });
   return statuses.map((status) => status === "success");
+}
+
+function getEmailContent(email: MailjetEmail) {
+  if ("template" in email) {
+    return {
+      TemplateID: email.template.id,
+      TemplateLanguage: email.template.language,
+      Variables: email.template.variables,
+    };
+  }
+
+  if ("html" in email) {
+    return { HTMLPart: email.html };
+  }
+
+  return { TextPart: email.text };
 }
 
 function getMailjetResponseLogDetails(result: MailjetResponse | null) {
