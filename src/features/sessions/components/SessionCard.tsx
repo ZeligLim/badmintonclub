@@ -54,23 +54,27 @@ export function SessionCard({
   const isWaitlisted = signupStatus.includes("waitlist");
   const isPlayed = signupStatus === "played";
   const isSignedUp = signupStatus.length > 0 && !isPlayed;
-  const isDemoSignupConfirmed = isDemo && signupStatus === "selected";
-  const maximumSlotNumber = Math.ceil(
-    session.capacity / session.playersPerSlot,
-  );
-  const currentUserCourt =
-    signupStatus === "selected" &&
-    signupState.currentUserSlot !== null &&
-    signupState.currentUserSlot >= 1 &&
-    signupState.currentUserSlot <= maximumSlotNumber
-      ? ((signupState.currentUserSlot - 1) % session.courtCount) + 1
-      : null;
-  const playerGameSchedule =
-    currentUserCourt === null
-      ? []
-      : createPlayerGameSchedule(session, currentUserCourt);
   const isConfirmed =
     session.status === "confirmed" || session.status === "closed";
+  const playerGroupCount = isDemo
+    ? Math.ceil(
+        Math.min(signupState.registeredCount, session.capacity) /
+          session.playersPerSlot,
+      )
+    : session.timeSlots.length;
+  const currentUserSlot = signupState.currentUserSlot;
+  const hasConfirmedPlayerGroup =
+    signupStatus === "selected" &&
+    currentUserSlot !== null &&
+    currentUserSlot >= 1 &&
+    currentUserSlot <= playerGroupCount;
+  const playerGameSchedule = hasConfirmedPlayerGroup
+    ? createPlayerGameSchedule(
+        session,
+        currentUserSlot,
+        playerGroupCount,
+      )
+    : [];
   const actionLabel = isWaitlisted
     ? "Leave waitlist"
     : isSignedUp
@@ -190,19 +194,9 @@ export function SessionCard({
               isSessionInProgress={isSessionInProgress}
               isSessionOver={isSessionOver}
             />
-            {!isSessionOver && (
+            {!isDemo && !isSessionOver && (
               <>
-                {isDemo ? (
-                  (isDemoSignupConfirmed || isSignedUp) && (
-                    <span className="text-[0.68rem] text-muted-foreground">
-                      {isDemoSignupConfirmed
-                        ? isSessionInProgress
-                          ? "In progress"
-                          : "Confirmed"
-                        : "Not confirmed"}
-                    </span>
-                  )
-                ) : !isSignedIn ? (
+                {!isSignedIn ? (
                   <Link
                     className="text-xs font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     href="https://badmintonclub.vercel.app/sign-in"
@@ -283,26 +277,62 @@ export function SessionCard({
   );
 }
 
-function createPlayerGameSchedule(session: ClubSession, startingCourt: number) {
-  const gameCount = Math.ceil(
+function createPlayerGameSchedule(
+  session: ClubSession,
+  playerGroupNumber: number,
+  playerGroupCount: number,
+) {
+  const roundCount = Math.ceil(
     session.durationMinutes / GAME_DURATION_MINUTES,
   );
+  const activeCourtCount = Math.min(session.courtCount, playerGroupCount);
+  const gamesPlayed = Array.from({ length: playerGroupCount }, () => 0);
+  const lastPlayedRounds = Array.from({ length: playerGroupCount }, () => -1);
+  const schedule = [];
 
-  return Array.from({ length: gameCount }, (_, gameIndex) => {
-    const startOffset = gameIndex * GAME_DURATION_MINUTES;
-    const endOffset = Math.min(
-      startOffset + GAME_DURATION_MINUTES,
-      session.durationMinutes,
-    );
-    const courtNumber =
-      ((startingCourt + gameIndex - 1) % session.courtCount) + 1;
+  for (let roundIndex = 0; roundIndex < roundCount; roundIndex += 1) {
+    const activeGroups = Array.from(
+      { length: playerGroupCount },
+      (_, groupIndex) => groupIndex + 1,
+    )
+      .sort(
+        (leftGroup, rightGroup) =>
+          gamesPlayed[leftGroup - 1] - gamesPlayed[rightGroup - 1] ||
+          lastPlayedRounds[leftGroup - 1] -
+            lastPlayedRounds[rightGroup - 1],
+      )
+      .slice(0, activeCourtCount);
+    const occupiedCourts = new Set<number>();
 
-    return {
-      courtNumber,
-      startAt: addMinutesToTime(session.startsAt, startOffset),
-      endAt: addMinutesToTime(session.startsAt, endOffset),
-    };
-  });
+    for (const groupNumber of activeGroups) {
+      const groupIndex = groupNumber - 1;
+      let courtNumber =
+        ((groupIndex + gamesPlayed[groupIndex]) % session.courtCount) + 1;
+
+      while (occupiedCourts.has(courtNumber)) {
+        courtNumber = (courtNumber % session.courtCount) + 1;
+      }
+      occupiedCourts.add(courtNumber);
+
+      if (groupNumber === playerGroupNumber) {
+        const startOffset = roundIndex * GAME_DURATION_MINUTES;
+        const endOffset = Math.min(
+          startOffset + GAME_DURATION_MINUTES,
+          session.durationMinutes,
+        );
+        schedule.push({
+          courtNumber,
+          startAt: addMinutesToTime(session.startsAt, startOffset),
+          endAt: addMinutesToTime(session.startsAt, endOffset),
+        });
+      }
+
+      gamesPlayed[groupIndex] += 1;
+      lastPlayedRounds[groupIndex] = roundIndex;
+    }
+  }
+
+  return schedule;
 }
 
 function formatSessionDate(value: string) {
