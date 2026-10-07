@@ -1,6 +1,6 @@
 begin;
 
-select plan(46);
+select plan(47);
 
 select has_table('public', 'profiles', 'profiles table exists');
 select has_table('public', 'sessions', 'sessions table exists');
@@ -443,8 +443,8 @@ select is(
     where session.event_date = date_trunc('week', now() at time zone 'Europe/London')::date + 9
       and signup.user_id = '10000000-0000-4000-8000-000000000032'
   ),
-  8::smallint,
-  'the 32nd selected player is assigned to the eighth four-player group'
+  4::smallint,
+  'the 16th-priority Wednesday player is assigned to the fourth group'
 );
 select is(
   (
@@ -452,10 +452,23 @@ select is(
     from public.session_signups as signup
     join public.sessions as session on session.id = signup.session_id
     where session.event_date = date_trunc('week', now() at time zone 'Europe/London')::date + 9
-      and signup.user_id = '10000000-0000-4000-8000-000000000033'
+      and signup.user_id = '10000000-0000-4000-8000-000000000016'
   ),
   'waitlisted',
-  'the 33rd-priority Wednesday player is waitlisted'
+  'a player selected Monday can be waitlisted Wednesday after their history updates'
+);
+select is(
+  (
+    select profile.last_played_at
+    from public.profiles as profile
+    where profile.id = '10000000-0000-4000-8000-000000000016'
+  ),
+  (
+    select (session.event_date + session.starts_at) at time zone 'Europe/London'
+    from public.sessions as session
+    where session.event_date = date_trunc('week', now() at time zone 'Europe/London')::date + 7
+  ),
+  'a selected player history records the scheduled session time'
 );
 
 select * from finish();

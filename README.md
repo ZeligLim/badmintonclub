@@ -54,12 +54,13 @@ project's Auth settings.
   sessions whose deadlines have passed. If no member has the dashboard open at
   the deadline, finalization runs when a member next opens the app.
 - Final selection prioritizes the oldest `last_played_at`, with never-played
-  members first and signup time as the tie-breaker. Overflow is waitlisted.
+  members first and signup time as the tie-breaker. Awarding a place updates
+  play history to that session's scheduled start; overflow is waitlisted.
 - Monday sessions have 2 courts and a 16-player capacity. Wednesday sessions
   have 4 courts and a 32-player capacity.
 - In `/dev`, the Testing controls set total sign-ups for each weekday from 0 to
   64, including over-capacity counts for previewing waitlist states.
-- A selected member checks in after the session to update their play history.
+- A selected member can check in after the session to record attendance.
 
 Session capacities are fixed by weekday in the database: 16 for Monday and 32
 for Wednesday. The four-player allocation groups run from 1–4 on Monday and
