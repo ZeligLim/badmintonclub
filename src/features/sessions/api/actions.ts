@@ -18,6 +18,18 @@ export async function signUp(sessionId: string): Promise<void> {
   await updateSignup(sessionId, "request_session_signup");
 }
 
+export async function joinConfirmedSession(sessionId: string): Promise<void> {
+  validateSessionId(sessionId);
+  const supabase = await requireAuthenticatedClient();
+  const { error } = await supabase.rpc("join_confirmed_session", {
+    p_session_id: sessionId,
+  });
+
+  if (error) {
+    throw new Error(`Could not join this session: ${error.message}`);
+  }
+}
+
 export async function cancelSignup(sessionId: string): Promise<void> {
   await updateSignup(sessionId, "cancel_session_signup");
 }

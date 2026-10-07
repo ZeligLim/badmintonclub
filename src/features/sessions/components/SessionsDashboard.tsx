@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   cancelSignupForSession,
   finalizeDueSessions,
+  joinConfirmedSessionFcfs,
   markSessionPlayed,
   signUpForSession,
 } from "@/features/sessions";
@@ -154,6 +155,8 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
 
       if (session.currentUserStatus) {
         await cancelSignupForSession(session.id);
+      } else if (session.status === "confirmed") {
+        await joinConfirmedSessionFcfs(session.id);
       } else {
         await signUpForSession(session.id);
       }
