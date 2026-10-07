@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import type { EmailOtpType } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
 import { LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,8 +10,6 @@ type SessionsAuthConfirmProps = {
   tokenHash?: string;
   type?: string;
 };
-
-type SignInEmailOtpType = Extract<EmailOtpType, "signup" | "magiclink" | "email">;
 
 const invalidLinkMessage =
   "This sign-in link is invalid or expired. Request a new one.";
@@ -36,19 +33,32 @@ export function SessionsAuthConfirm({
 
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.verifyOtp({
+      const { data, error } = await supabase.auth.verifyOtp({
         token_hash: tokenHash,
         type,
       });
 
       if (error) {
+        console.error("Supabase rejected email token verification.", {
+          status: error.status,
+          code: error.code,
+        });
         setErrorMessage(invalidLinkMessage);
         return;
       }
 
+      if (!data.session) {
+        console.error("Supabase verified the email token without returning a session.");
+        setErrorMessage("Sign-in could not be completed. Request a new link and try again.");
+        return;
+      }
+
       router.replace("/");
-    } catch {
-      setErrorMessage(invalidLinkMessage);
+    } catch (error) {
+      console.error("Email token verification failed unexpectedly.", {
+        errorName: error instanceof Error ? error.name : "UnknownError",
+      });
+      setErrorMessage("Sign-in could not be completed. Please try again.");
     } finally {
       setIsVerifying(false);
     }
@@ -98,10 +108,6 @@ export function SessionsAuthConfirm({
 
 function isSupportedEmailOtpType(
   emailOtpType: string | undefined,
-): emailOtpType is SignInEmailOtpType {
-  return (
-    emailOtpType === "signup" ||
-    emailOtpType === "magiclink" ||
-    emailOtpType === "email"
-  );
+): emailOtpType is "email" {
+  return emailOtpType === "email";
 }
