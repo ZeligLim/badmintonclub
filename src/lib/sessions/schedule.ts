@@ -2,24 +2,27 @@ export const CLUB_TIME_ZONE = "Europe/London";
 
 export type ClubSessionDay = "Monday" | "Wednesday";
 
-export type NextWeekSchedule = {
-  monday: string;
-  wednesday: string;
-  signupOpensAt: string;
+export type UpcomingSessionSchedule = {
+  sessions: Array<{
+    date: string;
+    signupOpensAt: string;
+  }>;
 };
 
-export function getNextWeekSchedule(now = new Date()): NextWeekSchedule {
+export function getUpcomingSchedule(now = new Date()): UpcomingSessionSchedule {
   const today = getLondonDate(now);
   const [year, month, day] = today.split("-").map(Number);
   const todayUtc = new Date(Date.UTC(year, month - 1, day));
-  const daysSinceMonday = (todayUtc.getUTCDay() + 6) % 7;
-  const nextMonday = addDays(todayUtc, 7 - daysSinceMonday);
-  const wednesday = addDays(nextMonday, 2);
+  const daysFromMonday = (todayUtc.getUTCDay() + 6) % 7;
+  const mondayOffset = daysFromMonday <= 2 ? -daysFromMonday : 7 - daysFromMonday;
+  const monday = addDays(todayUtc, mondayOffset);
+  const signupOpensAt = londonDateTime(addDays(monday, -4), 0, 0);
 
   return {
-    monday: formatDate(nextMonday),
-    wednesday: formatDate(wednesday),
-    signupOpensAt: londonDateTime(addDays(nextMonday, -4), 0, 0),
+    sessions: [
+      { date: formatDate(monday), signupOpensAt },
+      { date: formatDate(addDays(monday, 2)), signupOpensAt },
+    ],
   };
 }
 

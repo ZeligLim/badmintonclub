@@ -11,6 +11,15 @@ export async function cancelSignup(sessionId: string): Promise<void> {
   await updateSignup(sessionId, "cancel_session_signup");
 }
 
+export async function signOut(): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signOut();
+
+  if (error) {
+    throw new Error(`Could not sign out: ${error.message}`);
+  }
+}
+
 export async function markSessionPlayed(sessionId: string): Promise<void> {
   validateSessionId(sessionId);
   const supabase = await requireAuthenticatedClient();

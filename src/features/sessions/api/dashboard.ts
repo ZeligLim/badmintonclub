@@ -1,10 +1,9 @@
 import "server-only";
 
-import { addMinutesToTime, getNextWeekSchedule } from "@/lib/sessions/schedule";
+import { addMinutesToTime, getUpcomingSchedule } from "@/lib/sessions/schedule";
 import { hasSupabaseConfig } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
-import { createDemoDashboardData } from "../demo-data";
 import type {
   ClubSession,
   DashboardData,
@@ -19,7 +18,9 @@ type RosterRow =
 
 export async function loadDashboardData(): Promise<DashboardData> {
   if (!hasSupabaseConfig()) {
-    return createDemoDashboardData();
+    throw new Error(
+      "Supabase is not configured. Use /dev for local demo data or set the Supabase URL and public key.",
+    );
   }
 
   const supabase = await createClient();
@@ -34,15 +35,15 @@ export async function loadDashboardData(): Promise<DashboardData> {
 
   const { error: ensureError } = await supabase.rpc("ensure_next_week_sessions");
   if (ensureError) {
-    throw new Error(`Could not prepare next week's sessions: ${ensureError.message}`);
+    throw new Error(`Could not prepare upcoming sessions: ${ensureError.message}`);
   }
 
-  const schedule = getNextWeekSchedule();
+  const schedule = getUpcomingSchedule();
   const { data: sessionRows, error: sessionsError } = await supabase.rpc(
     "get_dashboard_sessions",
     {
-      p_from_date: schedule.monday,
-      p_through_date: schedule.wednesday,
+      p_from_date: schedule.sessions[0].date,
+      p_through_date: schedule.sessions[schedule.sessions.length - 1].date,
     },
   );
   if (sessionsError) {
@@ -118,9 +119,14 @@ function mapSession(row: DashboardSessionRow, rosterRows: RosterRow[]): ClubSess
     status === "confirmed"
       ? Array.from({ length: Math.ceil(sessionRoster.length / 4) }, (_, index) => {
           const number = index + 1;
+          const slotDurationMinutes =
+            row.duration_minutes / Math.ceil(row.capacity / 4);
           return {
             number,
-            startAt: addMinutesToTime(row.starts_at, index * 30),
+            startAt: addMinutesToTime(
+              row.starts_at,
+              index * slotDurationMinutes,
+            ),
             players: sessionRoster
               .filter((player) => player.slot_number === number)
               .map((player) => ({

@@ -1,6 +1,7 @@
 import { ArrowRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { signOutFromClub } from "@/features/sessions";
 
 type SessionsHeaderProps = {
   isDemo: boolean;
@@ -31,9 +32,19 @@ export function SessionsHeader({ isDemo, displayName }: SessionsHeaderProps) {
           Local demo
         </span>
       ) : displayName ? (
-        <span className="max-w-56 truncate text-sm text-muted-foreground">
-          {displayName}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="max-w-56 truncate text-sm text-muted-foreground">
+            {displayName}
+          </span>
+          <form action={signOutFromClub}>
+            <button
+              className="rounded-sm px-2 py-1 text-sm font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              type="submit"
+            >
+              Sign out
+            </button>
+          </form>
+        </div>
       ) : (
         <Link
           className="inline-flex items-center gap-1.5 rounded-sm px-2 py-1 text-sm font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

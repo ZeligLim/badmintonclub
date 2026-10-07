@@ -1,6 +1,6 @@
 begin;
 
-select plan(28);
+select plan(39);
 
 select has_table('public', 'profiles', 'profiles table exists');
 select has_table('public', 'sessions', 'sessions table exists');
@@ -101,10 +101,54 @@ select throws_ok(
 set local role anon;
 select lives_ok(
   'select public.ensure_next_week_sessions()',
-  'a visitor can prepare the public Monday and Wednesday schedules'
+  'a visitor can prepare the current and next Monday/Wednesday schedules'
 );
 reset role;
 
+select is(
+  (select starts_at
+   from public.sessions
+   where event_date = date_trunc('week', now() at time zone 'Europe/London')::date),
+  time '18:00',
+  'Monday sessions start at 18:00'
+);
+select is(
+  (select duration_minutes
+   from public.sessions
+   where event_date = date_trunc('week', now() at time zone 'Europe/London')::date),
+  60::smallint,
+  'Monday sessions last one hour'
+);
+select is(
+  (select starts_at
+   from public.sessions
+   where event_date = date_trunc('week', now() at time zone 'Europe/London')::date + 2),
+  time '20:00',
+  'Wednesday sessions start at 20:00'
+);
+select is(
+  (select duration_minutes
+   from public.sessions
+   where event_date = date_trunc('week', now() at time zone 'Europe/London')::date + 2),
+  120::smallint,
+  'Wednesday sessions last two hours'
+);
+select is(
+  (select confirmation_at
+   from public.sessions
+   where event_date = date_trunc('week', now() at time zone 'Europe/London')::date),
+  ((date_trunc('week', now() at time zone 'Europe/London')::date - 1)::timestamp
+    at time zone 'Europe/London'),
+  'current Monday session closes sign-ups at midnight on Sunday'
+);
+select is(
+  (select confirmation_at
+   from public.sessions
+   where event_date = date_trunc('week', now() at time zone 'Europe/London')::date + 2),
+  ((date_trunc('week', now() at time zone 'Europe/London')::date + 1)::timestamp
+    at time zone 'Europe/London'),
+  'current Wednesday session closes sign-ups at midnight on Tuesday'
+);
 select is(
   (select confirmation_at
    from public.sessions
@@ -152,6 +196,87 @@ select
   now(),
   now()
 from generated_players;
+
+update public.sessions
+set
+  signup_opens_at = now() + interval '1 day',
+  confirmation_at = now() + interval '2 days'
+where event_date = date_trunc('week', now() at time zone 'Europe/London')::date;
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claim.sub',
+  '10000000-0000-4000-8000-000000000001',
+  true
+);
+select throws_ok(
+  $$select public.request_session_signup(
+    (select id from public.sessions
+     where event_date = date_trunc('week', now() at time zone 'Europe/London')::date)
+  )$$,
+  'P0001',
+  'Sign-ups have not opened yet.',
+  'authenticated users cannot sign up before the opening time'
+);
+reset role;
+
+update public.sessions
+set
+  signup_opens_at = now() - interval '1 day',
+  confirmation_at = now() + interval '1 day'
+where event_date = date_trunc('week', now() at time zone 'Europe/London')::date;
+set local role authenticated;
+select set_config(
+  'request.jwt.claim.sub',
+  '10000000-0000-4000-8000-000000000001',
+  true
+);
+select lives_ok(
+  $$select public.request_session_signup(
+    (select id from public.sessions
+     where event_date = date_trunc('week', now() at time zone 'Europe/London')::date)
+  )$$,
+  'authenticated users can sign up after opening and before confirmation'
+);
+select lives_ok(
+  $$select public.cancel_session_signup(
+    (select id from public.sessions
+     where event_date = date_trunc('week', now() at time zone 'Europe/London')::date)
+  )$$,
+  'authenticated users can cancel before confirmation'
+);
+reset role;
+
+update public.sessions
+set
+  signup_opens_at = now() - interval '2 days',
+  confirmation_at = now() - interval '1 day'
+where event_date = date_trunc('week', now() at time zone 'Europe/London')::date;
+set local role authenticated;
+select set_config(
+  'request.jwt.claim.sub',
+  '10000000-0000-4000-8000-000000000001',
+  true
+);
+select throws_ok(
+  $$select public.request_session_signup(
+    (select id from public.sessions
+     where event_date = date_trunc('week', now() at time zone 'Europe/London')::date)
+  )$$,
+  'P0001',
+  'Sign-ups have closed for this session.',
+  'authenticated users cannot sign up after the confirmation deadline'
+);
+select throws_ok(
+  $$select public.cancel_session_signup(
+    (select id from public.sessions
+     where event_date = date_trunc('week', now() at time zone 'Europe/London')::date)
+  )$$,
+  'P0001',
+  'This session can no longer be changed.',
+  'authenticated users cannot cancel after the confirmation deadline'
+);
+reset role;
 
 select is(
   (select count(*) from public.profiles where id::text like '10000000-0000-4000-8000-%'),

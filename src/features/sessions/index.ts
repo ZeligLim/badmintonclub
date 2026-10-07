@@ -5,6 +5,7 @@ export {
   cancelSignupForSession,
   getDashboardData,
   markSessionPlayed,
+  signOutFromClub,
   signUpForSession,
 } from "./api";
 export type { ClubSession, DashboardData } from "./types";

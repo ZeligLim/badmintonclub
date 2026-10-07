@@ -1,6 +1,13 @@
 "use server";
 
-import { markSessionPlayed as markPlayed, cancelSignup, signUp } from "./actions";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import {
+  markSessionPlayed as markPlayed,
+  cancelSignup,
+  signOut,
+  signUp,
+} from "./actions";
 import { loadDashboardData } from "./dashboard";
 import type { DashboardData } from "../types";
 
@@ -18,4 +25,10 @@ export async function cancelSignupForSession(sessionId: string): Promise<void> {
 
 export async function markSessionPlayed(sessionId: string): Promise<void> {
   await markPlayed(sessionId);
+}
+
+export async function signOutFromClub(): Promise<void> {
+  await signOut();
+  revalidatePath("/", "layout");
+  redirect("/sign-in");
 }

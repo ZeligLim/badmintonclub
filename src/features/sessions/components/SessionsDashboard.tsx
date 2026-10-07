@@ -1,14 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   cancelSignupForSession,
   markSessionPlayed,
   signUpForSession,
 } from "@/features/sessions";
+import { londonDateTime } from "@/lib/sessions/schedule";
+import { createDemoDashboardData } from "../demo-data";
+import {
+  getSessionStartTimestamp,
+  getSignupWindowStatus,
+  hasSessionEnded,
+  isSessionInProgress,
+  isSessionViewVisible,
+} from "../session-timing";
 import { SessionsHeader } from "./SessionsHeader";
 import { SessionCard } from "./SessionCard";
+import { DemoClock } from "./DemoClock";
 import type { ClubSession, DashboardData } from "@/features/sessions";
 
 type SessionsDashboardProps = {
@@ -19,14 +29,19 @@ type DemoSessionState = {
   sessionId: string;
   registeredCount: number;
   currentUserStatus: string | null;
+  currentUserSlot: number | null;
 };
 
 export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
   const router = useRouter();
   const [demoSessions, setDemoSessions] = useState<DemoSessionState[]>(() =>
-    initialData.sessions.map((session) => createDemoSessionState(session)),
+    initialData.sessions.map((session, index) =>
+      createDemoSessionState(session, index),
+    ),
   );
   const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
+  const [currentTime, setCurrentTime] = useState<Date | null>(null);
+  const [demoTimeOverride, setDemoTimeOverride] = useState<Date | null>(null);
   const [playedSessionIds, setPlayedSessionIds] = useState<Set<string>>(
     () =>
       new Set(
@@ -37,6 +52,22 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
   );
   const [errorMessage, setErrorMessage] = useState("");
   const isDemo = initialData.mode === "demo";
+  const sessionClockTime = demoTimeOverride ?? currentTime;
+  const sessions =
+    isDemo && sessionClockTime
+      ? createDemoDashboardData(sessionClockTime).sessions.map((session) => ({
+          ...session,
+          status: getDemoSessionStatus(session, sessionClockTime),
+        }))
+      : initialData.sessions;
+
+  useEffect(() => {
+    const updateCurrentTime = () => setCurrentTime(new Date());
+    updateCurrentTime();
+
+    const intervalId = setInterval(updateCurrentTime, 15_000);
+    return () => clearInterval(intervalId);
+  }, []);
 
   async function changeSignup(session: ClubSession) {
     setErrorMessage("");
@@ -78,56 +109,63 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
   }
 
   function updateDemoSession(session: ClubSession) {
-    setDemoSessions((currentSessions) =>
-      currentSessions.map((currentSession) => {
-        if (currentSession.sessionId !== session.id) {
-          return currentSession;
-        }
+    setDemoSessions((currentSessions) => {
+      const currentSession =
+        currentSessions.find(({ sessionId }) => sessionId === session.id) ??
+        createDemoSessionState(session, -1);
+      const updatedSession = toggleDemoSignup(currentSession, session);
+      const hasSessionState = currentSessions.some(
+        ({ sessionId }) => sessionId === session.id,
+      );
 
-        const isWaitlisted =
-          currentSession.currentUserStatus?.toLowerCase().includes("waitlist") ??
-          false;
-        const isRegistered =
-          currentSession.currentUserStatus !== null && !isWaitlisted;
-
-        if (isRegistered || isWaitlisted) {
-          return {
-            ...currentSession,
-            registeredCount: isRegistered
-              ? Math.max(currentSession.registeredCount - 1, 0)
-              : currentSession.registeredCount,
-            currentUserStatus: null,
-          };
-        }
-
-        const hasCapacity =
-          currentSession.registeredCount < session.capacity;
-
-        return {
-          ...currentSession,
-          registeredCount: hasCapacity
-            ? currentSession.registeredCount + 1
-            : currentSession.registeredCount,
-          currentUserStatus: hasCapacity ? "registered" : "waitlisted",
-        };
-      }),
-    );
+      return hasSessionState
+        ? currentSessions.map((storedSession) =>
+            storedSession.sessionId === session.id
+              ? updatedSession
+              : storedSession,
+          )
+        : [...currentSessions, updatedSession];
+    });
   }
 
   function getSignupState(session: ClubSession) {
-    if (!isDemo) {
+    const signupState = isDemo
+      ? demoSessions.find(
+          (demoSession) => demoSession.sessionId === session.id,
+        ) ?? {
+          registeredCount: session.registeredCount,
+          currentUserStatus: session.currentUserStatus,
+          currentUserSlot: session.currentUserSlot,
+        }
+      : {
+          registeredCount: session.registeredCount,
+          currentUserStatus: session.currentUserStatus,
+          currentUserSlot: session.currentUserSlot,
+        };
+
+    if (
+      isDemo &&
+      session.status !== "open" &&
+      signupState.currentUserStatus === "requested"
+    ) {
       return {
-        registeredCount: session.registeredCount,
-        currentUserStatus: session.currentUserStatus,
+        ...signupState,
+        currentUserStatus:
+          signupState.registeredCount <= session.capacity
+            ? "selected"
+            : "waitlisted",
+        currentUserSlot:
+          signupState.registeredCount <= session.capacity ? 1 : null,
       };
     }
 
-    return demoSessions.find(
-      (demoSession) => demoSession.sessionId === session.id,
-    ) ?? {
-      registeredCount: session.registeredCount,
-      currentUserStatus: session.currentUserStatus,
-    };
+    return signupState;
+  }
+
+  function changeDemoTime(value: string) {
+    setDemoTimeOverride(
+      value ? parseLondonDateTimeInput(value) : null,
+    );
   }
 
   return (
@@ -148,28 +186,58 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
           </p>
         )}
 
+        {isDemo && (
+          <DemoClock
+            isOverridden={demoTimeOverride !== null}
+            onChange={changeDemoTime}
+            onReset={() => setDemoTimeOverride(null)}
+            value={
+              sessionClockTime
+                ? formatLondonDateTimeInput(sessionClockTime)
+                : ""
+            }
+          />
+        )}
+
         <section aria-label="Club sessions" className="mt-7 sm:mt-10">
           <div className="grid gap-4 lg:grid-cols-2">
-            {initialData.sessions.map((session) => (
-              <SessionCard
-                key={session.id}
-                session={session}
-                signupState={getSignupState(session)}
-                isDemo={isDemo}
-                isSignedIn={Boolean(initialData.user)}
-                isPending={pendingSessionId === session.id}
-                onSignup={() => changeSignup(session)}
-                canMarkPlayed={
-                  !isDemo &&
-                  Boolean(initialData.user) &&
-                  session.currentUserStatus === "selected" &&
-                  !playedSessionIds.has(session.id) &&
-                  hasSessionEnded(session)
-                }
-                hasBeenPlayed={playedSessionIds.has(session.id)}
-                onMarkPlayed={() => recordPlayedSession(session.id)}
-              />
-            ))}
+            {sessions.map((session) => {
+              const signupState = getSignupState(session);
+
+              return (
+                <SessionCard
+                  key={session.id}
+                  session={session}
+                  signupState={signupState}
+                  showSessionView={
+                    sessionClockTime !== null &&
+                    isSessionViewVisible(session, sessionClockTime)
+                  }
+                  isSessionInProgress={
+                    sessionClockTime !== null &&
+                    isSessionInProgress(session, sessionClockTime)
+                  }
+                  signupWindowStatus={
+                    sessionClockTime === null
+                      ? "not-open"
+                      : getSignupWindowStatus(session, sessionClockTime)
+                  }
+                  isDemo={isDemo}
+                  isSignedIn={Boolean(initialData.user)}
+                  isPending={pendingSessionId === session.id}
+                  onSignup={() => changeSignup(session)}
+                  canMarkPlayed={
+                    !isDemo &&
+                    Boolean(initialData.user) &&
+                    session.currentUserStatus === "selected" &&
+                    !playedSessionIds.has(session.id) &&
+                    hasSessionEnded(session)
+                  }
+                  hasBeenPlayed={playedSessionIds.has(session.id)}
+                  onMarkPlayed={() => recordPlayedSession(session.id)}
+                />
+              );
+            })}
           </div>
         </section>
 
@@ -188,23 +256,97 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
   );
 }
 
-function createDemoSessionState(session: ClubSession): DemoSessionState {
+function createDemoSessionState(
+  session: ClubSession,
+  index: number,
+): DemoSessionState {
+  const shouldPreviewCourt =
+    index === 0 &&
+    session.currentUserStatus === null &&
+    session.registeredCount < session.capacity;
+
   return {
     sessionId: session.id,
-    registeredCount: session.registeredCount,
-    currentUserStatus: session.currentUserStatus,
+    registeredCount: shouldPreviewCourt
+      ? session.registeredCount + 1
+      : session.registeredCount,
+    currentUserStatus: shouldPreviewCourt
+      ? "requested"
+      : session.currentUserStatus,
+    currentUserSlot: shouldPreviewCourt
+      ? null
+      : session.currentUserSlot,
   };
 }
 
-function hasSessionEnded(session: ClubSession) {
-  const sessionStart = new Date(
-    session.startsAt.includes("T")
-      ? session.startsAt
-      : `${session.date}T${session.startsAt}`,
-  );
-  const sessionEnd = new Date(
-    sessionStart.getTime() + session.durationMinutes * 60_000,
-  );
+function getDemoSessionStatus(session: ClubSession, currentTime: Date) {
+  const sessionEnd =
+    getSessionStartTimestamp(session) + session.durationMinutes * 60_000;
 
-  return sessionEnd.getTime() <= Date.now();
+  if (currentTime.getTime() >= sessionEnd) {
+    return "closed" as const;
+  }
+  if (currentTime.getTime() >= new Date(session.confirmationAt).getTime()) {
+    return "confirmed" as const;
+  }
+
+  return "open" as const;
+}
+
+function toggleDemoSignup(
+  currentSession: DemoSessionState,
+  session: ClubSession,
+): DemoSessionState {
+  const isWaitlisted =
+    currentSession.currentUserStatus?.toLowerCase().includes("waitlist") ??
+    false;
+  const isRegistered =
+    currentSession.currentUserStatus !== null && !isWaitlisted;
+
+  if (isRegistered || isWaitlisted) {
+    return {
+      ...currentSession,
+      registeredCount: isRegistered
+        ? Math.max(currentSession.registeredCount - 1, 0)
+        : currentSession.registeredCount,
+      currentUserStatus: null,
+      currentUserSlot: null,
+    };
+  }
+
+  const hasCapacity = currentSession.registeredCount < session.capacity;
+
+  return {
+    ...currentSession,
+    registeredCount: hasCapacity
+      ? currentSession.registeredCount + 1
+      : currentSession.registeredCount,
+    currentUserStatus: hasCapacity ? "requested" : "waitlisted",
+    currentUserSlot: null,
+  };
+}
+
+function parseLondonDateTimeInput(value: string) {
+  const [date, time] = value.split("T");
+  const [year, month, day] = date.split("-").map(Number);
+  const [hour, minute] = time.split(":").map(Number);
+  const selectedDate = new Date(Date.UTC(year, month - 1, day));
+
+  return new Date(londonDateTime(selectedDate, hour, minute));
+}
+
+function formatLondonDateTimeInput(value: Date) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/London",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(value);
+  const partValue = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+
+  return `${partValue("year")}-${partValue("month")}-${partValue("day")}T${partValue("hour")}:${partValue("minute")}`;
 }

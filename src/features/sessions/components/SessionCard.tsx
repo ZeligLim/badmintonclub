@@ -1,6 +1,3 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import {
   ArrowRight,
   Check,
@@ -11,15 +8,24 @@ import {
 import { Button } from "@/components/ui/button";
 import type { ClubSession } from "@/features/sessions";
 import Link from "next/link";
+import { addMinutesToTime } from "@/lib/sessions/schedule";
+import { SessionSignupStatus } from "./SessionSignupStatus";
+
+const COURT_COUNT = 4;
+const GAME_DURATION_MINUTES = 15;
 
 type SessionSignupState = {
   registeredCount: number;
   currentUserStatus: string | null;
+  currentUserSlot: number | null;
 };
 
 type SessionCardProps = {
   session: ClubSession;
   signupState: SessionSignupState;
+  showSessionView: boolean;
+  isSessionInProgress: boolean;
+  signupWindowStatus: "not-open" | "open" | "closed";
   isDemo: boolean;
   isSignedIn: boolean;
   isPending: boolean;
@@ -32,6 +38,9 @@ type SessionCardProps = {
 export function SessionCard({
   session,
   signupState,
+  showSessionView,
+  isSessionInProgress,
+  signupWindowStatus,
   isDemo,
   isSignedIn,
   isPending,
@@ -40,14 +49,6 @@ export function SessionCard({
   onSignup,
   onMarkPlayed,
 }: SessionCardProps) {
-  const [currentTime, setCurrentTime] = useState(0);
-
-  useEffect(() => {
-    const intervalId = setInterval(() => setCurrentTime(Date.now()), 1_000);
-
-    return () => clearInterval(intervalId);
-  }, []);
-
   const remainingPlaces = Math.max(
     session.capacity - signupState.registeredCount,
     0,
@@ -56,25 +57,37 @@ export function SessionCard({
   const isWaitlisted = signupStatus.includes("waitlist");
   const isPlayed = signupStatus === "played";
   const isSignedUp = signupStatus.length > 0 && !isPlayed;
-  const isConfirmed = session.status.toLowerCase() === "confirmed";
-  const signupOpensAt = new Date(session.signupOpensAt).getTime();
-  const confirmationAt = new Date(session.confirmationAt).getTime();
-  const isSignupOpen =
-    session.status === "open" &&
-    signupOpensAt <= currentTime &&
-    currentTime < confirmationAt;
-  const isSignupScheduled =
-    session.status === "open" && currentTime < signupOpensAt;
+  const isDemoSignupConfirmed = isDemo && signupStatus === "selected";
+  const currentUserCourt =
+    signupStatus === "selected" &&
+    signupState.currentUserSlot !== null &&
+    signupState.currentUserSlot >= 1 &&
+    signupState.currentUserSlot <= COURT_COUNT
+      ? signupState.currentUserSlot
+      : null;
+  const playerGameSchedule =
+    currentUserCourt === null
+      ? []
+      : createPlayerGameSchedule(session, currentUserCourt);
+  const isConfirmed =
+    session.status === "confirmed" || session.status === "closed";
   const actionLabel = isWaitlisted
     ? "Leave waitlist"
     : isSignedUp
       ? "Cancel place"
-      : remainingPlaces > 0
-        ? "Join session"
-        : "Join waitlist";
-  const unavailableActionLabel = isSignupScheduled
-    ? `Opens ${formatRuleDate(session.signupOpensAt)}`
-    : "Sign-ups closed";
+      : signupWindowStatus === "not-open"
+        ? "Sign-ups not open"
+        : remainingPlaces > 0
+          ? "Join session"
+          : "Join waitlist";
+
+  function handleSignupClick() {
+    if (isSignedUp && !window.confirm("Are you sure you want to cancel?")) {
+      return;
+    }
+
+    onSignup();
+  }
 
   return (
     <article className="overflow-hidden rounded-2xl bg-white">
@@ -82,9 +95,7 @@ export function SessionCard({
         <div className="min-w-0 flex-1 p-4 sm:p-5">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <p className="text-xs font-medium text-muted-foreground">
-                Evening session
-              </p>
+
               <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 <h3 className="text-lg font-medium tracking-tight">
                   {formatSessionTime(session.startsAt)}
@@ -97,94 +108,67 @@ export function SessionCard({
                 </p>
               </div>
             </div>
-            <SessionStatus
-              status={signupStatus}
-              isConfirmed={isConfirmed}
-              isSignedIn={isSignedIn}
-            />
+
           </div>
 
-          <div className="mt-4 flex items-center gap-3 py-2">
-            <UsersRound aria-hidden="true" className="size-4 shrink-0 text-primary" />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium tabular-nums">
-                {isConfirmed ? (
-                  <>
+          {!isSessionInProgress && (
+            <>
+              <div className="mt-4 flex items-center gap-3 py-2">
+                <UsersRound aria-hidden="true" className="size-4 shrink-0 text-primary" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium tabular-nums">
                     {signupState.registeredCount}/{session.capacity}{" "}
                     <span className="font-normal text-muted-foreground">
-                      players confirmed
+                      players {isConfirmed ? "confirmed" : "signed up"}
                     </span>
-                  </>
-                ) : (
-                  <>
-                    {remainingPlaces}{" "}
-                    <span className="font-normal text-muted-foreground">
-                      {remainingPlaces === 1 ? "place" : "places"} available
-                    </span>
-                  </>
-                )}
-              </p>
-            </div>
-            <div
-              aria-label={`${signupState.registeredCount} of ${session.capacity} places filled`}
-              className="capacity-track"
-              role="img"
-            >
-              <span
-                style={{
-                  width: `${Math.min(
-                    (signupState.registeredCount / session.capacity) * 100,
-                    100,
-                  )}%`,
-                }}
-              />
-            </div>
-            <span className="text-xs tabular-nums text-muted-foreground">
-              {signupState.registeredCount}/{session.capacity}
-            </span>
-          </div>
+                  </p>
+                </div>
+                <div
+                  aria-label={`${signupState.registeredCount} of ${session.capacity} places filled`}
+                  className="capacity-track"
+                  role="img"
+                >
+                  <span
+                    style={{
+                      width: `${Math.min(
+                        (signupState.registeredCount / session.capacity) * 100,
+                        100,
+                      )}%`,
+                    }}
+                  />
+                </div>
+                <span className="text-xs tabular-nums text-muted-foreground">
+                  {signupState.registeredCount}/{session.capacity}
+                </span>
+              </div>
 
-          <div className="mt-3 flex items-start gap-2 text-xs leading-5 text-muted-foreground">
-            <Clock3 aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
-            <p>
-              Sign-ups close {formatRuleDateTime(session.confirmationAt)} ·
-              final players and slots confirmed then
-            </p>
-          </div>
-
-          {isConfirmed && (
-            <div className="mt-4 p-3.5">
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">
-                  Confirmed court groups
+              <div className="mt-3 flex items-start gap-2 text-xs leading-5 text-muted-foreground">
+                <Clock3 aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
+                <p>
+                  Sign-ups close {formatRuleDateTime(session.confirmationAt)}
+                  <span className="hidden sm:inline"> · </span>
+                  <span className="block sm:inline">
+                    final players and slots confirmed then
+                  </span>
                 </p>
-                {signupState.currentUserStatus &&
-                  session.currentUserSlot != null && (
-                    <span className="rounded-full bg-accent px-2.5 py-1 text-[0.65rem] font-semibold text-accent-foreground">
-                      Your slot · {session.currentUserSlot}
-                    </span>
-                  )}
               </div>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {session.timeSlots.map((timeSlot) => (
-                  <div
-                    className="rounded-lg px-3 py-2"
-                    key={timeSlot.number}
-                  >
-                    <p className="mb-1 flex items-center justify-between text-xs font-medium">
-                      <span>Slot {timeSlot.number}</span>
-                      <span className="text-muted-foreground">
-                        {formatSessionTime(timeSlot.startAt)}
-                      </span>
-                    </p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {timeSlot.players
-                        .map((player) => player.displayName)
-                        .join(" · ") || "Players to be confirmed"}
-                    </p>
-                  </div>
+            </>
+          )}
+
+          {showSessionView && playerGameSchedule.length > 0 && (
+            <div aria-label="Your games" className="mt-3">
+              <p className="mb-2 text-sm font-medium text-primary">
+                Your games
+              </p>
+              <ul className="grid gap-1.5 text-sm text-primary sm:grid-cols-2">
+                {playerGameSchedule.map((game) => (
+                  <li key={`${game.startAt}-${game.courtNumber}`}>
+                    Court {game.courtNumber} ·{" "}
+                    {formatSessionTime(game.startAt)}–
+                    {formatSessionTime(game.endAt)}
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
           )}
 
@@ -196,9 +180,21 @@ export function SessionCard({
           )}
 
           <div className="mt-4 flex items-center justify-between gap-3">
+            <SessionSignupStatus
+              status={signupStatus}
+              isConfirmed={isConfirmed}
+              isSignedIn={isSignedIn}
+              isSessionInProgress={isSessionInProgress}
+            />
             {isDemo ? (
               <span className="text-[0.68rem] text-muted-foreground">
-                Demo changes stay local
+                {isDemoSignupConfirmed
+                  ? isSessionInProgress
+                    ? "In progress"
+                    : "Confirmed"
+                  : isSignedUp
+                    ? "Not confirmed"
+                    : "Demo changes stay local"}
               </span>
             ) : !isSignedIn ? (
               <Link
@@ -213,18 +209,20 @@ export function SessionCard({
                   ? "Attendance recorded"
                   : isSignedUp
                     ? "Your session"
-                    : "A place on court"}
+                    : null}
               </span>
             )}
-            {!isPlayed && session.status === "open" && (
+            {!isPlayed &&
+              session.status === "open" &&
+              signupWindowStatus !== "closed" && (
               <Button
                 className="h-auto min-h-10 py-2.5"
                 disabled={
                   isPending ||
-                  !isSignupOpen ||
+                  (!isSignedUp && signupWindowStatus !== "open") ||
                   (!isDemo && !isSignedIn)
                 }
-                onClick={onSignup}
+                onClick={handleSignupClick}
                 size="sm"
                 variant={isSignedUp ? "secondary" : "default"}
               >
@@ -235,15 +233,9 @@ export function SessionCard({
                   </>
                 ) : (
                   <>
-                    {isSignupOpen ? (
-                      <>
-                        {isSignedUp && <Check aria-hidden="true" />}
-                        {actionLabel}
-                        {!isSignedUp && <ArrowRight aria-hidden="true" />}
-                      </>
-                    ) : (
-                      unavailableActionLabel
-                    )}
+                    {isSignedUp && <Check aria-hidden="true" />}
+                    {actionLabel}
+                    {!isSignedUp && <ArrowRight aria-hidden="true" />}
                   </>
                 )}
               </Button>
@@ -282,64 +274,26 @@ export function SessionCard({
   );
 }
 
-function SessionStatus({
-  status,
-  isConfirmed,
-  isSignedIn,
-}: {
-  status: string;
-  isConfirmed: boolean;
-  isSignedIn: boolean;
-}) {
-  if (status.includes("waitlist")) {
-    return (
-      <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[0.65rem] font-semibold text-amber-900">
-        Not confirmed
-      </span>
+function createPlayerGameSchedule(session: ClubSession, startingCourt: number) {
+  const gameCount = Math.ceil(
+    session.durationMinutes / GAME_DURATION_MINUTES,
+  );
+
+  return Array.from({ length: gameCount }, (_, gameIndex) => {
+    const startOffset = gameIndex * GAME_DURATION_MINUTES;
+    const endOffset = Math.min(
+      startOffset + GAME_DURATION_MINUTES,
+      session.durationMinutes,
     );
-  }
+    const courtNumber =
+      ((startingCourt + gameIndex - 1) % COURT_COUNT) + 1;
 
-  if (status) {
-    if (status === "requested") {
-      return (
-        <span className="rounded-full bg-secondary px-2.5 py-1 text-[0.65rem] font-semibold text-secondary-foreground">
-          Awaiting confirmation
-        </span>
-      );
-    }
-
-    if (status === "played") {
-      return (
-        <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[0.65rem] font-semibold text-primary">
-          Played
-        </span>
-      );
-    }
-
-    if (status === "selected") {
-      return (
-        <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[0.65rem] font-semibold text-primary">
-          Confirmed
-        </span>
-      );
-    }
-
-    return (
-      <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[0.65rem] font-semibold text-primary">
-        {isConfirmed ? "Not signed up" : "Not confirmed"}
-      </span>
-    );
-  }
-
-  if (isConfirmed) {
-    return (
-      <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[0.65rem] font-semibold text-primary">
-        {isSignedIn ? "Not signed up" : "Session confirmed"}
-      </span>
-    );
-  }
-
-  return null;
+    return {
+      courtNumber,
+      startAt: addMinutesToTime(session.startsAt, startOffset),
+      endAt: addMinutesToTime(session.startsAt, endOffset),
+    };
+  });
 }
 
 function formatSessionDate(value: string) {
@@ -350,17 +304,8 @@ function formatSessionDate(value: string) {
   }).format(date);
 }
 
-function formatRuleDate(value: string) {
-  const date = parseSessionDate(value);
-  return new Intl.DateTimeFormat("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  }).format(date);
-}
-
 function formatRuleDateTime(value: string) {
-  return new Intl.DateTimeFormat("en-GB", {
+  const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Europe/London",
     weekday: "short",
     day: "numeric",
@@ -368,7 +313,11 @@ function formatRuleDateTime(value: string) {
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23",
-  }).format(new Date(value));
+  }).formatToParts(new Date(value));
+  const partValue = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+
+  return `${partValue("weekday")} ${partValue("day")} ${partValue("month")} at ${partValue("hour")}:${partValue("minute")}`;
 }
 
 function parseSessionDate(value: string) {

@@ -3,9 +3,10 @@
 A weekly badminton signup board for Monday and Wednesday evening sessions.
 Members request a place from Thursday. At midnight the day before each session,
 the club confirms players in order of who has gone longest without playing; members
-who have never checked in are first. Selected players are grouped into four
-30-minute court slots. Each session has a configurable capacity, defaulting to
-16. Membership and sign-in are limited to `@atu.ie` email addresses.
+who have never checked in are first. Selected players are grouped into
+four-player court slots across the session. Each session has a configurable
+capacity, defaulting to 16. Membership and sign-in are limited to `@atu.ie`
+email addresses.
 
 ## Local setup
 
@@ -28,20 +29,24 @@ production-local environment files also target the hosted project.
 npm run dev
 ```
 
-The app is at [http://localhost:3000](http://localhost:3000). Local Supabase
-email capture is disabled. To send sign-in links, configure the app to use a
-hosted Supabase project and configure email delivery in that project's Auth
-settings.
-Without Supabase environment values, the page runs in clearly labeled demo
-mode; demo signups stay in browser state and are not shared.
+The live app is at [http://localhost:3000](http://localhost:3000) and requires
+Supabase environment values. Use [http://localhost:3000/dev](http://localhost:3000/dev)
+for local demo data; demo signups and the adjustable Europe/London demo clock
+stay in browser state. The demo route is available only in development.
+Local Supabase email capture is disabled. To send sign-in links, configure the
+app to use a hosted Supabase project and configure email delivery in that
+project's Auth settings.
 
 ## Session rules
 
 - Session dates and signup deadlines use the `Europe/London` timezone.
-- Each week has Monday and Wednesday sessions starting at 18:00, with a
-  two-hour duration.
+- Monday sessions run from 18:00 to 19:00 (6–7 pm); Wednesday sessions run
+  from 20:00 to 22:00 (8–10 pm).
+- The schedule shows the current Monday and Wednesday sessions through
+  Wednesday, then switches to the following week's sessions on Thursday.
 - Signup requests open Thursday at 00:00 and close at 00:00 the day before the
-  event (Europe/London time).
+  event (Europe/London time). Both the signup UI and database enforce these
+  time windows.
 - The Vercel cron runs twice daily and calls `/api/cron/confirm-sessions`;
   `CRON_SECRET` and
   `SUPABASE_SERVICE_ROLE_KEY` must be configured in the deployment environment.
