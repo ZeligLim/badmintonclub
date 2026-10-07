@@ -50,10 +50,6 @@ export function SessionCard({
   onSignup,
   onMarkPlayed,
 }: SessionCardProps) {
-  const remainingPlaces = Math.max(
-    session.capacity - signupState.registeredCount,
-    0,
-  );
   const signupStatus = signupState.currentUserStatus?.toLowerCase() ?? "";
   const isWaitlisted = signupStatus.includes("waitlist");
   const isPlayed = signupStatus === "played";
@@ -81,9 +77,7 @@ export function SessionCard({
       ? "Cancel place"
       : signupWindowStatus === "not-open"
         ? "Sign-ups not open"
-        : remainingPlaces > 0
-          ? "Join session"
-          : "Join waitlist";
+        : "Join session";
 
   function handleSignupClick() {
     if (isSignedUp && !window.confirm("Are you sure you want to cancel?")) {
@@ -157,6 +151,10 @@ export function SessionCard({
                   </span>
                 </p>
               </div>
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                Everyone can sign up. When places are limited, players who have
+                waited longest since playing are prioritized.
+              </p>
             </>
           )}
 
@@ -207,7 +205,7 @@ export function SessionCard({
                 ) : !isSignedIn ? (
                   <Link
                     className="text-xs font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    href="/sign-in"
+                    href="https://badmintonclub.vercel.app/sign-in"
                   >
                     Sign in to join
                   </Link>

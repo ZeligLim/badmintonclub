@@ -190,7 +190,6 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
         ...storedSession,
         registeredCount: demoSignupCounts[session.dayName],
       },
-      session,
     );
     const hasSessionState = demoSessions.some(
       ({ sessionId }) => sessionId === session.id,

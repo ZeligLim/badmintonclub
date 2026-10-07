@@ -57,7 +57,7 @@ export function SessionsHeader({ isDemo, displayName }: SessionsHeaderProps) {
       ) : (
         <Link
           className="inline-flex items-center gap-1.5 rounded-sm px-2 py-1 text-sm font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          href="/sign-in"
+          href="https://badmintonclub.vercel.app/sign-in"
         >
           Sign in <ArrowRight aria-hidden="true" className="size-4" />
         </Link>

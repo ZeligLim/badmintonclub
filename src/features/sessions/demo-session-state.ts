@@ -81,7 +81,6 @@ export function getDemoSignupState(
 
 export function toggleDemoSignup(
   currentSession: DemoSessionState,
-  session: ClubSession,
 ): DemoSessionState {
   const isWaitlisted =
     currentSession.currentUserStatus?.toLowerCase().includes("waitlist") ??
@@ -100,14 +99,10 @@ export function toggleDemoSignup(
     };
   }
 
-  const hasCapacity = currentSession.registeredCount < session.capacity;
-
   return {
     ...currentSession,
-    registeredCount: hasCapacity
-      ? currentSession.registeredCount + 1
-      : currentSession.registeredCount,
-    currentUserStatus: hasCapacity ? "requested" : "waitlisted",
+    registeredCount: currentSession.registeredCount + 1,
+    currentUserStatus: "requested",
     currentUserSlot: null,
   };
 }
