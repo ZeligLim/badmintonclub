@@ -1,11 +1,24 @@
 import { londonDateTime } from "@/lib/sessions/schedule";
 import type { ClubSession } from "./types";
 
-export function hasSessionEnded(session: ClubSession) {
-  const sessionEnd =
-    getSessionStartTimestamp(session) + session.durationMinutes * 60_000;
+export type SessionPeriod = "upcoming" | "in-progress" | "over";
 
-  return sessionEnd <= Date.now();
+export function getSessionPeriod(
+  session: ClubSession,
+  currentTime: Date,
+): SessionPeriod {
+  const sessionStart = getSessionStartTimestamp(session);
+  const sessionEnd = sessionStart + session.durationMinutes * 60_000;
+  const currentTimestamp = currentTime.getTime();
+
+  if (currentTimestamp >= sessionEnd) {
+    return "over";
+  }
+  if (currentTimestamp >= sessionStart) {
+    return "in-progress";
+  }
+
+  return "upcoming";
 }
 
 export function isSessionViewVisible(
@@ -13,22 +26,17 @@ export function isSessionViewVisible(
   currentTime: Date,
 ) {
   const sessionStart = getSessionStartTimestamp(session);
-  const sessionEnd = sessionStart + session.durationMinutes * 60_000;
   const sessionViewOpens = sessionStart - 30 * 60_000;
   const currentTimestamp = currentTime.getTime();
 
-  return currentTimestamp >= sessionViewOpens && currentTimestamp < sessionEnd;
+  return (
+    currentTimestamp >= sessionViewOpens &&
+    getSessionPeriod(session, currentTime) !== "over"
+  );
 }
 
-export function isSessionInProgress(
-  session: ClubSession,
-  currentTime: Date,
-) {
-  const sessionStart = getSessionStartTimestamp(session);
-  const sessionEnd = sessionStart + session.durationMinutes * 60_000;
-  const currentTimestamp = currentTime.getTime();
-
-  return currentTimestamp >= sessionStart && currentTimestamp < sessionEnd;
+export function isSessionInProgress(session: ClubSession, currentTime: Date) {
+  return getSessionPeriod(session, currentTime) === "in-progress";
 }
 
 export function getSignupWindowStatus(

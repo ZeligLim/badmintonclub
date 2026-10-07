@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
+  finalizeDueSessions as finalizeDue,
   markSessionPlayed as markPlayed,
   cancelSignup,
   signOut,
@@ -13,6 +14,10 @@ import type { DashboardData } from "../types";
 
 export async function getDashboardData(): Promise<DashboardData> {
   return loadDashboardData();
+}
+
+export async function finalizeDueSessions(): Promise<number> {
+  return finalizeDue();
 }
 
 export async function signUpForSession(sessionId: string): Promise<void> {

@@ -25,6 +25,7 @@ type SessionCardProps = {
   signupState: SessionSignupState;
   showSessionView: boolean;
   isSessionInProgress: boolean;
+  isSessionOver: boolean;
   signupWindowStatus: "not-open" | "open" | "closed";
   isDemo: boolean;
   isSignedIn: boolean;
@@ -40,6 +41,7 @@ export function SessionCard({
   signupState,
   showSessionView,
   isSessionInProgress,
+  isSessionOver,
   signupWindowStatus,
   isDemo,
   isSignedIn,
@@ -111,7 +113,7 @@ export function SessionCard({
 
           </div>
 
-          {!isSessionInProgress && (
+          {!isSessionInProgress && !isSessionOver && (
             <>
               <div className="mt-4 flex items-center gap-3 py-2">
                 <UsersRound aria-hidden="true" className="size-4 shrink-0 text-primary" />
@@ -185,34 +187,40 @@ export function SessionCard({
               isConfirmed={isConfirmed}
               isSignedIn={isSignedIn}
               isSessionInProgress={isSessionInProgress}
+              isSessionOver={isSessionOver}
             />
-            {isDemo ? (
-              <span className="text-[0.68rem] text-muted-foreground">
-                {isDemoSignupConfirmed
-                  ? isSessionInProgress
-                    ? "In progress"
-                    : "Confirmed"
-                  : isSignedUp
-                    ? "Not confirmed"
-                    : "Demo changes stay local"}
-              </span>
-            ) : !isSignedIn ? (
-              <Link
-                className="text-xs font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                href="/sign-in"
-              >
-                Sign in to join
-              </Link>
-            ) : (
-              <span className="text-[0.68rem] text-muted-foreground">
-                {isPlayed
-                  ? "Attendance recorded"
-                  : isSignedUp
-                    ? "Your session"
-                    : null}
-              </span>
+            {!isSessionOver && (
+              <>
+                {isDemo ? (
+                  (isDemoSignupConfirmed || isSignedUp) && (
+                    <span className="text-[0.68rem] text-muted-foreground">
+                      {isDemoSignupConfirmed
+                        ? isSessionInProgress
+                          ? "In progress"
+                          : "Confirmed"
+                        : "Not confirmed"}
+                    </span>
+                  )
+                ) : !isSignedIn ? (
+                  <Link
+                    className="text-xs font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    href="/sign-in"
+                  >
+                    Sign in to join
+                  </Link>
+                ) : (
+                  <span className="text-[0.68rem] text-muted-foreground">
+                    {isPlayed
+                      ? "Attendance recorded"
+                      : isSignedUp
+                        ? "Your session"
+                        : null}
+                  </span>
+                )}
+              </>
             )}
             {!isPlayed &&
+              !isSessionOver &&
               session.status === "open" &&
               signupWindowStatus !== "closed" && (
               <Button

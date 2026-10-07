@@ -21,9 +21,8 @@ npm run db:reset
 Copy `.env.example` to `.env.local` to use the hosted club project. For a local
 Supabase instance, replace the public URL and publishable key with the values
 printed by `npx supabase status`. Set its service-role key for
-`SUPABASE_SERVICE_ROLE_KEY` and generate a separate value for `CRON_SECRET`.
-Keep both secrets server-side. This checkout's ignored development and
-production-local environment files also target the hosted project.
+`SUPABASE_SERVICE_ROLE_KEY` and keep it server-side. This checkout's ignored
+development and production-local environment files also target the hosted project.
 
 ```bash
 npm run dev
@@ -47,9 +46,13 @@ project's Auth settings.
 - Signup requests open Thursday at 00:00 and close at 00:00 the day before the
   event (Europe/London time). Both the signup UI and database enforce these
   time windows.
-- The Vercel cron runs twice daily and calls `/api/cron/confirm-sessions`;
-  `CRON_SECRET` and
-  `SUPABASE_SERVICE_ROLE_KEY` must be configured in the deployment environment.
+- The browser clock checks session periods every 60 seconds and uses the
+  browser's current time. Session dates and deadlines remain anchored to
+  Europe/London.
+- When a signed-in member's open dashboard reaches a confirmation deadline, it
+  asks a server action to finalize due sessions in Supabase. The service-role
+  key is used only on the server. If no member has the dashboard open at the
+  deadline, finalization runs when a member next opens the app.
 - Final selection prioritizes the oldest `last_played_at`, with never-played
   members first and signup time as the tie-breaker. Overflow is waitlisted.
 - A selected member checks in after the session to update their play history.
@@ -81,8 +84,8 @@ vercel link
 vercel deploy
 ```
 
-The service-role key is required only by the server-side cron handler. Never
-prefix it with `NEXT_PUBLIC_` or add it to browser code.
+The service-role key is required by the server-side session finalization action.
+Never prefix it with `NEXT_PUBLIC_` or add it to browser code.
 
 Configure a custom SMTP provider in the hosted Supabase project's Auth settings
 before expecting magic links to reach club members. Supabase's default sender

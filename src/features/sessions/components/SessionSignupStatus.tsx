@@ -3,6 +3,7 @@ type SessionSignupStatusProps = {
   isConfirmed: boolean;
   isSignedIn: boolean;
   isSessionInProgress: boolean;
+  isSessionOver: boolean;
 };
 
 export function SessionSignupStatus({
@@ -10,7 +11,16 @@ export function SessionSignupStatus({
   isConfirmed,
   isSignedIn,
   isSessionInProgress,
+  isSessionOver,
 }: SessionSignupStatusProps) {
+  if (isSessionOver) {
+    return (
+      <span className="rounded-full bg-secondary px-2.5 py-1 text-[0.65rem] font-semibold text-secondary-foreground">
+        Event over
+      </span>
+    );
+  }
+
   if (status.includes("waitlist")) {
     return (
       <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[0.65rem] font-semibold text-amber-900">

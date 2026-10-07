@@ -1,7 +1,30 @@
 import "server-only";
 
+import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/supabase/database.types";
 import { hasSupabaseConfig } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
+
+export async function finalizeDueSessions(): Promise<number> {
+  await requireAuthenticatedClient();
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceRoleKey) {
+    throw new Error("Session finalization is not configured.");
+  }
+
+  const supabase = createSupabaseAdminClient<Database>(url, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const { data, error } = await supabase.rpc("finalize_due_sessions");
+
+  if (error) {
+    throw new Error(`Could not finalize due sessions: ${error.message}`);
+  }
+
+  return data;
+}
 
 export async function signUp(sessionId: string): Promise<void> {
   await updateSignup(sessionId, "request_session_signup");

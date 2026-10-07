@@ -1,21 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   cancelSignupForSession,
+  finalizeDueSessions,
   markSessionPlayed,
   signUpForSession,
 } from "@/features/sessions";
-import { londonDateTime } from "@/lib/sessions/schedule";
+import { getUpcomingSchedule, londonDateTime } from "@/lib/sessions/schedule";
 import { createDemoDashboardData } from "../demo-data";
 import {
-  getSessionStartTimestamp,
+  createDemoSessionState,
+  getDemoSessionStatus,
+  toggleDemoSignup,
+  type DemoSessionState,
+} from "../demo-session-state";
+import {
+  getSessionPeriod,
   getSignupWindowStatus,
-  hasSessionEnded,
   isSessionInProgress,
   isSessionViewVisible,
 } from "../session-timing";
+import { useBrowserClock } from "../use-browser-clock";
 import { SessionsHeader } from "./SessionsHeader";
 import { SessionCard } from "./SessionCard";
 import { DemoClock } from "./DemoClock";
@@ -23,13 +30,6 @@ import type { ClubSession, DashboardData } from "@/features/sessions";
 
 type SessionsDashboardProps = {
   initialData: DashboardData;
-};
-
-type DemoSessionState = {
-  sessionId: string;
-  registeredCount: number;
-  currentUserStatus: string | null;
-  currentUserSlot: number | null;
 };
 
 export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
@@ -40,8 +40,10 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
     ),
   );
   const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
-  const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const [demoTimeOverride, setDemoTimeOverride] = useState<Date | null>(null);
+  const finalizedSessionIds = useRef(new Set<string>());
+  const isFinalizationPending = useRef(false);
+  const isScheduleRefreshPending = useRef(false);
   const [playedSessionIds, setPlayedSessionIds] = useState<Set<string>>(
     () =>
       new Set(
@@ -51,6 +53,7 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
       ),
   );
   const [errorMessage, setErrorMessage] = useState("");
+  const currentTime = useBrowserClock();
   const isDemo = initialData.mode === "demo";
   const sessionClockTime = demoTimeOverride ?? currentTime;
   const sessions =
@@ -62,12 +65,68 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
       : initialData.sessions;
 
   useEffect(() => {
-    const updateCurrentTime = () => setCurrentTime(new Date());
-    updateCurrentTime();
+    if (isDemo || !sessionClockTime) {
+      return;
+    }
 
-    const intervalId = setInterval(updateCurrentTime, 15_000);
-    return () => clearInterval(intervalId);
-  }, []);
+    const expectedDates = getUpcomingSchedule(sessionClockTime).sessions.map(
+      ({ date }) => date,
+    );
+    const hasScheduleChanged = expectedDates.some(
+      (date) => !sessions.some((session) => session.date === date),
+    );
+
+    if (!hasScheduleChanged) {
+      isScheduleRefreshPending.current = false;
+      return;
+    }
+    if (isScheduleRefreshPending.current) {
+      return;
+    }
+
+    isScheduleRefreshPending.current = true;
+    router.refresh();
+  }, [isDemo, router, sessionClockTime, sessions]);
+
+  useEffect(() => {
+    if (
+      isDemo ||
+      !initialData.user ||
+      !sessionClockTime ||
+      isFinalizationPending.current
+    ) {
+      return;
+    }
+
+    const dueSessions = sessions.filter(
+      (session) =>
+        session.status === "open" &&
+        sessionClockTime.getTime() >=
+          new Date(session.confirmationAt).getTime() &&
+        getSessionPeriod(session, sessionClockTime) !== "over" &&
+        !finalizedSessionIds.current.has(session.id),
+    );
+    if (dueSessions.length === 0) {
+      return;
+    }
+
+    dueSessions.forEach(({ id }) => finalizedSessionIds.current.add(id));
+    isFinalizationPending.current = true;
+
+    void finalizeDueSessions()
+      .then(() => {
+        setErrorMessage("");
+        router.refresh();
+      })
+      .catch((error: unknown) => {
+        dueSessions.forEach(({ id }) => finalizedSessionIds.current.delete(id));
+        console.error("Could not confirm due club sessions.", error);
+        setErrorMessage("We couldn’t confirm players for this session. Please try again.");
+      })
+      .finally(() => {
+        isFinalizationPending.current = false;
+      });
+  }, [initialData.user, isDemo, router, sessionClockTime, sessions]);
 
   async function changeSignup(session: ClubSession) {
     setErrorMessage("");
@@ -217,6 +276,10 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
                     sessionClockTime !== null &&
                     isSessionInProgress(session, sessionClockTime)
                   }
+                  isSessionOver={
+                    sessionClockTime !== null &&
+                    getSessionPeriod(session, sessionClockTime) === "over"
+                  }
                   signupWindowStatus={
                     sessionClockTime === null
                       ? "not-open"
@@ -231,7 +294,8 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
                     Boolean(initialData.user) &&
                     session.currentUserStatus === "selected" &&
                     !playedSessionIds.has(session.id) &&
-                    hasSessionEnded(session)
+                    sessionClockTime !== null &&
+                    getSessionPeriod(session, sessionClockTime) === "over"
                   }
                   hasBeenPlayed={playedSessionIds.has(session.id)}
                   onMarkPlayed={() => recordPlayedSession(session.id)}
@@ -254,76 +318,6 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
       </div>
     </main>
   );
-}
-
-function createDemoSessionState(
-  session: ClubSession,
-  index: number,
-): DemoSessionState {
-  const shouldPreviewCourt =
-    index === 0 &&
-    session.currentUserStatus === null &&
-    session.registeredCount < session.capacity;
-
-  return {
-    sessionId: session.id,
-    registeredCount: shouldPreviewCourt
-      ? session.registeredCount + 1
-      : session.registeredCount,
-    currentUserStatus: shouldPreviewCourt
-      ? "requested"
-      : session.currentUserStatus,
-    currentUserSlot: shouldPreviewCourt
-      ? null
-      : session.currentUserSlot,
-  };
-}
-
-function getDemoSessionStatus(session: ClubSession, currentTime: Date) {
-  const sessionEnd =
-    getSessionStartTimestamp(session) + session.durationMinutes * 60_000;
-
-  if (currentTime.getTime() >= sessionEnd) {
-    return "closed" as const;
-  }
-  if (currentTime.getTime() >= new Date(session.confirmationAt).getTime()) {
-    return "confirmed" as const;
-  }
-
-  return "open" as const;
-}
-
-function toggleDemoSignup(
-  currentSession: DemoSessionState,
-  session: ClubSession,
-): DemoSessionState {
-  const isWaitlisted =
-    currentSession.currentUserStatus?.toLowerCase().includes("waitlist") ??
-    false;
-  const isRegistered =
-    currentSession.currentUserStatus !== null && !isWaitlisted;
-
-  if (isRegistered || isWaitlisted) {
-    return {
-      ...currentSession,
-      registeredCount: isRegistered
-        ? Math.max(currentSession.registeredCount - 1, 0)
-        : currentSession.registeredCount,
-      currentUserStatus: null,
-      currentUserSlot: null,
-    };
-  }
-
-  const hasCapacity = currentSession.registeredCount < session.capacity;
-
-  return {
-    ...currentSession,
-    registeredCount: hasCapacity
-      ? currentSession.registeredCount + 1
-      : currentSession.registeredCount,
-    currentUserStatus: hasCapacity ? "requested" : "waitlisted",
-    currentUserSlot: null,
-  };
 }
 
 function parseLondonDateTimeInput(value: string) {

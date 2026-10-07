@@ -3,6 +3,7 @@ export { SessionsPage } from "./components/SessionsPage";
 export { SessionsSignIn } from "./components/SessionsSignIn";
 export {
   cancelSignupForSession,
+  finalizeDueSessions,
   getDashboardData,
   markSessionPlayed,
   signOutFromClub,

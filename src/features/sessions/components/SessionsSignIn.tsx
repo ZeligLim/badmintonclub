@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { ArrowRight, LoaderCircle } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 
@@ -37,9 +37,7 @@ export function SessionsSignIn() {
         return;
       }
 
-      setMessage(
-        "Supabase accepted the request. Delivery depends on this project’s email provider.",
-      );
+      setMessage("Sent");
     } catch (error) {
       console.error("Could not send the ATU sign-in link.", error);
       setErrorMessage("We couldn’t send a sign-in link. Please try again.");
@@ -57,36 +55,31 @@ export function SessionsSignIn() {
         Enter your @atu.ie email and we’ll send you a secure sign-in link.
       </p>
       <form
-        className="mt-7 flex max-w-md flex-col gap-4"
+        className="mt-7 flex max-w-md items-center gap-3"
         onSubmit={sendSignInLink}
       >
-        <label className="flex-1 text-xs font-medium text-muted-foreground">
-          Email address
+        <div className="min-w-0 flex-1">
           <input
+            aria-label="Email address"
             autoComplete="email"
-            className="mt-2 h-11 w-full rounded-lg bg-white px-3 text-base text-foreground outline-none transition-shadow placeholder:text-muted-foreground/70 focus-visible:ring-3 focus-visible:ring-ring/25"
+            className="h-11 w-full rounded-lg bg-white px-3 text-base text-foreground outline-none transition-shadow placeholder:text-muted-foreground/70 focus-visible:ring-3 focus-visible:ring-ring/25"
             onChange={(event) => setEmail(event.target.value)}
             placeholder="you@atu.ie"
             required
             inputMode="email"
-            type="text"
+            type="email"
             value={email}
           />
-        </label>
+        </div>
         <Button
-          className="h-11 self-start"
+          className="h-11 shrink-0 px-5"
           disabled={isSendingLink}
           type="submit"
         >
           {isSendingLink ? (
-            <>
-              <LoaderCircle aria-hidden="true" className="animate-spin" />
-              Sending
-            </>
+            <LoaderCircle aria-hidden="true" className="animate-spin" />
           ) : (
-            <>
-              Send sign-in link <ArrowRight aria-hidden="true" />
-            </>
+            "Send"
           )}
         </Button>
       </form>

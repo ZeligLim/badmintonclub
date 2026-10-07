@@ -1,3 +1,5 @@
+"use client";
+
 import { ArrowRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -36,7 +38,14 @@ export function SessionsHeader({ isDemo, displayName }: SessionsHeaderProps) {
           <span className="max-w-56 truncate text-sm text-muted-foreground">
             {displayName}
           </span>
-          <form action={signOutFromClub}>
+          <form
+            action={signOutFromClub}
+            onSubmit={(event) => {
+              if (!window.confirm("Are you sure you want to sign out?")) {
+                event.preventDefault();
+              }
+            }}
+          >
             <button
               className="rounded-sm px-2 py-1 text-sm font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               type="submit"
