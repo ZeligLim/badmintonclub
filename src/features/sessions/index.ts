@@ -1,6 +1,7 @@
 export { SessionsDashboard } from "./components/SessionsDashboard";
 export { SessionsPage } from "./components/SessionsPage";
 export { SessionsSignIn } from "./components/SessionsSignIn";
+export { SessionsAuthConfirm } from "./components/SessionsAuthConfirm";
 export {
   cancelSignupForSession,
   finalizeDueSessions,
