@@ -106,7 +106,7 @@ async function sendAuthEmails(
     const messages: MailjetEmail[] = [];
     if (emailData.token_hash_new) {
       messages.push(
-        createAuthEmail(
+        await createAuthEmail(
           apiUrl,
           emailData,
           user.email,
@@ -118,7 +118,7 @@ async function sendAuthEmails(
     }
     if (emailData.token_hash && user.new_email) {
       messages.push(
-        createAuthEmail(
+        await createAuthEmail(
           apiUrl,
           emailData,
           user.new_email,
@@ -140,7 +140,7 @@ async function sendAuthEmails(
 
   const results = await sendMailjetEmails(
     config,
-    [createAuthEmail(
+    [await createAuthEmail(
       apiUrl,
       emailData,
       user.email,
@@ -154,15 +154,16 @@ async function sendAuthEmails(
   }
 }
 
-function createAuthEmail(
+async function createAuthEmail(
   apiUrl: string,
   emailData: AuthEmailEvent["email_data"],
   to: string,
   token: string,
   tokenHash: string,
   subject: string,
-) {
+): Promise<MailjetEmail> {
   if (!token || !tokenHash) {
+    await logAuthEmailLinkDiagnostic(emailData, token, tokenHash);
     return {
       to,
       subject,
@@ -171,6 +172,7 @@ function createAuthEmail(
   }
 
   const verifyUrl = createVerificationUrl(apiUrl, emailData, tokenHash);
+  await logAuthEmailLinkDiagnostic(emailData, token, tokenHash, verifyUrl);
 
   return {
     to,
@@ -202,6 +204,58 @@ function createVerificationUrl(
     emailData.redirect_to || emailData.site_url,
   );
   return verificationUrl;
+}
+
+async function logAuthEmailLinkDiagnostic(
+  emailData: AuthEmailEvent["email_data"],
+  token: string,
+  tokenHash: string,
+  destination?: URL,
+): Promise<void> {
+  console.info("Auth email link diagnostic.", {
+    email_action_type: emailData.email_action_type,
+    token_exists: Boolean(token),
+    token_hash_exists: Boolean(tokenHash),
+    token_hash_length: tokenHash.length,
+    redirect_to: safeLogLocation(emailData.redirect_to),
+    site_url: safeLogLocation(emailData.site_url),
+    destination_pathname: destination?.pathname ?? null,
+    generated_type: destination?.searchParams.get("type") ?? null,
+    token_hash_fingerprint: tokenHash
+      ? await fingerprintTokenHash(tokenHash)
+      : null,
+  });
+}
+
+async function fingerprintTokenHash(tokenHash: string): Promise<string | null> {
+  try {
+    const digest = await crypto.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode(tokenHash),
+    );
+
+    return Array.from(new Uint8Array(digest), (byte) =>
+      byte.toString(16).padStart(2, "0"),
+    ).join("");
+  } catch (error) {
+    console.error("Could not fingerprint the Auth email token hash.", {
+      errorName: error instanceof Error ? error.name : "UnknownError",
+    });
+    return null;
+  }
+}
+
+function safeLogLocation(location: string): string {
+  if (!location) {
+    return "";
+  }
+
+  try {
+    const url = new URL(location);
+    return `${url.origin}${url.pathname}`;
+  } catch {
+    return "[invalid-url]";
+  }
 }
 
 function getMailjetConfig() {
