@@ -20,9 +20,8 @@ npm run db:reset
 
 Copy `.env.example` to `.env.local` to use the hosted club project. For a local
 Supabase instance, replace the public URL and publishable key with the values
-printed by `npx supabase status`. Set its service-role key for
-`SUPABASE_SERVICE_ROLE_KEY` and keep it server-side. This checkout's ignored
-development and production-local environment files also target the hosted project.
+printed by `npx supabase status`. This checkout's ignored development and
+production-local environment files also target the hosted project.
 
 ```bash
 npm run dev
@@ -50,9 +49,10 @@ project's Auth settings.
   browser's current time. Session dates and deadlines remain anchored to
   Europe/London.
 - When a signed-in member's open dashboard reaches a confirmation deadline, it
-  asks a server action to finalize due sessions in Supabase. The service-role
-  key is used only on the server. If no member has the dashboard open at the
-  deadline, finalization runs when a member next opens the app.
+  asks an authenticated Supabase function to finalize due sessions. The
+  database verifies the caller is an `@atu.ie` account and finalizes only
+  sessions whose deadlines have passed. If no member has the dashboard open at
+  the deadline, finalization runs when a member next opens the app.
 - Final selection prioritizes the oldest `last_played_at`, with never-played
   members first and signup time as the tie-breaker. Overflow is waitlisted.
 - Monday sessions have 2 courts and a 16-player capacity. Wednesday sessions
@@ -67,12 +67,12 @@ for Wednesday. The four-player allocation groups run from 1–4 on Monday and
 
 ## Database and deployment
 
-Database changes are versioned in `supabase/migrations/`. The current migrations
-have been applied to the hosted club project. Run
+Database changes are versioned in `supabase/migrations/`. Run
 `npm run db:reset` to reapply them locally and `npm run db:test` for the pgTAP
-security suite. The local Supabase Auth before-user-created hook and database
-trigger reject accounts outside `@atu.ie`. When configuring a hosted Supabase
-project, enable the **Before user created** Auth hook and select
+security suite. Push pending migrations to the linked hosted project with
+`npx supabase db push`. The local Supabase Auth before-user-created hook and
+database trigger reject accounts outside `@atu.ie`. When configuring a hosted
+Supabase project, enable the **Before user created** Auth hook and select
 `public.hook_restrict_club_email` to enforce the same signup rule there.
 
 For a hosted setup, create a Supabase project and a Vercel project, copy the
@@ -87,9 +87,6 @@ vercel login
 vercel link
 vercel deploy
 ```
-
-The service-role key is required by the server-side session finalization action.
-Never prefix it with `NEXT_PUBLIC_` or add it to browser code.
 
 Configure a custom SMTP provider in the hosted Supabase project's Auth settings
 before expecting magic links to reach club members. Supabase's default sender

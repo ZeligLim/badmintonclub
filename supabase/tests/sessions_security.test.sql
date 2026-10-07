@@ -1,6 +1,6 @@
 begin;
 
-select plan(45);
+select plan(46);
 
 select has_table('public', 'profiles', 'profiles table exists');
 select has_table('public', 'sessions', 'sessions table exists');
@@ -38,12 +38,12 @@ select ok(
   'authenticated users can prepare public session schedules'
 );
 select ok(
-  has_function_privilege('service_role', 'public.finalize_due_sessions()', 'execute'),
-  'service role can finalize due sessions'
+  not has_function_privilege('service_role', 'public.finalize_due_sessions()', 'execute'),
+  'service role does not need a direct finalization grant'
 );
 select ok(
-  not has_function_privilege('authenticated', 'public.finalize_due_sessions()', 'execute'),
-  'authenticated users cannot finalize sessions'
+  has_function_privilege('authenticated', 'public.finalize_due_sessions()', 'execute'),
+  'authenticated users can request due-session finalization'
 );
 select ok(
   not has_function_privilege('anon', 'public.finalize_due_sessions()', 'execute'),
@@ -330,10 +330,33 @@ cross join auth.users as auth_user
 where session.event_date = date_trunc('week', now() at time zone 'Europe/London')::date + 9
   and auth_user.id::text like '10000000-0000-4000-8000-%';
 
+set local role authenticated;
+select set_config(
+  'request.jwt.claim.sub',
+  '10000000-0000-4000-8000-000000000001',
+  true
+);
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"10000000-0000-4000-8000-000000000001","email":"outsider@example.test","role":"authenticated"}',
+  true
+);
+select throws_ok(
+  'select public.finalize_due_sessions()',
+  '28000',
+  'Only @atu.ie email addresses can finalize sessions.',
+  'the database rejects finalization requests from non-club accounts'
+);
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"10000000-0000-4000-8000-000000000001","email":"rally-test-1@atu.ie","role":"authenticated"}',
+  true
+);
 select lives_ok(
   'select public.finalize_due_sessions()',
-  'due sessions can be finalized'
+  'an authenticated club member can finalize due sessions'
 );
+reset role;
 
 select is(
   (
