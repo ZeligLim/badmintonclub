@@ -2,6 +2,7 @@ import "server-only";
 
 import { hasSupabaseConfig } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
+import { sendBookingConfirmationEmailBestEffort } from "./booking-confirmation-email";
 
 export async function finalizeDueSessions(): Promise<number> {
   const supabase = await requireAuthenticatedClient();
@@ -28,6 +29,8 @@ export async function joinConfirmedSession(sessionId: string): Promise<void> {
   if (error) {
     throw new Error(`Could not join this session: ${error.message}`);
   }
+
+  await sendBookingConfirmationEmailBestEffort(supabase, sessionId);
 }
 
 export async function cancelSignup(sessionId: string): Promise<void> {
