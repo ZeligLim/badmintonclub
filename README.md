@@ -4,9 +4,9 @@ A weekly badminton signup board for Monday and Wednesday evening sessions.
 Members request a place from Thursday. At midnight the day before each session,
 the club confirms players in order of who has gone longest without playing; members
 who have never checked in are first. Selected players are grouped into
-four-player court slots across the session. Each session has a configurable
-capacity, defaulting to 16. Membership and sign-in are limited to `@atu.ie`
-email addresses.
+four-player court slots across the session. Monday has 2 courts and 16 places;
+Wednesday has 4 courts and 32 places. Membership and sign-in are limited to
+`@atu.ie` email addresses.
 
 ## Local setup
 
@@ -55,11 +55,15 @@ project's Auth settings.
   deadline, finalization runs when a member next opens the app.
 - Final selection prioritizes the oldest `last_played_at`, with never-played
   members first and signup time as the tie-breaker. Overflow is waitlisted.
+- Monday sessions have 2 courts and a 16-player capacity. Wednesday sessions
+  have 4 courts and a 32-player capacity.
+- In `/dev`, the Testing controls set total sign-ups for each weekday from 0 to
+  64, including over-capacity counts for previewing waitlist states.
 - A selected member checks in after the session to update their play history.
 
-The initial capacity is 16 and the database accepts capacities of 4, 8, 12, or
-16. Change the session creation function and its capacity constraint together
-if the club needs different values.
+Session capacities are fixed by weekday in the database: 16 for Monday and 32
+for Wednesday. The four-player allocation groups run from 1–4 on Monday and
+1–8 on Wednesday.
 
 ## Database and deployment
 

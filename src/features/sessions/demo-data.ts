@@ -4,9 +4,21 @@ import {
   getUpcomingSchedule,
   londonDateTime,
 } from "@/lib/sessions/schedule";
-import type { ClubSession, DashboardData } from "./types";
+import type {
+  ClubSession,
+  DashboardData,
+  DemoSignupCounts,
+} from "./types";
 
-export function createDemoDashboardData(now = new Date()): DashboardData {
+export const DEFAULT_DEMO_SIGNUP_COUNTS: DemoSignupCounts = {
+  Monday: 12,
+  Wednesday: 8,
+};
+
+export function createDemoDashboardData(
+  now = new Date(),
+  signupCounts: DemoSignupCounts = DEFAULT_DEMO_SIGNUP_COUNTS,
+): DashboardData {
   const schedule = getUpcomingSchedule(now);
 
   return {
@@ -14,7 +26,7 @@ export function createDemoDashboardData(now = new Date()): DashboardData {
     user: null,
     sessions: schedule.sessions.map(({ date, signupOpensAt }) => {
       const dayName = getSessionDayName(date);
-      const registeredCount = dayName === "Monday" ? 11 : 8;
+      const registeredCount = signupCounts[dayName];
       return createDemoSession(date, dayName, signupOpensAt, registeredCount);
     }),
   };
@@ -29,25 +41,32 @@ function createDemoSession(
   const confirmationDate = new Date(`${date}T12:00:00Z`);
   confirmationDate.setUTCDate(confirmationDate.getUTCDate() - 1);
 
+  const capacity = dayName === "Monday" ? 16 : 32;
+  const playersPerSlot = 4;
+  const slotCount = capacity / playersPerSlot;
+  const durationMinutes = dayName === "Monday" ? 60 : 120;
+  const startsAt = dayName === "Monday" ? "18:00" : "20:00";
+
   return {
     id: `demo-${dayName.toLowerCase()}-${date}`,
     date,
     dayName,
-    startsAt: dayName === "Monday" ? "18:00" : "20:00",
-    durationMinutes: dayName === "Monday" ? 60 : 120,
-    capacity: 16,
+    startsAt,
+    durationMinutes,
+    courtCount: capacity / 8,
+    capacity,
     registeredCount,
-    playersPerSlot: 4,
+    playersPerSlot,
     signupOpensAt,
     confirmationAt: londonDateTime(confirmationDate, 0, 0),
     status: "open",
     currentUserStatus: null,
     currentUserSlot: null,
-    timeSlots: Array.from({ length: 4 }, (_, index) => ({
+    timeSlots: Array.from({ length: slotCount }, (_, index) => ({
       number: index + 1,
       startAt: addMinutesToTime(
-        dayName === "Monday" ? "18:00" : "20:00",
-        index * (dayName === "Monday" ? 15 : 30),
+        startsAt,
+        index * (durationMinutes / slotCount),
       ),
       players: [],
     })),

@@ -9,9 +9,13 @@ import {
   signUpForSession,
 } from "@/features/sessions";
 import { getUpcomingSchedule, londonDateTime } from "@/lib/sessions/schedule";
-import { createDemoDashboardData } from "../demo-data";
+import {
+  createDemoDashboardData,
+  DEFAULT_DEMO_SIGNUP_COUNTS,
+} from "../demo-data";
 import {
   createDemoSessionState,
+  getDemoSignupState,
   getDemoSessionStatus,
   toggleDemoSignup,
   type DemoSessionState,
@@ -26,7 +30,12 @@ import { useBrowserClock } from "../use-browser-clock";
 import { SessionsHeader } from "./SessionsHeader";
 import { SessionCard } from "./SessionCard";
 import { DemoClock } from "./DemoClock";
-import type { ClubSession, DashboardData } from "@/features/sessions";
+import { DemoSignupCountsControl } from "./DemoSignupCountsControl";
+import type {
+  ClubSession,
+  DashboardData,
+  DemoSignupCounts,
+} from "@/features/sessions";
 
 type SessionsDashboardProps = {
   initialData: DashboardData;
@@ -41,6 +50,9 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
   );
   const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
   const [demoTimeOverride, setDemoTimeOverride] = useState<Date | null>(null);
+  const [demoSignupCounts, setDemoSignupCounts] = useState<DemoSignupCounts>(
+    DEFAULT_DEMO_SIGNUP_COUNTS,
+  );
   const finalizedSessionIds = useRef(new Set<string>());
   const isFinalizationPending = useRef(false);
   const isScheduleRefreshPending = useRef(false);
@@ -58,10 +70,12 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
   const sessionClockTime = demoTimeOverride ?? currentTime;
   const sessions =
     isDemo && sessionClockTime
-      ? createDemoDashboardData(sessionClockTime).sessions.map((session) => ({
-          ...session,
-          status: getDemoSessionStatus(session, sessionClockTime),
-        }))
+      ? createDemoDashboardData(sessionClockTime, demoSignupCounts).sessions.map(
+          (session) => ({
+            ...session,
+            status: getDemoSessionStatus(session, sessionClockTime),
+          }),
+        )
       : initialData.sessions;
 
   useEffect(() => {
@@ -168,57 +182,75 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
   }
 
   function updateDemoSession(session: ClubSession) {
-    setDemoSessions((currentSessions) => {
-      const currentSession =
-        currentSessions.find(({ sessionId }) => sessionId === session.id) ??
-        createDemoSessionState(session, -1);
-      const updatedSession = toggleDemoSignup(currentSession, session);
-      const hasSessionState = currentSessions.some(
-        ({ sessionId }) => sessionId === session.id,
-      );
+    const storedSession =
+      demoSessions.find(({ sessionId }) => sessionId === session.id) ??
+      createDemoSessionState(session, -1);
+    const updatedSession = toggleDemoSignup(
+      {
+        ...storedSession,
+        registeredCount: demoSignupCounts[session.dayName],
+      },
+      session,
+    );
+    const hasSessionState = demoSessions.some(
+      ({ sessionId }) => sessionId === session.id,
+    );
 
-      return hasSessionState
-        ? currentSessions.map((storedSession) =>
-            storedSession.sessionId === session.id
+    setDemoSessions(
+      hasSessionState
+        ? demoSessions.map((currentSession) =>
+            currentSession.sessionId === session.id
               ? updatedSession
-              : storedSession,
+              : currentSession,
           )
-        : [...currentSessions, updatedSession];
-    });
+        : [...demoSessions, updatedSession],
+    );
+    setDemoSignupCounts((currentCounts) => ({
+      ...currentCounts,
+      [session.dayName]: updatedSession.registeredCount,
+    }));
   }
 
   function getSignupState(session: ClubSession) {
-    const signupState = isDemo
-      ? demoSessions.find(
-          (demoSession) => demoSession.sessionId === session.id,
-        ) ?? {
-          registeredCount: session.registeredCount,
-          currentUserStatus: session.currentUserStatus,
-          currentUserSlot: session.currentUserSlot,
-        }
-      : {
-          registeredCount: session.registeredCount,
-          currentUserStatus: session.currentUserStatus,
-          currentUserSlot: session.currentUserSlot,
-        };
-
-    if (
-      isDemo &&
-      session.status !== "open" &&
-      signupState.currentUserStatus === "requested"
-    ) {
-      return {
-        ...signupState,
-        currentUserStatus:
-          signupState.registeredCount <= session.capacity
-            ? "selected"
-            : "waitlisted",
-        currentUserSlot:
-          signupState.registeredCount <= session.capacity ? 1 : null,
-      };
+    if (isDemo) {
+      const storedState = demoSessions.find(
+        (demoSession) => demoSession.sessionId === session.id,
+      );
+      return getDemoSignupState(
+        session,
+        storedState,
+        demoSignupCounts[session.dayName],
+      );
     }
 
-    return signupState;
+    return {
+      registeredCount: session.registeredCount,
+      currentUserStatus: session.currentUserStatus,
+      currentUserSlot: session.currentUserSlot,
+    };
+  }
+
+  function changeDemoSignupCount(
+    dayName: keyof DemoSignupCounts,
+    count: number,
+  ) {
+    setDemoSignupCounts((currentCounts) => ({
+      ...currentCounts,
+      [dayName]: count,
+    }));
+    setDemoSessions((currentSessions) =>
+      currentSessions.map((demoSession) =>
+        demoSession.dayName === dayName
+          ? {
+              ...demoSession,
+              registeredCount: count,
+              currentUserStatus:
+                count === 0 ? null : demoSession.currentUserStatus,
+              currentUserSlot: count === 0 ? null : demoSession.currentUserSlot,
+            }
+          : demoSession,
+      ),
+    );
   }
 
   function changeDemoTime(value: string) {
@@ -255,6 +287,12 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
                 ? formatLondonDateTimeInput(sessionClockTime)
                 : ""
             }
+          />
+        )}
+        {isDemo && (
+          <DemoSignupCountsControl
+            onChange={changeDemoSignupCount}
+            value={demoSignupCounts}
           />
         )}
 

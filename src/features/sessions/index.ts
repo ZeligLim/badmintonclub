@@ -9,4 +9,4 @@ export {
   signOutFromClub,
   signUpForSession,
 } from "./api";
-export type { ClubSession, DashboardData } from "./types";
+export type { ClubSession, DashboardData, DemoSignupCounts } from "./types";

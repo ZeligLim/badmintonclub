@@ -3,6 +3,7 @@ import type { ClubSession } from "./types";
 
 export type DemoSessionState = {
   sessionId: string;
+  dayName: ClubSession["dayName"];
   registeredCount: number;
   currentUserStatus: string | null;
   currentUserSlot: number | null;
@@ -19,9 +20,8 @@ export function createDemoSessionState(
 
   return {
     sessionId: session.id,
-    registeredCount: shouldPreviewCourt
-      ? session.registeredCount + 1
-      : session.registeredCount,
+    dayName: session.dayName,
+    registeredCount: session.registeredCount,
     currentUserStatus: shouldPreviewCourt
       ? "requested"
       : session.currentUserStatus,
@@ -43,6 +43,40 @@ export function getDemoSessionStatus(
   }
 
   return "open" as const;
+}
+
+export function getDemoSignupState(
+  session: ClubSession,
+  storedState: DemoSessionState | undefined,
+  registeredCount: number,
+) {
+  const currentUserStatus =
+    storedState?.currentUserStatus ?? session.currentUserStatus;
+  const currentUserSlot = storedState?.currentUserSlot ?? session.currentUserSlot;
+
+  if (session.status === "open") {
+    return { registeredCount, currentUserStatus, currentUserSlot };
+  }
+
+  const confirmedCount = Math.min(registeredCount, session.capacity);
+  const isSelected =
+    currentUserStatus === "requested" && registeredCount <= session.capacity;
+
+  return {
+    registeredCount: confirmedCount,
+    currentUserStatus:
+      currentUserStatus === "requested"
+        ? isSelected
+          ? "selected"
+          : "waitlisted"
+        : currentUserStatus,
+    currentUserSlot:
+      currentUserStatus === "requested"
+        ? isSelected
+          ? 1
+          : null
+        : currentUserSlot,
+  };
 }
 
 export function toggleDemoSignup(

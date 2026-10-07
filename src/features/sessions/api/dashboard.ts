@@ -143,6 +143,7 @@ function mapSession(row: DashboardSessionRow, rosterRows: RosterRow[]): ClubSess
     dayName,
     startsAt: row.starts_at,
     durationMinutes: row.duration_minutes,
+    courtCount: row.capacity / 8,
     capacity: row.capacity,
     registeredCount: row.registered_count,
     playersPerSlot: 4,

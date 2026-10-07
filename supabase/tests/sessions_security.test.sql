@@ -1,6 +1,6 @@
 begin;
 
-select plan(39);
+select plan(45);
 
 select has_table('public', 'profiles', 'profiles table exists');
 select has_table('public', 'sessions', 'sessions table exists');
@@ -134,6 +134,20 @@ select is(
   'Wednesday sessions last two hours'
 );
 select is(
+  (select capacity
+   from public.sessions
+   where event_date = date_trunc('week', now() at time zone 'Europe/London')::date),
+  16::smallint,
+  'Monday sessions have a capacity of 16'
+);
+select is(
+  (select capacity
+   from public.sessions
+   where event_date = date_trunc('week', now() at time zone 'Europe/London')::date + 2),
+  32::smallint,
+  'Wednesday sessions have a capacity of 32'
+);
+select is(
   (select confirmation_at
    from public.sessions
    where event_date = date_trunc('week', now() at time zone 'Europe/London')::date),
@@ -170,7 +184,7 @@ with generated_players as (
   select
     ('10000000-0000-4000-8000-' || lpad(player_number::text, 12, '0'))::uuid as id,
     player_number
-  from generate_series(1, 18) as player(player_number)
+  from generate_series(1, 34) as player(player_number)
 )
 insert into auth.users (
   id,
@@ -280,7 +294,7 @@ reset role;
 
 select is(
   (select count(*) from public.profiles where id::text like '10000000-0000-4000-8000-%'),
-  18::bigint,
+  34::bigint,
   'auth sign-up creates a profile for every player'
 );
 
@@ -301,6 +315,19 @@ select session.id, auth_user.id, 'requested'
 from public.sessions as session
 cross join auth.users as auth_user
 where session.event_date = date_trunc('week', now() at time zone 'Europe/London')::date + 7
+  and auth_user.id::text like '10000000-0000-4000-8000-%';
+
+update public.sessions
+set
+  signup_opens_at = now() - interval '1 day',
+  confirmation_at = now() - interval '1 minute'
+where event_date = date_trunc('week', now() at time zone 'Europe/London')::date + 9;
+
+insert into public.session_signups (session_id, user_id, status)
+select session.id, auth_user.id, 'requested'
+from public.sessions as session
+cross join auth.users as auth_user
+where session.event_date = date_trunc('week', now() at time zone 'Europe/London')::date + 9
   and auth_user.id::text like '10000000-0000-4000-8000-%';
 
 select lives_ok(
@@ -327,7 +354,7 @@ select is(
     where session.event_date = date_trunc('week', now() at time zone 'Europe/London')::date + 7
       and signup.status = 'waitlisted'
   ),
-  2::bigint,
+  18::bigint,
   'players over capacity are waitlisted'
 );
 select is(
@@ -362,6 +389,50 @@ select is(
   ),
   'waitlisted',
   'the more recently played player is lower in selection priority'
+);
+select is(
+  (
+    select count(*)
+    from public.session_signups as signup
+    join public.sessions as session on session.id = signup.session_id
+    where session.event_date = date_trunc('week', now() at time zone 'Europe/London')::date + 9
+      and signup.status = 'selected'
+  ),
+  32::bigint,
+  'Wednesday selection fills all 32 available places'
+);
+select is(
+  (
+    select count(*)
+    from public.session_signups as signup
+    join public.sessions as session on session.id = signup.session_id
+    where session.event_date = date_trunc('week', now() at time zone 'Europe/London')::date + 9
+      and signup.status = 'waitlisted'
+  ),
+  2::bigint,
+  'Wednesday players beyond 32 places are waitlisted'
+);
+select is(
+  (
+    select signup.slot_number
+    from public.session_signups as signup
+    join public.sessions as session on session.id = signup.session_id
+    where session.event_date = date_trunc('week', now() at time zone 'Europe/London')::date + 9
+      and signup.user_id = '10000000-0000-4000-8000-000000000032'
+  ),
+  8::smallint,
+  'the 32nd selected player is assigned to the eighth four-player group'
+);
+select is(
+  (
+    select signup.status
+    from public.session_signups as signup
+    join public.sessions as session on session.id = signup.session_id
+    where session.event_date = date_trunc('week', now() at time zone 'Europe/London')::date + 9
+      and signup.user_id = '10000000-0000-4000-8000-000000000033'
+  ),
+  'waitlisted',
+  'the 33rd-priority Wednesday player is waitlisted'
 );
 
 select * from finish();

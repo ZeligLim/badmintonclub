@@ -24,6 +24,7 @@ export type ClubSession = {
   dayName: "Monday" | "Wednesday";
   startsAt: string;
   durationMinutes: number;
+  courtCount: number;
   capacity: number;
   registeredCount: number;
   playersPerSlot: number;
@@ -33,6 +34,11 @@ export type ClubSession = {
   currentUserStatus: Exclude<SessionSignupStatus, "cancelled"> | null;
   currentUserSlot: number | null;
   timeSlots: SessionTimeSlot[];
+};
+
+export type DemoSignupCounts = {
+  Monday: number;
+  Wednesday: number;
 };
 
 export type DashboardData = {

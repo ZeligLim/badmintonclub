@@ -11,7 +11,6 @@ import Link from "next/link";
 import { addMinutesToTime } from "@/lib/sessions/schedule";
 import { SessionSignupStatus } from "./SessionSignupStatus";
 
-const COURT_COUNT = 4;
 const GAME_DURATION_MINUTES = 15;
 
 type SessionSignupState = {
@@ -60,12 +59,15 @@ export function SessionCard({
   const isPlayed = signupStatus === "played";
   const isSignedUp = signupStatus.length > 0 && !isPlayed;
   const isDemoSignupConfirmed = isDemo && signupStatus === "selected";
+  const maximumSlotNumber = Math.ceil(
+    session.capacity / session.playersPerSlot,
+  );
   const currentUserCourt =
     signupStatus === "selected" &&
     signupState.currentUserSlot !== null &&
     signupState.currentUserSlot >= 1 &&
-    signupState.currentUserSlot <= COURT_COUNT
-      ? signupState.currentUserSlot
+    signupState.currentUserSlot <= maximumSlotNumber
+      ? ((signupState.currentUserSlot - 1) % session.courtCount) + 1
       : null;
   const playerGameSchedule =
     currentUserCourt === null
@@ -106,7 +108,8 @@ export function SessionCard({
                   </span>
                 </h3>
                 <p className="text-sm font-medium text-muted-foreground">
-                  {session.dayName}, {formatSessionDate(session.date)}
+                  {session.dayName}, {formatSessionDate(session.date)} ·{" "}
+                  {session.courtCount} courts
                 </p>
               </div>
             </div>
@@ -294,7 +297,7 @@ function createPlayerGameSchedule(session: ClubSession, startingCourt: number) {
       session.durationMinutes,
     );
     const courtNumber =
-      ((startingCourt + gameIndex - 1) % COURT_COUNT) + 1;
+      ((startingCourt + gameIndex - 1) % session.courtCount) + 1;
 
     return {
       courtNumber,
