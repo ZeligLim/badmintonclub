@@ -5,6 +5,7 @@ export {
   cancelSignupForSession,
   finalizeDueSessions,
   getDashboardData,
+  joinConfirmedSessionFcfs,
   markSessionPlayed,
   signOutFromClub,
   signUpForSession,

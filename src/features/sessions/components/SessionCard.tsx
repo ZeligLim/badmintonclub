@@ -75,11 +75,14 @@ export function SessionCard({
         playerGroupCount,
       )
     : [];
+  const hasFcfsSpace =
+    session.status === "confirmed" &&
+    signupState.registeredCount < session.capacity;
   const actionLabel = isWaitlisted
     ? "Leave waitlist"
     : isSignedUp
       ? "Cancel place"
-      : signupWindowStatus === "not-open"
+      : signupWindowStatus === "not-open" && !hasFcfsSpace
         ? "Sign-ups not open"
         : "Join session";
 
@@ -147,18 +150,28 @@ export function SessionCard({
 
               <div className="mt-3 flex items-start gap-2 text-xs leading-5 text-muted-foreground">
                 <Clock3 aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
-                <p>
-                  Sign-ups close {formatRuleDateTime(session.confirmationAt)}
-                  <span className="hidden sm:inline"> · </span>
-                  <span className="block sm:inline">
-                    final players and slots confirmed then
-                  </span>
-                </p>
+                {hasFcfsSpace ? (
+                  <p>
+                    Session confirmed · spaces still available on a{" "}
+                    <span className="font-medium text-foreground">first-come, first-served</span>{" "}
+                    basis
+                  </p>
+                ) : (
+                  <p>
+                    Sign-ups close {formatRuleDateTime(session.confirmationAt)}
+                    <span className="hidden sm:inline"> · </span>
+                    <span className="block sm:inline">
+                      final players and slots confirmed then
+                    </span>
+                  </p>
+                )}
               </div>
-              <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                Everyone can sign up. When places are limited, players who have
-                waited longest since playing are prioritized.
-              </p>
+              {!hasFcfsSpace && (
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                  Everyone can sign up. When places are limited, players who have
+                  waited longest since playing are prioritized.
+                </p>
+              )}
             </>
           )}
 
@@ -203,26 +216,18 @@ export function SessionCard({
                   >
                     Sign in to join
                   </Link>
-                ) : (
-                  <span className="text-[0.68rem] text-muted-foreground">
-                    {isPlayed
-                      ? "Attendance recorded"
-                      : isSignedUp
-                        ? "Your session"
-                        : null}
-                  </span>
-                )}
+                ) : null}
               </>
             )}
             {!isPlayed &&
               !isSessionOver &&
-              session.status === "open" &&
-              signupWindowStatus !== "closed" && (
+              (session.status === "open" || hasFcfsSpace) &&
+              (session.status === "open" ? signupWindowStatus !== "closed" : true) && (
               <Button
                 className="h-auto min-h-10 py-2.5"
                 disabled={
                   isPending ||
-                  (!isSignedUp && signupWindowStatus !== "open") ||
+                  (session.status === "open" && !isSignedUp && signupWindowStatus !== "open") ||
                   (!isDemo && !isSignedIn)
                 }
                 onClick={handleSignupClick}

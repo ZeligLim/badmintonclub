@@ -8,6 +8,7 @@ import {
   cancelSignup,
   signOut,
   signUp,
+  joinConfirmedSession as joinConfirmed,
 } from "./actions";
 import { loadDashboardData } from "./dashboard";
 import type { DashboardData } from "../types";
@@ -22,6 +23,10 @@ export async function finalizeDueSessions(): Promise<number> {
 
 export async function signUpForSession(sessionId: string): Promise<void> {
   await signUp(sessionId);
+}
+
+export async function joinConfirmedSessionFcfs(sessionId: string): Promise<void> {
+  await joinConfirmed(sessionId);
 }
 
 export async function cancelSignupForSession(sessionId: string): Promise<void> {
