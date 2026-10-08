@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { Switch } from "@/components/ui/switch";
 import { updateSessionAvailability } from "./session-actions";
 
 type SessionAvailabilityToggleProps = {
@@ -20,7 +21,11 @@ export function SessionAvailabilityToggle({
   const [errorMessage, setErrorMessage] = useState("");
   const [isPending, startTransition] = useTransition();
 
-  function toggleAvailability() {
+  function toggleAvailability(nextIsHappening: boolean) {
+    if (nextIsHappening === isHappening) {
+      return;
+    }
+
     if (
       isHappening &&
       !window.confirm(
@@ -33,8 +38,8 @@ export function SessionAvailabilityToggle({
     setErrorMessage("");
     startTransition(async () => {
       try {
-        await updateSessionAvailability(sessionId, !isHappening);
-        setIsHappening((current) => !current);
+        await updateSessionAvailability(sessionId, nextIsHappening);
+        setIsHappening(nextIsHappening);
         router.refresh();
       } catch (error) {
         console.error("Could not update session availability.", error);
@@ -49,38 +54,29 @@ export function SessionAvailabilityToggle({
 
   return (
     <div className="flex flex-col items-start gap-1">
-      <button
-        aria-checked={isHappening}
-        aria-label={isHappening ? "Mark session not happening" : "Reopen session"}
-        className="inline-flex min-h-9 items-center gap-2 rounded-full border border-border px-3 text-xs font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-        disabled={isPending}
-        onClick={toggleAvailability}
-        role="switch"
-        type="button"
-      >
-        <span
-          aria-hidden="true"
-          className={`relative h-5 w-9 rounded-full transition-colors ${
-            isHappening ? "bg-primary" : "bg-muted-foreground"
-          }`}
+      <div className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-border bg-card px-3">
+        <Switch
+          checked={isHappening}
+          disabled={isPending}
+          id={`session-happening-${sessionId}`}
+          onCheckedChange={toggleAvailability}
+        />
+        <label
+          className="cursor-pointer whitespace-nowrap text-xs font-medium"
+          htmlFor={`session-happening-${sessionId}`}
         >
-          <span
-            className={`absolute top-0.5 size-4 rounded-full bg-white transition-transform ${
-              isHappening ? "translate-x-4" : "translate-x-0.5"
-            }`}
-          />
-        </span>
-        {isPending
-          ? "Updating…"
-          : isHappening
-            ? "Happening"
-            : "Not happening"}
-      </button>
-      {errorMessage && (
+          {isPending
+            ? "Updating…"
+            : isHappening
+              ? "Happening"
+              : "Not happening"}
+        </label>
+      </div>
+      {errorMessage ? (
         <p className="max-w-xs text-xs text-destructive" role="alert">
           {errorMessage}
         </p>
-      )}
+      ) : null}
     </div>
   );
 }
