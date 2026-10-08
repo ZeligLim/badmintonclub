@@ -190,40 +190,44 @@ export function SessionsHeader({
                   <Pencil aria-hidden="true" className="size-4" />
                 </button>
               )}
-              <label className="sr-only" htmlFor="player-level">
-                Playing level
-              </label>
-              <select
-                className="h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-xs sm:w-auto sm:flex-none sm:px-3 sm:text-sm"
-                disabled={isUpdatingLevel}
-                id="player-level"
-                onChange={(event) => changePlayerLevel(event.target.value)}
-                value={playerLevel}
-              >
-                <option value="BEGINNER">Beginner</option>
-                <option value="INTERMEDIATE">Intermediate</option>
-                <option disabled value="PROFESSIONAL">
-                  Professional
-                </option>
-              </select>
-              <form
-                action={signOutFromClub}
-                className="shrink-0"
-                onSubmit={(event) => {
-                  if (!window.confirm("Are you sure you want to sign out?")) {
-                    event.preventDefault();
-                  }
-                }}
-              >
-                <button
-                  aria-label="Sign out"
-                  className="inline-flex size-10 items-center justify-center rounded-md border border-border bg-background text-sm font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  title="Sign out"
-                  type="submit"
-                >
-                  <LogOut aria-hidden="true" className="size-4" />
-                </button>
-              </form>
+              {!isEditingName && (
+                <>
+                  <label className="sr-only" htmlFor="player-level">
+                    Playing level
+                  </label>
+                  <select
+                    className="h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-xs sm:w-auto sm:flex-none sm:px-3 sm:text-sm"
+                    disabled={isUpdatingLevel}
+                    id="player-level"
+                    onChange={(event) => changePlayerLevel(event.target.value)}
+                    value={playerLevel}
+                  >
+                    <option value="BEGINNER">Beginner</option>
+                    <option value="INTERMEDIATE">Intermediate</option>
+                    <option disabled value="PROFESSIONAL">
+                      Professional
+                    </option>
+                  </select>
+                  <form
+                    action={signOutFromClub}
+                    className="shrink-0"
+                    onSubmit={(event) => {
+                      if (!window.confirm("Are you sure you want to sign out?")) {
+                        event.preventDefault();
+                      }
+                    }}
+                  >
+                    <button
+                      aria-label="Sign out"
+                      className="inline-flex size-10 items-center justify-center rounded-md border border-border bg-background text-sm font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      title="Sign out"
+                      type="submit"
+                    >
+                      <LogOut aria-hidden="true" className="size-4" />
+                    </button>
+                  </form>
+                </>
+              )}
             </div>
 
             <div className="mt-2 flex min-w-0 items-center gap-2">
