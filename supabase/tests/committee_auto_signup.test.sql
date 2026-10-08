@@ -199,9 +199,63 @@ select set_config(
 );
 select lives_ok(
   $$select public.set_my_committee_auto_signup(true)$$,
-  'a cancelled member can enable automatic signup without restoring that session'
+  'explicitly enabling auto-signup reactivates a cancelled signup for an upcoming open session'
 );
 reset role;
+select is(
+  (
+    select status
+    from public.session_signups
+    where session_id = '32000000-0000-4000-8000-000000000001'
+      and user_id = '22000000-0000-4000-8000-000000000005'
+  ),
+  'requested',
+  'explicit opt-in restores the cancelled signup as an ordinary request'
+);
+select ok(
+  exists (
+    select 1
+    from private.committee_auto_signups
+    where session_id = '32000000-0000-4000-8000-000000000001'
+      and user_id = '22000000-0000-4000-8000-000000000005'
+  ),
+  'a reactivated signup is tracked as automatic'
+);
+set local role authenticated;
+select set_config(
+  'request.jwt.claim.sub',
+  '22000000-0000-4000-8000-000000000005',
+  true
+);
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"22000000-0000-4000-8000-000000000005","email":"committee-auto-5@atu.ie","role":"authenticated"}',
+  true
+);
+select lives_ok(
+  $$select public.cancel_session_signup(
+    '32000000-0000-4000-8000-000000000001'
+  )$$,
+  'a member can cancel again after explicitly opting in'
+);
+reset role;
+select lives_ok(
+  $$select private.auto_signup_committee_members(
+    '32000000-0000-4000-8000-000000000001',
+    true
+  )$$,
+  'routine automatic signup does not undo a cancellation made after opt-in'
+);
+select is(
+  (
+    select status
+    from public.session_signups
+    where session_id = '32000000-0000-4000-8000-000000000001'
+      and user_id = '22000000-0000-4000-8000-000000000005'
+  ),
+  'cancelled',
+  'a manually cancelled signup stays cancelled until the member opts in again'
+);
 
 set local role authenticated;
 select set_config(
@@ -322,6 +376,25 @@ select lives_ok(
   )$$,
   'a committee member can cancel an automatic signup'
 );
+reset role;
+select lives_ok(
+  $$select private.auto_signup_committee_members(
+    '32000000-0000-4000-8000-000000000002',
+    true
+  )$$,
+  'routine automatic signup processing leaves a manually cancelled signup alone'
+);
+select is(
+  (
+    select status
+    from public.session_signups
+    where session_id = '32000000-0000-4000-8000-000000000002'
+      and user_id = '22000000-0000-4000-8000-000000000014'
+  ),
+  'cancelled',
+  'a cancellation is not immediately reversed while auto-signup remains enabled'
+);
+set local role authenticated;
 select lives_ok(
   $$select public.request_session_signup(
     '32000000-0000-4000-8000-000000000002',
@@ -361,7 +434,7 @@ select is(
       )
   ),
   2::bigint,
-  'manual signups are retained and a cancelled signup is not restored'
+  'manual signups and cancellations after explicit opt-in are retained'
 );
 
 select is(
