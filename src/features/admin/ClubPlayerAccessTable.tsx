@@ -1,5 +1,6 @@
 import type { AdminClubPlayer } from "./data";
 import { updateClubPlayerAccess } from "./player-actions";
+import { ProfessionalChoiceToggle } from "./ProfessionalChoiceToggle";
 
 type ClubPlayerAccessTableProps = {
   players: AdminClubPlayer[];
@@ -10,8 +11,7 @@ export function ClubPlayerAccessTable({ players }: ClubPlayerAccessTableProps) {
     <section className="mb-10">
       <h2 className="mb-1 text-base font-semibold">Player levels and committee</h2>
       <p className="mb-4 text-sm text-muted-foreground">
-        Beginner and Intermediate are available to members. Professional is
-        invite-only and can only be assigned here by an administrator.
+        Enable Professional choice for members who may select it in their profile.
       </p>
       <div className="overflow-x-auto rounded-xl border border-border">
         <table className="w-full text-sm">
@@ -25,6 +25,9 @@ export function ClubPlayerAccessTable({ players }: ClubPlayerAccessTableProps) {
               </th>
               <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
                 Committee
+              </th>
+              <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                Professional choice
               </th>
               <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
                 Action
@@ -48,8 +51,16 @@ export function ClubPlayerAccessTable({ players }: ClubPlayerAccessTableProps) {
                     >
                       <option value="BEGINNER">Beginner</option>
                       <option value="INTERMEDIATE">Intermediate</option>
-                      <option value="PROFESSIONAL">Professional · invite-only</option>
+                      <option value="PROFESSIONAL">Professional · enables choice</option>
                     </select>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <ProfessionalChoiceToggle
+                      canChooseProfessional={player.canChooseProfessional}
+                      displayName={player.displayName}
+                      isProfessional={player.playerLevel === "PROFESSIONAL"}
+                      userId={player.userId}
+                    />
                   </td>
                   <td className="px-4 py-2.5">
                     <select

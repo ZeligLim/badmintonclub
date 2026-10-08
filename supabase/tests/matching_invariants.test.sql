@@ -401,7 +401,7 @@ select throws_ok(
 select throws_ok(
   $$select public.update_my_player_level('PROFESSIONAL')$$,
   '22023',
-  'Professional level is assigned by a club administrator.',
+  'Professional level is not available for this member.',
   'the server prevents members from selecting Professional level'
 );
 

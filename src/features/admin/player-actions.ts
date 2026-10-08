@@ -37,3 +37,32 @@ export async function updateClubPlayerAccess(formData: FormData): Promise<void> 
   revalidatePath("/admin");
   revalidatePath("/");
 }
+
+export async function updateProfessionalChoice(
+  userId: string,
+  enabled: boolean,
+): Promise<void> {
+  if (!(await requireAdminUser())) {
+    throw new Error("Only a club administrator can change Professional level access.");
+  }
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      userId,
+    ) ||
+    typeof enabled !== "boolean"
+  ) {
+    throw new Error("The Professional level access request is invalid.");
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_set_professional_choice", {
+    p_user_id: userId,
+    p_enabled: enabled,
+  });
+  if (error) {
+    throw new Error(`Could not update Professional level access: ${error.message}`);
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/");
+}

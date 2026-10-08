@@ -41,6 +41,7 @@ export type AdminClubPlayer = {
   displayName: string;
   playerLevel: PlayerLevel;
   isCommittee: boolean;
+  canChooseProfessional: boolean;
 };
 
 export async function requireAdminUser() {
@@ -91,6 +92,7 @@ export async function loadClubPlayers(): Promise<AdminClubPlayer[]> {
     displayName: player.display_name,
     playerLevel: parsePlayerLevel(player.player_level),
     isCommittee: player.is_committee,
+    canChooseProfessional: player.can_choose_professional,
   }));
 }
 

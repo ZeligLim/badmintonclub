@@ -302,6 +302,9 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
               ? demoPlayerLevel
               : initialData.user?.playerLevel ?? "INTERMEDIATE"
           }
+          canChooseProfessional={
+            !isDemo && (initialData.user?.canChooseProfessional ?? false)
+          }
           onDemoPlayerLevelChange={setDemoPlayerLevel}
         />
         <h1 className="sr-only">ATU Galway Badminton Club</h1>

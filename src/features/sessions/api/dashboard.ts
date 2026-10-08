@@ -73,6 +73,7 @@ export async function loadDashboardData(): Promise<DashboardData> {
             user.email?.split("@")[0] ??
             "Player",
           playerLevel: parsePlayerLevel(profile?.player_level ?? "INTERMEDIATE"),
+          canChooseProfessional: profile?.can_choose_professional ?? false,
           isCommittee: profile?.is_committee ?? false,
           isCommitteeAdmin: profile?.is_committee_admin ?? false,
           committeeAutoSignup: profile?.committee_auto_signup ?? false,
@@ -91,7 +92,7 @@ async function getProfile(
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "display_name, player_level, is_committee, is_committee_admin, committee_auto_signup",
+      "display_name, player_level, can_choose_professional, is_committee, is_committee_admin, committee_auto_signup",
     )
     .eq("id", userId)
     .maybeSingle();

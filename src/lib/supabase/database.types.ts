@@ -35,14 +35,14 @@ export type Database = {
           Tables: {
             "profiles": {
                   Row: {
-                    "committee_auto_signup": boolean,"created_at": string,"display_name": string,"id": string,"is_committee": boolean,"is_committee_admin": boolean,"last_played_at": string | null,"player_level": string
+                    "can_choose_professional": boolean,"committee_auto_signup": boolean,"created_at": string,"display_name": string,"id": string,"is_committee": boolean,"is_committee_admin": boolean,"last_played_at": string | null,"player_level": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "committee_auto_signup"?: boolean,"created_at"?: string,"display_name": string,"id": string,"is_committee"?: boolean,"is_committee_admin"?: boolean,"last_played_at"?: string | null,"player_level"?: string
+                    "can_choose_professional"?: boolean,"committee_auto_signup"?: boolean,"created_at"?: string,"display_name": string,"id": string,"is_committee"?: boolean,"is_committee_admin"?: boolean,"last_played_at"?: string | null,"player_level"?: string
                   }
                   Update: {
-                    "committee_auto_signup"?: boolean,"created_at"?: string,"display_name"?: string,"id"?: string,"is_committee"?: boolean,"is_committee_admin"?: boolean,"last_played_at"?: string | null,"player_level"?: string
+                    "can_choose_professional"?: boolean,"committee_auto_signup"?: boolean,"created_at"?: string,"display_name"?: string,"id"?: string,"is_committee"?: boolean,"is_committee_admin"?: boolean,"last_played_at"?: string | null,"player_level"?: string
                   }
                   Relationships: [
 
@@ -121,11 +121,14 @@ isOneToOne: false
           Functions: {
             "admin_list_club_players":
 { Args: Record<PropertyKey, never>; Returns: {
-              "display_name": string,"is_committee": boolean,"player_level": string,"user_id": string
+              "can_choose_professional": boolean,"display_name": string,"is_committee": boolean,"player_level": string,"user_id": string
             }[]
                            },
             "admin_set_session_happening":
             { Args: { "p_happening": boolean,"p_session_id": string }; Returns: undefined
+                                       },
+            "admin_set_professional_choice":
+            { Args: { "p_enabled": boolean,"p_user_id": string }; Returns: undefined
                                        },
             "admin_update_player_access":
 { Args: { "p_is_committee": boolean,"p_player_level": string,"p_user_id": string }; Returns: undefined
@@ -149,6 +152,11 @@ isOneToOne: false
                            },
 "find_club_member_by_student_id":
 { Args: { "p_student_id": string }; Returns: {
+              "display_name": string,"is_selected": boolean,"player_level": string,"student_id": string,"user_id": string
+            }[]
+                           },
+"find_club_members":
+{ Args: { "p_query": string }; Returns: {
               "display_name": string,"is_selected": boolean,"player_level": string,"student_id": string,"user_id": string
             }[]
                            },

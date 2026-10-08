@@ -1,8 +1,29 @@
 import Image from "next/image";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { SessionsSignIn } from "@/features/sessions";
+import { createClient } from "@/lib/supabase/server";
 
-export default function SignInPage() {
+export const instant = false;
+
+export default async function SignInPage() {
+  await connection();
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.getUser();
+
+  if (
+    error &&
+    error.name !== "AuthSessionMissingError" &&
+    error.status !== 401
+  ) {
+    throw new Error(`Could not check your sign-in status: ${error.message}`);
+  }
+
+  if (data.user?.email && /^[^@\s]+@atu\.ie$/i.test(data.user.email)) {
+    redirect("/");
+  }
+
   return (
     <main className="min-h-screen px-5 pb-12 pt-3 sm:px-8 sm:pt-5">
       <div className="mx-auto w-full max-w-6xl">

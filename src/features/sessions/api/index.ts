@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   finalizeDueSessions as finalizeDue,
-  findFriendByStudentId as findFriendByStudentIdAction,
+  searchClubMembers as searchClubMembersAction,
   markSessionPlayed as markPlayed,
   cancelSignup,
   signOut,
@@ -26,8 +26,8 @@ export async function finalizeDueSessions(): Promise<number> {
   return finalizeDue();
 }
 
-export async function findFriendByStudentId(studentId: string) {
-  return findFriendByStudentIdAction(studentId);
+export async function searchClubMembers(query: string) {
+  return searchClubMembersAction(query);
 }
 
 export async function signUpForSession(
@@ -45,7 +45,7 @@ export async function saveSessionFriendPreferences(
 }
 
 export async function updatePlayerLevelForCurrentUser(
-  playerLevel: "BEGINNER" | "INTERMEDIATE",
+  playerLevel: "BEGINNER" | "INTERMEDIATE" | "PROFESSIONAL",
 ): Promise<void> {
   await updatePlayerLevel(playerLevel);
 }

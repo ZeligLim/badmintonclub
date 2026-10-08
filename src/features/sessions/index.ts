@@ -6,11 +6,11 @@ export { createPlayerGameSchedule } from "./court-schedule";
 export {
   cancelSignupForSession,
   finalizeDueSessions,
-  findFriendByStudentId,
   getDashboardData,
   joinConfirmedSessionFcfs,
   markSessionPlayed,
   saveSessionFriendPreferences,
+  searchClubMembers,
   signOutFromClub,
   signUpForSession,
   updateCommitteeAutoSignupForCurrentUser,

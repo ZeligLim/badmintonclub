@@ -42,47 +42,44 @@ export async function updateSessionFriendPreferences(
   }
 }
 
-export async function findFriendByStudentId(
-  studentId: string,
-): Promise<FriendCandidate | null> {
-  const normalizedStudentId = studentId.trim().toLowerCase();
-  if (!/^[a-z0-9]{1,64}$/.test(normalizedStudentId)) {
-    throw new Error("Enter a valid ATU student ID.");
+export async function searchClubMembers(
+  query: string,
+): Promise<FriendCandidate[]> {
+  const normalizedQuery = query.trim();
+  if (normalizedQuery.length < 2 || normalizedQuery.length > 64) {
+    throw new Error("Search using at least two characters.");
   }
 
   const supabase = await requireAuthenticatedClient();
-  const { data, error } = await supabase.rpc(
-    "find_club_member_by_student_id",
-    { p_student_id: normalizedStudentId },
-  );
+  const { data, error } = await supabase.rpc("find_club_members", {
+    p_query: normalizedQuery,
+  });
 
   if (error) {
-    throw new Error(`Could not look up this student ID: ${error.message}`);
+    throw new Error(`Could not search club members: ${error.message}`);
   }
 
-  const friend = data[0];
-  if (!friend) {
-    return null;
-  }
-  if (
-    friend.player_level !== "BEGINNER" &&
-    friend.player_level !== "INTERMEDIATE" &&
-    friend.player_level !== "PROFESSIONAL"
-  ) {
-    throw new Error("The club member has an unsupported player level.");
-  }
+  return data.map((friend) => {
+    if (
+      friend.player_level !== "BEGINNER" &&
+      friend.player_level !== "INTERMEDIATE" &&
+      friend.player_level !== "PROFESSIONAL"
+    ) {
+      throw new Error("A club member has an unsupported player level.");
+    }
 
-  return {
-    userId: friend.user_id,
-    displayName: friend.display_name,
-    studentId: friend.student_id,
-    playerLevel: friend.player_level,
-    isSelected: false,
-  };
+    return {
+      userId: friend.user_id,
+      displayName: friend.display_name,
+      studentId: friend.student_id,
+      playerLevel: friend.player_level,
+      isSelected: false,
+    };
+  });
 }
 
 export async function updatePlayerLevel(
-  playerLevel: "BEGINNER" | "INTERMEDIATE",
+  playerLevel: "BEGINNER" | "INTERMEDIATE" | "PROFESSIONAL",
 ): Promise<void> {
   const supabase = await requireAuthenticatedClient();
   const { error } = await supabase.rpc("update_my_player_level", {

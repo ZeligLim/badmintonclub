@@ -60,6 +60,7 @@ export type DashboardData = {
     id: string;
     displayName: string;
     playerLevel: PlayerLevel;
+    canChooseProfessional: boolean;
     isCommittee: boolean;
     isCommitteeAdmin: boolean;
     committeeAutoSignup: boolean;

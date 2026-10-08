@@ -408,6 +408,35 @@ select lives_ok(
 );
 reset role;
 
+set local role authenticated;
+select set_config(
+  'request.jwt.claim.sub',
+  '22000000-0000-4000-8000-000000000013',
+  true
+);
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"22000000-0000-4000-8000-000000000013","email":"committee-auto-13@atu.ie","role":"authenticated"}',
+  true
+);
+select lives_ok(
+  $$select public.ensure_next_week_sessions()$$,
+  'loading the sessions page auto-signs up opted-in members before finalization'
+);
+reset role;
+
+select is(
+  (
+    select count(*)
+    from public.session_signups
+    where session_id = '32000000-0000-4000-8000-000000000001'
+      and user_id = '22000000-0000-4000-8000-000000000001'
+      and status = 'requested'
+  ),
+  1::bigint,
+  'page-load auto-signup includes the upcoming session after its signup cutoff'
+);
+
 select is(
   (
     select count(*)
@@ -415,8 +444,8 @@ select is(
     where session_id = '32000000-0000-4000-8000-000000000001'
       and user_id = '22000000-0000-4000-8000-000000000013'
   ),
-  0::bigint,
-  'an expired signup window is not reopened by changing the setting'
+  1::bigint,
+  'an opted-in member is added to an upcoming session even after signup closes'
 );
 
 set local role authenticated;

@@ -26,6 +26,7 @@ type SessionsHeaderProps = {
   isCommitteeAdmin: boolean;
   committeeAutoSignup: boolean;
   playerLevel: PlayerLevel;
+  canChooseProfessional: boolean;
   onDemoPlayerLevelChange: (playerLevel: "BEGINNER" | "INTERMEDIATE") => void;
 };
 
@@ -36,6 +37,7 @@ export function SessionsHeader({
   isCommitteeAdmin,
   committeeAutoSignup: initialCommitteeAutoSignup,
   playerLevel: initialPlayerLevel,
+  canChooseProfessional,
   onDemoPlayerLevelChange,
 }: SessionsHeaderProps) {
   const router = useRouter();
@@ -75,11 +77,21 @@ export function SessionsHeader({
   }, [displayName]);
 
   function changePlayerLevel(value: string) {
-    if (value !== "BEGINNER" && value !== "INTERMEDIATE") {
+    if (
+      value !== "BEGINNER" &&
+      value !== "INTERMEDIATE" &&
+      value !== "PROFESSIONAL"
+    ) {
+      return;
+    }
+    if (value === "PROFESSIONAL" && !canChooseProfessional) {
       return;
     }
 
     if (isDemo) {
+      if (value === "PROFESSIONAL") {
+        return;
+      }
       setPlayerLevel(value);
       onDemoPlayerLevelChange(value);
       return;
@@ -173,9 +185,6 @@ export function SessionsHeader({
             >
               <option value="BEGINNER">Your level: Beginner</option>
               <option value="INTERMEDIATE">Your level: Intermediate</option>
-              <option disabled value="PROFESSIONAL">
-                Professional
-              </option>
             </select>
           </div>
         ) : displayName ? (
@@ -263,9 +272,9 @@ export function SessionsHeader({
                   >
                     <option value="BEGINNER">Beginner</option>
                     <option value="INTERMEDIATE">Intermediate</option>
-                    <option disabled value="PROFESSIONAL">
-                      Professional
-                    </option>
+                    {canChooseProfessional && (
+                      <option value="PROFESSIONAL">Professional</option>
+                    )}
                   </select>
                   <form
                     action={signOutFromClub}

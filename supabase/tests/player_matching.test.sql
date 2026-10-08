@@ -1,6 +1,6 @@
 begin;
 
-select plan(45);
+select plan(47);
 
 alter table public.sessions drop constraint sessions_capacity_check;
 
@@ -32,6 +32,10 @@ from generate_series(1, 25) as player_number;
 update auth.users
 set email = 'g00440629@atu.ie'
 where id = '20000000-0000-4000-8000-000000000025';
+
+update public.profiles
+set display_name = 'Aoife Murphy'
+where id = '20000000-0000-4000-8000-000000000001';
 
 insert into public.sessions (
   id, event_date, starts_at, duration_minutes, capacity,
@@ -178,7 +182,7 @@ select set_config(
 select throws_ok(
   $$select public.update_my_player_level('PROFESSIONAL')$$,
   '22023',
-  'Professional level is assigned by a club administrator.',
+  'Professional level is not available for this member.',
   'members cannot self-select Professional level'
 );
 select lives_ok(
@@ -242,16 +246,16 @@ select set_config(
 );
 select is(
   (select user_id::text
-   from public.find_club_member_by_student_id(' G00440629 ')
+   from public.find_club_members(' G00440629 ')
    limit 1),
   '20000000-0000-4000-8000-000000000025',
   'members can look up a registered club account by case-insensitive student ID'
 );
 select is(
   (select count(*)::integer
-   from public.find_club_member_by_student_id('notarealstudent')),
+   from public.find_club_members('notarealstudent')),
   0,
-  'a missing student ID returns no account details'
+  'a query with no matches returns no account details'
 );
 select set_config(
   'request.jwt.claim.sub',
@@ -265,9 +269,23 @@ select set_config(
 );
 select is(
   (select count(*)::integer
-   from public.find_club_member_by_student_id('g00440629')),
+   from public.find_club_members('g00440629')),
   0,
   'members cannot select themselves'
+);
+select is(
+  (select user_id::text
+   from public.find_club_members('AOIFE')
+   limit 1),
+  '20000000-0000-4000-8000-000000000001',
+  'members can find another club member by a case-insensitive name search'
+);
+select is(
+  (select user_id::text
+   from public.find_club_members('matching-player-1')
+   limit 1),
+  '20000000-0000-4000-8000-000000000001',
+  'members can find another club member by student ID'
 );
 select set_config(
   'request.jwt.claim.sub',
@@ -365,18 +383,18 @@ select ok(
 select ok(
   has_function_privilege(
     'authenticated',
-    'public.find_club_member_by_student_id(text)',
+    'public.find_club_members(text)',
     'execute'
   ),
-  'authenticated club members can use the protected student ID lookup'
+  'authenticated club members can use the protected club-member search'
 );
 select ok(
   not has_function_privilege(
     'anon',
-    'public.find_club_member_by_student_id(text)',
+    'public.find_club_members(text)',
     'execute'
   ),
-  'anonymous users cannot use the student ID lookup'
+  'anonymous users cannot use the club-member search'
 );
 select ok(
   not has_function_privilege(
