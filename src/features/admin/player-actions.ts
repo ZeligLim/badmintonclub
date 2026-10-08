@@ -5,21 +5,19 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAdminUser } from "./data";
 
 export async function updateClubCommitteeStatus(
-  formData: FormData,
+  userId: string,
+  isCommittee: boolean,
 ): Promise<void> {
   if (!(await requireAdminUser())) {
     throw new Error("Only a club administrator can manage committee status.");
   }
-
-  const userId = formData.get("user_id");
-  const committeeValue = formData.get("is_committee");
 
   if (
     typeof userId !== "string" ||
     !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
       userId,
     ) ||
-    (committeeValue !== "true" && committeeValue !== "false")
+    typeof isCommittee !== "boolean"
   ) {
     throw new Error("The committee status request is invalid.");
   }
@@ -27,7 +25,7 @@ export async function updateClubCommitteeStatus(
   const supabase = await createClient();
   const { error } = await supabase.rpc("admin_set_committee_status", {
     p_user_id: userId,
-    p_is_committee: committeeValue === "true",
+    p_is_committee: isCommittee,
   });
   if (error) {
     throw new Error(`Could not update committee status: ${error.message}`);

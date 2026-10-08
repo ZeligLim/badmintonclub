@@ -1,5 +1,5 @@
 import type { AdminClubPlayer } from "./data";
-import { updateClubCommitteeStatus } from "./player-actions";
+import { CommitteeStatusSelect } from "./CommitteeStatusSelect";
 import { ProfessionalChoiceToggle } from "./ProfessionalChoiceToggle";
 
 type ClubPlayerAccessTableProps = {
@@ -30,31 +30,15 @@ export function ClubPlayerAccessTable({ players }: ClubPlayerAccessTableProps) {
           </thead>
           <tbody>
             {players.map((player) => {
-              const formId = `committee-status-${player.userId}`;
-
               return (
                 <tr className="border-t border-border/50 bg-card" key={player.userId}>
                   <td className="px-4 py-2.5">{player.displayName}</td>
                   <td className="px-4 py-2.5">
-                    <form action={updateClubCommitteeStatus} id={formId}>
-                      <input name="user_id" type="hidden" value={player.userId} />
-                      <select
-                        aria-label={`${player.displayName} committee status`}
-                        className="rounded-md border border-border bg-background px-2 py-1"
-                        defaultValue={player.isCommittee ? "true" : "false"}
-                        form={formId}
-                        name="is_committee"
-                      >
-                        <option value="false">Member</option>
-                        <option value="true">Committee</option>
-                      </select>
-                      <button
-                        className="ml-2 rounded-md bg-primary px-3 py-1.5 text-primary-foreground"
-                        type="submit"
-                      >
-                        Save
-                      </button>
-                    </form>
+                    <CommitteeStatusSelect
+                      displayName={player.displayName}
+                      isCommittee={player.isCommittee}
+                      userId={player.userId}
+                    />
                   </td>
                   <td className="px-4 py-2.5">
                     <ProfessionalChoiceToggle
