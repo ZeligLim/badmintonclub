@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, type FormEvent } from "react";
-import { ArrowRight, Check, Pencil, X } from "lucide-react";
+import { ArrowRight, Check, LogOut, Pencil, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -36,6 +36,7 @@ export function SessionsHeader({
   const [isEditingName, setIsEditingName] = useState(false);
   const [draftDisplayName, setDraftDisplayName] = useState(displayName ?? "");
   const [nameError, setNameError] = useState("");
+  const compactDisplayName = getCompactDisplayName(displayName ?? "");
 
   function changePlayerLevel(value: string) {
     if (value !== "BEGINNER" && value !== "INTERMEDIATE") {
@@ -125,10 +126,60 @@ export function SessionsHeader({
           </div>
         ) : displayName ? (
           <div className="min-w-0 flex-1">
-            {!isEditingName ? (
-              <div className="flex min-w-0 items-center gap-2">
+            <div className="flex min-w-0 items-center gap-1 sm:gap-2">
+              {!isEditingName ? (
+                <h1
+                  className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight text-foreground sm:text-2xl"
+                  title={displayName}
+                >
+                  <span className="sm:hidden">{compactDisplayName}</span>
+                  <span className="hidden sm:inline">{displayName}</span>
+                </h1>
+              ) : (
+                <form
+                  className="flex min-w-0 flex-1 flex-col gap-1"
+                  onSubmit={saveDisplayName}
+                >
+                  <div className="flex items-center gap-1">
+                    <input
+                      autoComplete="name"
+                      aria-label="Display name"
+                      className="h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-base"
+                      maxLength={80}
+                      onChange={(event) => setDraftDisplayName(event.target.value)}
+                      value={draftDisplayName}
+                    />
+                    <button
+                      aria-label="Save name"
+                      className="inline-flex size-10 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground"
+                      type="submit"
+                    >
+                      <Check aria-hidden="true" className="size-4" />
+                    </button>
+                    <button
+                      aria-label="Cancel editing name"
+                      className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-border bg-background"
+                      onClick={() => {
+                        setIsEditingName(false);
+                        setNameError("");
+                        setDraftDisplayName(displayName);
+                      }}
+                      type="button"
+                    >
+                      <X aria-hidden="true" className="size-4" />
+                    </button>
+                  </div>
+                  {nameError && (
+                    <span className="text-xs text-destructive" role="alert">
+                      {nameError}
+                    </span>
+                  )}
+                </form>
+              )}
+              {!isEditingName && (
                 <button
-                  className="group inline-flex min-w-0 max-w-full items-center gap-2 rounded-md px-1 py-0.5 text-left text-base font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-lg"
+                  aria-label="Edit name"
+                  className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-border bg-background text-sm font-medium text-foreground transition-colors hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   onClick={() => {
                     setDraftDisplayName(displayName);
                     setNameError("");
@@ -136,67 +187,14 @@ export function SessionsHeader({
                   }}
                   type="button"
                 >
-                  <span className="max-w-[9rem] truncate sm:max-w-[14rem]">
-                    {displayName}
-                  </span>
-                  <Pencil
-                    aria-hidden="true"
-                    className="size-3.5 shrink-0 text-muted-foreground group-hover:text-primary"
-                  />
+                  <Pencil aria-hidden="true" className="size-4" />
                 </button>
-              </div>
-            ) : (
-              <form
-                className="flex min-w-0 max-w-[14rem] flex-col gap-1 sm:max-w-[18rem]"
-                onSubmit={saveDisplayName}
-              >
-                <div className="flex items-center gap-1">
-                  <input
-                    autoComplete="name"
-                    className="h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-base"
-                    maxLength={80}
-                    onChange={(event) => setDraftDisplayName(event.target.value)}
-                    value={draftDisplayName}
-                  />
-                  <button
-                    aria-label="Save name"
-                    className="inline-flex size-10 items-center justify-center rounded-md bg-primary text-primary-foreground"
-                    type="submit"
-                  >
-                    <Check aria-hidden="true" className="size-3.5" />
-                  </button>
-                  <button
-                    aria-label="Cancel editing name"
-                    className="inline-flex size-10 items-center justify-center rounded-md border border-border bg-background"
-                    onClick={() => {
-                      setIsEditingName(false);
-                      setNameError("");
-                      setDraftDisplayName(displayName);
-                    }}
-                    type="button"
-                  >
-                    <X aria-hidden="true" className="size-3.5" />
-                  </button>
-                </div>
-                {nameError && (
-                  <span className="text-[0.65rem] text-destructive" role="alert">
-                    {nameError}
-                  </span>
-                )}
-              </form>
-            )}
-
-            <div className="mt-1 flex flex-wrap items-center gap-2">
-              {isCommittee && (
-                <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[0.65rem] font-medium text-primary sm:text-xs">
-                  Committee
-                </span>
               )}
               <label className="sr-only" htmlFor="player-level">
                 Playing level
               </label>
               <select
-                className="h-10 min-w-[8.5rem] rounded-md border border-border bg-background px-3 text-sm"
+                className="h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-xs sm:w-auto sm:flex-none sm:px-3 sm:text-sm"
                 disabled={isUpdatingLevel}
                 id="player-level"
                 onChange={(event) => changePlayerLevel(event.target.value)}
@@ -208,6 +206,40 @@ export function SessionsHeader({
                   Professional
                 </option>
               </select>
+              <form
+                action={signOutFromClub}
+                className="shrink-0"
+                onSubmit={(event) => {
+                  if (!window.confirm("Are you sure you want to sign out?")) {
+                    event.preventDefault();
+                  }
+                }}
+              >
+                <button
+                  aria-label="Sign out"
+                  className="inline-flex size-10 items-center justify-center rounded-md border border-border bg-background text-sm font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  title="Sign out"
+                  type="submit"
+                >
+                  <LogOut aria-hidden="true" className="size-4" />
+                </button>
+              </form>
+            </div>
+
+            <div className="mt-2 flex min-w-0 items-center gap-2">
+              {isCommittee && (
+                <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[0.65rem] font-medium text-primary sm:text-xs">
+                  Committee
+                </span>
+              )}
+              {isCommitteeAdmin && (
+                <Link
+                  className="inline-flex h-10 shrink-0 items-center rounded-md px-2 text-xs font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-sm"
+                  href="/admin"
+                >
+                  Manage club
+                </Link>
+              )}
             </div>
             {levelError && (
               <span className="mt-1 block text-[0.65rem] text-destructive" role="alert">
@@ -225,33 +257,17 @@ export function SessionsHeader({
         )}
       </div>
 
-      {isDemo || !displayName ? null : (
-        <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-end sm:gap-4">
-          {isCommitteeAdmin && (
-            <Link
-              className="inline-flex h-10 items-center text-sm font-medium text-primary underline-offset-4 hover:underline"
-              href="/admin"
-            >
-              Manage club
-            </Link>
-          )}
-          <form
-            action={signOutFromClub}
-            onSubmit={(event) => {
-              if (!window.confirm("Are you sure you want to sign out?")) {
-                event.preventDefault();
-              }
-            }}
-          >
-            <button
-              className="inline-flex h-10 items-center rounded-sm px-2 text-sm font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              type="submit"
-            >
-              Sign out
-            </button>
-          </form>
-        </div>
-      )}
     </header>
   );
+}
+
+function getCompactDisplayName(name: string): string {
+  const nameParts = name.trim().split(/\s+/).filter(Boolean);
+  if (nameParts.length < 2) {
+    return name;
+  }
+
+  const firstName = nameParts[0];
+  const lastName = nameParts.at(-1);
+  return `${firstName} ${lastName?.[0]}.`;
 }
