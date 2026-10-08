@@ -4,34 +4,33 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdminUser } from "./data";
 
-export async function updateClubPlayerAccess(formData: FormData): Promise<void> {
+export async function updateClubCommitteeStatus(
+  formData: FormData,
+): Promise<void> {
   if (!(await requireAdminUser())) {
-    throw new Error("Only a club administrator can manage player access.");
+    throw new Error("Only a club administrator can manage committee status.");
   }
 
   const userId = formData.get("user_id");
-  const playerLevel = formData.get("player_level");
   const committeeValue = formData.get("is_committee");
 
   if (
     typeof userId !== "string" ||
-    typeof playerLevel !== "string" ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      userId,
+    ) ||
     (committeeValue !== "true" && committeeValue !== "false")
   ) {
-    throw new Error("The player access request is invalid.");
-  }
-  if (!["BEGINNER", "INTERMEDIATE", "PROFESSIONAL"].includes(playerLevel)) {
-    throw new Error("Select a valid player level.");
+    throw new Error("The committee status request is invalid.");
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.rpc("admin_update_player_access", {
+  const { error } = await supabase.rpc("admin_set_committee_status", {
     p_user_id: userId,
-    p_player_level: playerLevel,
     p_is_committee: committeeValue === "true",
   });
   if (error) {
-    throw new Error(`Could not update player access: ${error.message}`);
+    throw new Error(`Could not update committee status: ${error.message}`);
   }
 
   revalidatePath("/admin");

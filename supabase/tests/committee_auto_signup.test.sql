@@ -122,6 +122,17 @@ select lives_ok(
   $$select public.set_my_committee_auto_signup(true)$$,
   'committee members can enable automatic signup'
 );
+select is(
+  (
+    select count(*)
+    from public.session_signups
+    where session_id = '32000000-0000-4000-8000-000000000002'
+      and user_id = '22000000-0000-4000-8000-000000000001'
+      and status = 'requested'
+  ),
+  1::bigint,
+  'enabling automatic signup immediately adds the member to every upcoming open session, even before signup opens'
+);
 reset role;
 
 set local role authenticated;
@@ -273,9 +284,10 @@ select is(
     from public.session_signups
     where session_id = '32000000-0000-4000-8000-000000000002'
       and user_id = '22000000-0000-4000-8000-000000000007'
+      and status <> 'cancelled'
   ),
   0::bigint,
-  'a member who loses committee status is not auto-signed-up'
+  'a member who loses committee status has no active automatic signup'
 );
 
 select is(

@@ -75,6 +75,22 @@ select ok(
   ),
   'anonymous users cannot call the permission RPC'
 );
+select ok(
+  has_function_privilege(
+    'authenticated',
+    'public.admin_set_committee_status(uuid, boolean)',
+    'execute'
+  ),
+  'authenticated members can call the committee RPC subject to its admin check'
+);
+select ok(
+  not has_function_privilege(
+    'anon',
+    'public.admin_set_committee_status(uuid, boolean)',
+    'execute'
+  ),
+  'anonymous users cannot call the committee RPC'
+);
 
 set local role authenticated;
 select set_config(
@@ -102,6 +118,15 @@ select throws_ok(
   'Only a club administrator can change Professional level access.',
   'members cannot grant themselves Professional choice'
 );
+select throws_ok(
+  $$select public.admin_set_committee_status(
+    '98000000-0000-4000-8000-000000000002',
+    true
+  )$$,
+  '42501',
+  'Only a club administrator can change committee status.',
+  'members cannot grant themselves committee status'
+);
 reset role;
 
 set local role authenticated;
@@ -122,7 +147,32 @@ select lives_ok(
   )$$,
   'an administrator can enable Professional choice for a member'
 );
+select lives_ok(
+  $$select public.admin_set_committee_status(
+    '98000000-0000-4000-8000-000000000002',
+    true
+  )$$,
+  'an administrator can update committee status without changing player level'
+);
 reset role;
+select is(
+  (
+    select is_committee
+    from public.profiles
+    where id = '98000000-0000-4000-8000-000000000002'
+  ),
+  true,
+  'the committee status is persisted independently'
+);
+select is(
+  (
+    select player_level
+    from public.profiles
+    where id = '98000000-0000-4000-8000-000000000002'
+  ),
+  'INTERMEDIATE',
+  'changing committee status does not change player level'
+);
 select is(
   (
     select can_choose_professional

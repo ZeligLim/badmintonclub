@@ -130,6 +130,9 @@ isOneToOne: false
             "admin_set_professional_choice":
             { Args: { "p_enabled": boolean,"p_user_id": string }; Returns: undefined
                                        },
+            "admin_set_committee_status":
+            { Args: { "p_is_committee": boolean,"p_user_id": string }; Returns: undefined
+                                       },
             "admin_update_player_access":
 { Args: { "p_is_committee": boolean,"p_player_level": string,"p_user_id": string }; Returns: undefined
                            },
