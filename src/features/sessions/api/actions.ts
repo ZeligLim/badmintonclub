@@ -94,6 +94,33 @@ export async function updatePlayerLevel(
   }
 }
 
+export async function updateDisplayName(
+  displayName: string,
+): Promise<void> {
+  const trimmedName = displayName.trim();
+  if (!trimmedName || trimmedName.length > 80) {
+    throw new Error("Enter a valid display name between 1 and 80 characters.");
+  }
+
+  const supabase = await requireAuthenticatedClient();
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError) {
+    throw new Error(`Could not verify your sign-in: ${authError.message}`);
+  }
+  if (!authData.user) {
+    throw new Error("Sign in before updating your name.");
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ display_name: trimmedName })
+    .eq("id", authData.user.id);
+
+  if (error) {
+    throw new Error(`Could not update your name: ${error.message}`);
+  }
+}
+
 export async function joinConfirmedSession(sessionId: string): Promise<void> {
   validateSessionId(sessionId);
   const supabase = await requireAuthenticatedClient();

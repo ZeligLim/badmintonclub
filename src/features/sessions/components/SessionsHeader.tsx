@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { ArrowRight } from "lucide-react";
+import { useState, useTransition, type FormEvent } from "react";
+import { ArrowRight, Check, Pencil, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import {
   signOutFromClub,
+  updateDisplayNameForCurrentUser,
   updatePlayerLevelForCurrentUser,
   type PlayerLevel,
 } from "@/features/sessions";
@@ -32,6 +33,9 @@ export function SessionsHeader({
   const [playerLevel, setPlayerLevel] = useState(initialPlayerLevel);
   const [isUpdatingLevel, startTransition] = useTransition();
   const [levelError, setLevelError] = useState("");
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [draftDisplayName, setDraftDisplayName] = useState(displayName ?? "");
+  const [nameError, setNameError] = useState("");
 
   function changePlayerLevel(value: string) {
     if (value !== "BEGINNER" && value !== "INTERMEDIATE") {
@@ -56,52 +60,133 @@ export function SessionsHeader({
     });
   }
 
+  async function saveDisplayName(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmedName = draftDisplayName.trim();
+
+    if (!trimmedName) {
+      setNameError("Enter a display name.");
+      return;
+    }
+    if (trimmedName.length > 80) {
+      setNameError("Display name must be 80 characters or fewer.");
+      return;
+    }
+
+    setNameError("");
+    try {
+      await updateDisplayNameForCurrentUser(trimmedName);
+      setIsEditingName(false);
+      router.refresh();
+    } catch {
+      setNameError("We couldn’t update your name. Please try again.");
+    }
+  }
+
   return (
     <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <Link
-        aria-label="ATU Galway Badminton Club home"
-        className="flex shrink-0 items-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        href="/"
-      >
-        <Image
-          alt="ATU Galway Badminton Club"
-          className="size-14 rounded-full object-cover sm:size-16"
-          height={64}
-          priority
-          src="/logo.png"
-          width={64}
-        />
-      </Link>
+      <div className="flex min-w-0 items-center gap-3">
+        <Link
+          aria-label="ATU Galway Badminton Club home"
+          className="flex shrink-0 items-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          href="/"
+        >
+          <Image
+            alt="ATU Galway Badminton Club"
+            className="size-14 rounded-full object-cover sm:size-16"
+            height={64}
+            priority
+            src="/logo.png"
+            width={64}
+          />
+        </Link>
 
-      {isDemo ? (
-        <div className="flex min-w-0 flex-col items-stretch gap-2 sm:ml-auto sm:flex-row sm:items-center sm:justify-end">
-          <span className="inline-flex items-center gap-2 rounded-full bg-primary/5 px-3 py-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.13em] text-primary">
-            <span className="size-1.5 rounded-full bg-primary" />
-            Local demo
-          </span>
-          <label className="sr-only" htmlFor="demo-player-level">
-            Demo playing level
-          </label>
-          <select
-            className="w-full min-w-0 rounded-md border border-border bg-background px-2 py-1.5 text-xs sm:w-auto sm:max-w-44"
-            id="demo-player-level"
-            onChange={(event) => changePlayerLevel(event.target.value)}
-            value={playerLevel}
-          >
-            <option value="BEGINNER">Your level: Beginner</option>
-            <option value="INTERMEDIATE">Your level: Intermediate</option>
-            <option disabled value="PROFESSIONAL">
-              Professional · invite-only
-            </option>
-          </select>
-        </div>
-      ) : displayName ? (
-        <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:items-center sm:justify-end sm:gap-3">
-          <div className="flex min-w-0 max-w-full flex-col gap-1 sm:items-end">
-            <span className="max-w-full truncate text-sm text-muted-foreground sm:max-w-52">
-              {displayName}
+        {isDemo ? (
+          <div className="flex min-w-0 flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
+            <span className="inline-flex items-center gap-2 rounded-full bg-primary/5 px-3 py-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.13em] text-primary">
+              <span className="size-1.5 rounded-full bg-primary" />
+              Local demo
             </span>
-            <div className="flex w-full flex-wrap items-center gap-2 sm:justify-end">
+            <label className="sr-only" htmlFor="demo-player-level">
+              Demo playing level
+            </label>
+            <select
+              className="w-full min-w-0 rounded-md border border-border bg-background px-2 py-1.5 text-xs sm:w-auto sm:max-w-44"
+              id="demo-player-level"
+              onChange={(event) => changePlayerLevel(event.target.value)}
+              value={playerLevel}
+            >
+              <option value="BEGINNER">Your level: Beginner</option>
+              <option value="INTERMEDIATE">Your level: Intermediate</option>
+              <option disabled value="PROFESSIONAL">
+                Professional · invite-only
+              </option>
+            </select>
+          </div>
+        ) : displayName ? (
+          <div className="min-w-0 flex-1">
+            {!isEditingName ? (
+              <div className="flex min-w-0 items-center gap-2">
+                <button
+                  className="group inline-flex min-w-0 max-w-full items-center gap-2 rounded-md px-1 py-0.5 text-left text-sm font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  onClick={() => {
+                    setDraftDisplayName(displayName);
+                    setNameError("");
+                    setIsEditingName(true);
+                  }}
+                  type="button"
+                >
+                  <span className="max-w-[9rem] truncate sm:max-w-[14rem]">
+                    {displayName}
+                  </span>
+                  <Pencil
+                    aria-hidden="true"
+                    className="size-3.5 shrink-0 text-muted-foreground group-hover:text-primary"
+                  />
+                </button>
+              </div>
+            ) : (
+              <form
+                className="flex min-w-0 max-w-[14rem] flex-col gap-1 sm:max-w-[18rem]"
+                onSubmit={saveDisplayName}
+              >
+                <div className="flex items-center gap-1">
+                  <input
+                    autoComplete="name"
+                    className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-sm"
+                    maxLength={80}
+                    onChange={(event) => setDraftDisplayName(event.target.value)}
+                    value={draftDisplayName}
+                  />
+                  <button
+                    aria-label="Save name"
+                    className="inline-flex items-center justify-center rounded-md bg-primary p-1.5 text-primary-foreground"
+                    type="submit"
+                  >
+                    <Check aria-hidden="true" className="size-3.5" />
+                  </button>
+                  <button
+                    aria-label="Cancel editing name"
+                    className="inline-flex items-center justify-center rounded-md border border-border bg-background p-1.5"
+                    onClick={() => {
+                      setIsEditingName(false);
+                      setNameError("");
+                      setDraftDisplayName(displayName);
+                    }}
+                    type="button"
+                  >
+                    <X aria-hidden="true" className="size-3.5" />
+                  </button>
+                </div>
+                {nameError && (
+                  <span className="text-[0.65rem] text-destructive" role="alert">
+                    {nameError}
+                  </span>
+                )}
+              </form>
+            )}
+
+            <div className="mt-1 flex flex-wrap items-center gap-2">
               {isCommittee && (
                 <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[0.65rem] font-medium text-primary sm:text-xs">
                   Committee
@@ -111,7 +196,7 @@ export function SessionsHeader({
                 Playing level
               </label>
               <select
-                className="min-w-[8.5rem] flex-1 rounded-md border border-border bg-background px-2 py-1 text-xs sm:max-w-36 sm:flex-none"
+                className="min-w-[8.5rem] rounded-md border border-border bg-background px-2 py-1 text-xs"
                 disabled={isUpdatingLevel}
                 id="player-level"
                 onChange={(event) => changePlayerLevel(event.target.value)}
@@ -125,45 +210,47 @@ export function SessionsHeader({
               </select>
             </div>
             {levelError && (
-              <span className="text-xs text-destructive" role="alert">
+              <span className="mt-1 block text-[0.65rem] text-destructive" role="alert">
                 {levelError}
               </span>
             )}
           </div>
+        ) : (
+          <Link
+            className="inline-flex items-center gap-1.5 rounded-sm px-2 py-1 text-sm font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            href="https://badmintonclub.vercel.app/sign-in"
+          >
+            Sign in <ArrowRight aria-hidden="true" className="size-4" />
+          </Link>
+        )}
+      </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-2 sm:flex-col sm:items-end sm:justify-center sm:gap-1">
-            {isCommitteeAdmin && (
-              <Link
-                className="text-xs font-medium text-primary underline-offset-4 hover:underline"
-                href="/admin"
-              >
-                Manage club
-              </Link>
-            )}
-            <form
-              action={signOutFromClub}
-              onSubmit={(event) => {
-                if (!window.confirm("Are you sure you want to sign out?")) {
-                  event.preventDefault();
-                }
-              }}
+      {isDemo || !displayName ? null : (
+        <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-end sm:gap-3">
+          {isCommitteeAdmin && (
+            <Link
+              className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+              href="/admin"
             >
-              <button
-                className="rounded-sm px-2 py-1 text-sm font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                type="submit"
-              >
-                Sign out
-              </button>
-            </form>
-          </div>
+              Manage club
+            </Link>
+          )}
+          <form
+            action={signOutFromClub}
+            onSubmit={(event) => {
+              if (!window.confirm("Are you sure you want to sign out?")) {
+                event.preventDefault();
+              }
+            }}
+          >
+            <button
+              className="rounded-sm px-2 py-1 text-sm font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              type="submit"
+            >
+              Sign out
+            </button>
+          </form>
         </div>
-      ) : (
-        <Link
-          className="inline-flex items-center gap-1.5 rounded-sm px-2 py-1 text-sm font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          href="https://badmintonclub.vercel.app/sign-in"
-        >
-          Sign in <ArrowRight aria-hidden="true" className="size-4" />
-        </Link>
       )}
     </header>
   );

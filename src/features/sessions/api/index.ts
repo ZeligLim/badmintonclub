@@ -9,6 +9,7 @@ import {
   cancelSignup,
   signOut,
   signUp,
+  updateDisplayName,
   updateSessionFriendPreferences as updateSessionFriendPreferencesAction,
   updatePlayerLevel,
   joinConfirmedSession as joinConfirmed,
@@ -46,6 +47,12 @@ export async function updatePlayerLevelForCurrentUser(
   playerLevel: "BEGINNER" | "INTERMEDIATE",
 ): Promise<void> {
   await updatePlayerLevel(playerLevel);
+}
+
+export async function updateDisplayNameForCurrentUser(
+  displayName: string,
+): Promise<void> {
+  await updateDisplayName(displayName);
 }
 
 export async function joinConfirmedSessionFcfs(sessionId: string): Promise<void> {
