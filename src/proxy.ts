@@ -39,7 +39,15 @@ export async function proxy(request: NextRequest) {
   }
 
   const { error } = await supabase.auth.getUser();
-  if (error && error.name !== "AuthSessionMissingError") {
+  const isExpiredSession =
+    error?.code === "refresh_token_not_found" ||
+    error?.code === "refresh_token_already_used" ||
+    error?.code === "session_expired";
+  if (
+    error &&
+    error.name !== "AuthSessionMissingError" &&
+    !isExpiredSession
+  ) {
     throw new Error(`Could not refresh your sign-in: ${error.message}`);
   }
 

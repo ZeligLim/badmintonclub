@@ -15,8 +15,25 @@ export async function finalizeDueSessions(): Promise<number> {
   return data;
 }
 
-export async function signUp(sessionId: string): Promise<void> {
-  await updateSignup(sessionId, "request_session_signup");
+export async function signUp(
+  sessionId: string,
+  friendIds: string[],
+): Promise<void> {
+  validateFriendIds(friendIds);
+  await updateSignup(sessionId, "request_session_signup", friendIds);
+}
+
+export async function updatePlayerLevel(
+  playerLevel: "BEGINNER" | "INTERMEDIATE",
+): Promise<void> {
+  const supabase = await requireAuthenticatedClient();
+  const { error } = await supabase.rpc("update_my_player_level", {
+    p_player_level: playerLevel,
+  });
+
+  if (error) {
+    throw new Error(`Could not update your player level: ${error.message}`);
+  }
 }
 
 export async function joinConfirmedSession(sessionId: string): Promise<void> {
@@ -61,12 +78,17 @@ export async function markSessionPlayed(sessionId: string): Promise<void> {
 async function updateSignup(
   sessionId: string,
   functionName: "request_session_signup" | "cancel_session_signup",
+  friendIds: string[] = [],
 ): Promise<void> {
   validateSessionId(sessionId);
   const supabase = await requireAuthenticatedClient();
-  const { error } = await supabase.rpc(functionName, {
-    p_session_id: sessionId,
-  });
+  const { error } =
+    functionName === "request_session_signup"
+      ? await supabase.rpc(functionName, {
+          p_session_id: sessionId,
+          p_friend_ids: friendIds,
+        })
+      : await supabase.rpc(functionName, { p_session_id: sessionId });
 
   if (error) {
     throw new Error(
@@ -100,5 +122,17 @@ async function requireAuthenticatedClient() {
 function validateSessionId(sessionId: string): void {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(sessionId)) {
     throw new Error("That session could not be found.");
+  }
+}
+
+function validateFriendIds(friendIds: string[]): void {
+  const hasInvalidId = friendIds.some(
+    (friendId) =>
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        friendId,
+      ),
+  );
+  if (friendIds.length > 3 || hasInvalidId) {
+    throw new Error("Select up to three valid club members.");
   }
 }

@@ -1,3 +1,5 @@
+import type { PlayerLevel } from "@/types/player";
+
 export type SessionSignupStatus =
   | "requested"
   | "selected"
@@ -6,6 +8,15 @@ export type SessionSignupStatus =
   | "cancelled";
 
 export type SessionStatus = "open" | "confirmed" | "closed";
+
+export type { PlayerLevel } from "@/types/player";
+
+export type FriendCandidate = {
+  userId: string;
+  displayName: string;
+  playerLevel: PlayerLevel;
+  isSelected: boolean;
+};
 
 export type SessionPlayer = {
   id: string;
@@ -33,6 +44,7 @@ export type ClubSession = {
   status: SessionStatus;
   currentUserStatus: Exclude<SessionSignupStatus, "cancelled"> | null;
   currentUserSlot: number | null;
+  friendCandidates: FriendCandidate[];
   timeSlots: SessionTimeSlot[];
 };
 
@@ -43,6 +55,12 @@ export type DemoSignupCounts = {
 
 export type DashboardData = {
   mode: "demo" | "live";
-  user: { id: string; displayName: string } | null;
+  user: {
+    id: string;
+    displayName: string;
+    playerLevel: PlayerLevel;
+    isCommittee: boolean;
+    isCommitteeAdmin: boolean;
+  } | null;
   sessions: ClubSession[];
 };

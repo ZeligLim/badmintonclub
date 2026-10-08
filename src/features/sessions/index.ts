@@ -11,5 +11,12 @@ export {
   markSessionPlayed,
   signOutFromClub,
   signUpForSession,
+  updatePlayerLevelForCurrentUser,
 } from "./api";
-export type { ClubSession, DashboardData, DemoSignupCounts } from "./types";
+export type {
+  ClubSession,
+  DashboardData,
+  DemoSignupCounts,
+  FriendCandidate,
+  PlayerLevel,
+} from "./types";

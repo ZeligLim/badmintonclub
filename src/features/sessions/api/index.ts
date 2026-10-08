@@ -8,6 +8,7 @@ import {
   cancelSignup,
   signOut,
   signUp,
+  updatePlayerLevel,
   joinConfirmedSession as joinConfirmed,
 } from "./actions";
 import { loadDashboardData } from "./dashboard";
@@ -21,8 +22,17 @@ export async function finalizeDueSessions(): Promise<number> {
   return finalizeDue();
 }
 
-export async function signUpForSession(sessionId: string): Promise<void> {
-  await signUp(sessionId);
+export async function signUpForSession(
+  sessionId: string,
+  friendIds: string[] = [],
+): Promise<void> {
+  await signUp(sessionId, friendIds);
+}
+
+export async function updatePlayerLevelForCurrentUser(
+  playerLevel: "BEGINNER" | "INTERMEDIATE",
+): Promise<void> {
+  await updatePlayerLevel(playerLevel);
 }
 
 export async function joinConfirmedSessionFcfs(sessionId: string): Promise<void> {

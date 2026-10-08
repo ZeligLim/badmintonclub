@@ -7,6 +7,7 @@ import type { Database } from "@/lib/supabase/database.types";
 import type {
   ClubSession,
   DashboardData,
+  FriendCandidate,
   SessionSignupStatus,
   SessionStatus,
 } from "../types";
@@ -15,6 +16,8 @@ type DashboardSessionRow =
   Database["public"]["Functions"]["get_dashboard_sessions"]["Returns"][number];
 type RosterRow =
   Database["public"]["Functions"]["get_session_roster"]["Returns"][number];
+type FriendCandidateRow =
+  Database["public"]["Functions"]["get_friend_candidates"]["Returns"][number];
 
 export async function loadDashboardData(): Promise<DashboardData> {
   if (!hasSupabaseConfig()) {
@@ -53,6 +56,9 @@ export async function loadDashboardData(): Promise<DashboardData> {
   const rosterRows = user
     ? await getRosterRows(supabase, sessionRows)
     : [];
+  const friendCandidates: Map<string, FriendCandidate[]> = user
+    ? await getFriendCandidates(supabase, sessionRows)
+    : new Map();
   const profile = user
     ? await getProfile(supabase, user.id)
     : null;
@@ -66,9 +72,14 @@ export async function loadDashboardData(): Promise<DashboardData> {
             profile?.display_name ??
             user.email?.split("@")[0] ??
             "Player",
+          playerLevel: parsePlayerLevel(profile?.player_level ?? "INTERMEDIATE"),
+          isCommittee: profile?.is_committee ?? false,
+          isCommitteeAdmin: profile?.is_committee_admin ?? false,
         }
       : null,
-    sessions: sessionRows.map((row) => mapSession(row, rosterRows)),
+    sessions: sessionRows.map((row) =>
+      mapSession(row, rosterRows, friendCandidates.get(row.id) ?? []),
+    ),
   };
 }
 
@@ -78,7 +89,7 @@ async function getProfile(
 ) {
   const { data, error } = await supabase
     .from("profiles")
-    .select("display_name")
+    .select("display_name, player_level, is_committee, is_committee_admin")
     .eq("id", userId)
     .maybeSingle();
 
@@ -87,6 +98,31 @@ async function getProfile(
   }
 
   return data;
+}
+
+async function getFriendCandidates(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  sessions: DashboardSessionRow[],
+): Promise<Map<string, FriendCandidate[]>> {
+  const openSessions = sessions.filter((session) => session.status === "open");
+  const candidateRows = await Promise.all(
+    openSessions.map(async (session) => {
+      const { data, error } = await supabase.rpc("get_friend_candidates", {
+        p_session_id: session.id,
+      });
+      if (error) {
+        throw new Error(`Could not load friend choices: ${error.message}`);
+      }
+      return [session.id, data] as const;
+    }),
+  );
+
+  return new Map(
+    candidateRows.map(([sessionId, candidates]) => [
+      sessionId,
+      candidates.map(mapFriendCandidate),
+    ]),
+  );
 }
 
 async function getRosterRows(
@@ -111,7 +147,11 @@ async function getRosterRows(
   return rosters.flatMap((roster) => roster.data ?? []);
 }
 
-function mapSession(row: DashboardSessionRow, rosterRows: RosterRow[]): ClubSession {
+function mapSession(
+  row: DashboardSessionRow,
+  rosterRows: RosterRow[],
+  friendCandidates: FriendCandidate[],
+): ClubSession {
   const dayName = getDayName(row.day_name);
   const status = getSessionStatus(row.status);
   const sessionRoster = rosterRows.filter((player) => player.session_id === row.id);
@@ -152,8 +192,30 @@ function mapSession(row: DashboardSessionRow, rosterRows: RosterRow[]): ClubSess
     status,
     currentUserStatus: getSignupStatus(row.current_user_status),
     currentUserSlot: row.current_user_slot,
+    friendCandidates,
     timeSlots,
   };
+}
+
+function mapFriendCandidate(row: FriendCandidateRow): FriendCandidate {
+  return {
+    userId: row.user_id,
+    displayName: row.display_name,
+    playerLevel: parsePlayerLevel(row.player_level),
+    isSelected: row.is_selected,
+  };
+}
+
+function parsePlayerLevel(playerLevel: string): FriendCandidate["playerLevel"] {
+  if (
+    playerLevel === "BEGINNER" ||
+    playerLevel === "INTERMEDIATE" ||
+    playerLevel === "PROFESSIONAL"
+  ) {
+    return playerLevel;
+  }
+
+  throw new Error("A club member has an unsupported player level.");
 }
 
 function getDayName(value: string): "Monday" | "Wednesday" {

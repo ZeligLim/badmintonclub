@@ -4,6 +4,7 @@ import { connection } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { addMinutesToTime } from "@/lib/sessions/schedule";
+import type { PlayerLevel } from "@/types/player";
 
 const GAME_DURATION_MINUTES = 15;
 
@@ -34,17 +35,62 @@ export type AdminSession = {
   courtSchedule: AdminCourtGame[];
 };
 
+export type AdminClubPlayer = {
+  userId: string;
+  displayName: string;
+  playerLevel: PlayerLevel;
+  isCommittee: boolean;
+};
+
 export async function requireAdminUser() {
   await connection();
   const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
+  const { data, error } = await supabase.auth.getUser();
+  if (error && error.name !== "AuthSessionMissingError") {
+    throw new Error(`Could not verify club administrator: ${error.message}`);
+  }
+  if (!data.user) {
+    return null;
+  }
+
   const email = data.user?.email ?? "";
 
   if (!email || !/^[^@\s]+@atu\.ie$/i.test(email)) {
     return null;
   }
 
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("is_committee_admin")
+    .eq("id", data.user.id)
+    .maybeSingle();
+  if (profileError) {
+    throw new Error(`Could not verify club administrator access: ${profileError.message}`);
+  }
+  if (!profile?.is_committee_admin) {
+    return null;
+  }
+
   return { email };
+}
+
+export async function loadClubPlayers(): Promise<AdminClubPlayer[]> {
+  if (!(await requireAdminUser())) {
+    throw new Error("Only a club administrator can manage player access.");
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_list_club_players");
+  if (error) {
+    throw new Error(`Could not load club players: ${error.message}`);
+  }
+
+  return data.map((player) => ({
+    userId: player.user_id,
+    displayName: player.display_name,
+    playerLevel: parsePlayerLevel(player.player_level),
+    isCommittee: player.is_committee,
+  }));
 }
 
 export async function loadAdminData(): Promise<AdminSession[]> {
@@ -125,6 +171,18 @@ export async function loadAdminData(): Promise<AdminSession[]> {
       courtSchedule,
     };
   });
+}
+
+function parsePlayerLevel(playerLevel: string): PlayerLevel {
+  if (
+    playerLevel === "BEGINNER" ||
+    playerLevel === "INTERMEDIATE" ||
+    playerLevel === "PROFESSIONAL"
+  ) {
+    return playerLevel;
+  }
+
+  throw new Error("A club member has an unsupported player level.");
 }
 
 function buildCourtSchedule(

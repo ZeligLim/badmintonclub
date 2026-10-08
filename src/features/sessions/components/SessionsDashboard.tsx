@@ -51,6 +51,9 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
   );
   const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
   const [demoTimeOverride, setDemoTimeOverride] = useState<Date | null>(null);
+  const [demoPlayerLevel, setDemoPlayerLevel] = useState<
+    "BEGINNER" | "INTERMEDIATE"
+  >("INTERMEDIATE");
   const [demoSignupCounts, setDemoSignupCounts] = useState<DemoSignupCounts>(
     DEFAULT_DEMO_SIGNUP_COUNTS,
   );
@@ -143,7 +146,7 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
       });
   }, [initialData.user, isDemo, router, sessionClockTime, sessions]);
 
-  async function changeSignup(session: ClubSession) {
+  async function changeSignup(session: ClubSession, friendIds: string[] = []) {
     setErrorMessage("");
     setPendingSessionId(session.id);
 
@@ -158,7 +161,7 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
       } else if (session.status === "confirmed") {
         await joinConfirmedSessionFcfs(session.id);
       } else {
-        await signUpForSession(session.id);
+        await signUpForSession(session.id, friendIds);
       }
 
       router.refresh();
@@ -270,6 +273,14 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
         <SessionsHeader
           isDemo={isDemo}
           displayName={initialData.user?.displayName ?? null}
+          isCommittee={initialData.user?.isCommittee ?? false}
+          isCommitteeAdmin={initialData.user?.isCommitteeAdmin ?? false}
+          playerLevel={
+            isDemo
+              ? demoPlayerLevel
+              : initialData.user?.playerLevel ?? "INTERMEDIATE"
+          }
+          onDemoPlayerLevelChange={setDemoPlayerLevel}
         />
         <h1 className="sr-only">ATU Galway Badminton Club</h1>
 
@@ -326,9 +337,9 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
                       : getSignupWindowStatus(session, sessionClockTime)
                   }
                   isDemo={isDemo}
-                  isSignedIn={Boolean(initialData.user)}
+                  isSignedIn={isDemo || Boolean(initialData.user)}
                   isPending={pendingSessionId === session.id}
-                  onSignup={() => changeSignup(session)}
+                  onSignup={(friendIds) => changeSignup(session, friendIds)}
                   canMarkPlayed={
                     !isDemo &&
                     Boolean(initialData.user) &&

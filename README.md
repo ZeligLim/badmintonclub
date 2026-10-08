@@ -54,8 +54,18 @@ project's Auth settings.
   sessions whose deadlines have passed. If no member has the dashboard open at
   the deadline, finalization runs when a member next opens the app.
 - Final selection prioritizes the oldest `last_played_at`, with never-played
-  members first and signup time as the tie-breaker. Awarding a place updates
-  play history to that session's scheduled start; overflow is waitlisted.
+  members first and signup time as the tie-breaker. Committee members are
+  considered first, then friend groups are ranked using the most recently
+  played eligible group member. Awarding a place updates play history to that
+  session's scheduled start; overflow is waitlisted.
+- Beginner and Intermediate are member-selectable matching preferences.
+  Professional is invite-only and can only be assigned by a club administrator.
+  Levels never prevent a player from being selected; complete courts prefer
+  compatible levels after fairness and friend-group preferences.
+- Members can select up to three club friends for an open-session request.
+  Friend selection does not bypass committee priority or longest-since-last-play
+  fairness. Friends who do not make an eligible request for that session are
+  ignored when matching.
 - Monday sessions have 2 courts and a 16-player capacity. Wednesday sessions
   have 4 courts and a 32-player capacity.
 - In `/dev`, the Testing controls set total sign-ups for each weekday from 0 to
@@ -75,6 +85,26 @@ security suite. Push pending migrations to the linked hosted project with
 database trigger reject accounts outside `@atu.ie`. When configuring a hosted
 Supabase project, enable the **Before user created** Auth hook and select
 `public.hook_restrict_club_email` to enforce the same signup rule there.
+
+After applying the matching migration, a trusted database administrator must
+bootstrap the first club administrator by setting `is_committee_admin = true`
+for that member's profile, after confirming the member's `@atu.ie` identity.
+For example, replace the placeholder with the verified member's Auth user ID:
+
+```sql
+update public.profiles
+set is_committee_admin = true
+where id = '<verified-atu-user-id>'
+  and exists (
+    select 1
+    from auth.users
+    where auth.users.id = profiles.id
+      and lower(auth.users.email) like '%@atu.ie'
+  );
+```
+
+Subsequent administrators can manage player levels and committee status in
+`/admin`; the database verifies administrator access on every request.
 
 For a hosted setup, create a Supabase project and a Vercel project, copy the
 values from `.env.example` into the Vercel environment settings, then link and

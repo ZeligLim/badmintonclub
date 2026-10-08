@@ -8,9 +8,37 @@ import type {
   ClubSession,
   DashboardData,
   DemoSignupCounts,
+  FriendCandidate,
 } from "./types";
 import type { AdminPlayer, AdminSession } from "../admin/data";
 import { buildDemoCourtSchedule } from "./demo-court-schedule";
+
+const DEMO_FRIEND_CANDIDATES: FriendCandidate[] = [
+  {
+    userId: "demo-friend-aoife",
+    displayName: "Aoife Murphy",
+    playerLevel: "BEGINNER",
+    isSelected: false,
+  },
+  {
+    userId: "demo-friend-ciaran",
+    displayName: "Ciarán Kelly",
+    playerLevel: "INTERMEDIATE",
+    isSelected: false,
+  },
+  {
+    userId: "demo-friend-sile",
+    displayName: "Síle Brennan",
+    playerLevel: "BEGINNER",
+    isSelected: false,
+  },
+  {
+    userId: "demo-friend-darragh",
+    displayName: "Darragh Quinn",
+    playerLevel: "PROFESSIONAL",
+    isSelected: false,
+  },
+];
 
 export const DEFAULT_DEMO_SIGNUP_COUNTS: DemoSignupCounts = {
   Monday: 12,
@@ -140,6 +168,7 @@ function createDemoSession(
     status: "open",
     currentUserStatus: null,
     currentUserSlot: null,
+    friendCandidates: DEMO_FRIEND_CANDIDATES,
     timeSlots: Array.from({ length: slotCount }, (_, index) => ({
       number: index + 1,
       startAt: addMinutesToTime(

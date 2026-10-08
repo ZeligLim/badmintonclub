@@ -1,7 +1,12 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { loadAdminData, requireAdminUser } from "@/features/admin/data";
-import { CourtScheduleTable } from "@/features/admin/CourtScheduleTable";
+import {
+  ClubPlayerAccessTable,
+  CourtScheduleTable,
+  loadAdminData,
+  loadClubPlayers,
+  requireAdminUser,
+} from "@/features/admin";
 
 export const instant = false;
 
@@ -9,7 +14,10 @@ export default async function AdminPage() {
   const user = await requireAdminUser();
   if (!user) redirect("/sign-in");
 
-  const sessions = await loadAdminData();
+  const [sessions, players] = await Promise.all([
+    loadAdminData(),
+    loadClubPlayers(),
+  ]);
 
   return (
     <main className="min-h-screen px-4 pb-16 pt-6 sm:px-8">
@@ -26,6 +34,8 @@ export default async function AdminPage() {
             ← Back to sessions
           </Link>
         </header>
+
+        <ClubPlayerAccessTable players={players} />
 
         {sessions.length === 0 ? (
           <p className="text-sm text-muted-foreground">No upcoming sessions found.</p>
