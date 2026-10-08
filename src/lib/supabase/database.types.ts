@@ -124,7 +124,10 @@ isOneToOne: false
               "display_name": string,"is_committee": boolean,"player_level": string,"user_id": string
             }[]
                            },
-"admin_update_player_access":
+            "admin_set_session_happening":
+            { Args: { "p_happening": boolean,"p_session_id": string }; Returns: undefined
+                                       },
+            "admin_update_player_access":
 { Args: { "p_is_committee": boolean,"p_player_level": string,"p_user_id": string }; Returns: undefined
                            },
 "cancel_session_signup":

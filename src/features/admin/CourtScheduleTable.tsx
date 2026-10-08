@@ -1,4 +1,5 @@
 import type { AdminSession } from "./data";
+import { SessionAvailabilityToggle } from "./SessionAvailabilityToggle";
 
 export function CourtScheduleTable({ session }: { session: AdminSession }) {
   const selectedPlayers = session.players.filter(
@@ -11,6 +12,7 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
     session.status === "confirmed"
       ? "bg-primary/10 text-primary"
       : "bg-secondary text-secondary-foreground";
+  const isCancelled = session.status === "cancelled";
 
   return (
     <section>
@@ -31,12 +33,23 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
         <span
           className={`rounded-full px-2 py-0.5 text-[0.65rem] font-semibold capitalize ${statusBadge}`}
         >
-          {session.status}
+          {isCancelled ? "Not happening" : session.status}
         </span>
+        {session.availabilityCanChange && (
+          <SessionAvailabilityToggle
+            sessionId={session.id}
+            isHappening={!isCancelled}
+            isConfirmed={session.status === "confirmed"}
+          />
+        )}
       </div>
 
       {/* Court schedule table */}
-      {session.courtSchedule.length > 0 ? (
+      {isCancelled ? (
+        <p className="text-sm text-muted-foreground">
+          This session will not take place. Existing sign-ups are retained.
+        </p>
+      ) : session.courtSchedule.length > 0 ? (
         <div className="overflow-x-auto rounded-xl border border-border">
           <table className="w-full text-sm">
             <thead>
@@ -80,21 +93,21 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
       <div className="mt-4 flex flex-wrap gap-6 text-xs text-muted-foreground">
         <span>
           <span className="font-medium text-foreground">{selectedPlayers.length}</span>{" "}
-          confirmed
+          {isCancelled ? "previously confirmed" : "confirmed"}
         </span>
         {requestedPlayers.length > 0 && (
           <span>
             <span className="font-medium text-foreground">{requestedPlayers.length}</span>{" "}
-            awaiting confirmation
+            {isCancelled ? "signup requests retained" : "awaiting confirmation"}
           </span>
         )}
         {waitlistedPlayers.length > 0 && (
           <span>
             <span className="font-medium text-foreground">{waitlistedPlayers.length}</span>{" "}
-            waitlisted
+            {isCancelled ? "waitlisted (retained)" : "waitlisted"}
           </span>
         )}
-        {selectedPlayers.length < session.capacity && (
+        {!isCancelled && selectedPlayers.length < session.capacity && (
           <span>
             <span className="font-medium text-foreground">
               {session.capacity - selectedPlayers.length}

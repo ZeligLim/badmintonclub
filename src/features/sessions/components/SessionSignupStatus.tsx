@@ -1,5 +1,6 @@
 type SessionSignupStatusProps = {
   status: string;
+  isCancelled: boolean;
   isConfirmed: boolean;
   isSignedIn: boolean;
   isSessionInProgress: boolean;
@@ -8,11 +9,20 @@ type SessionSignupStatusProps = {
 
 export function SessionSignupStatus({
   status,
+  isCancelled,
   isConfirmed,
   isSignedIn,
   isSessionInProgress,
   isSessionOver,
 }: SessionSignupStatusProps) {
+  if (isCancelled) {
+    return (
+      <span className="rounded-full bg-secondary px-2.5 py-1 text-[0.65rem] font-semibold text-secondary-foreground">
+        Not happening
+      </span>
+    );
+  }
+
   if (isSessionOver) {
     return (
       <span className="rounded-full bg-secondary px-2.5 py-1 text-[0.65rem] font-semibold text-secondary-foreground">

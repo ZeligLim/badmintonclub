@@ -231,7 +231,12 @@ function getDayName(value: string): "Monday" | "Wednesday" {
 }
 
 function getSessionStatus(value: string): SessionStatus {
-  if (value === "open" || value === "confirmed" || value === "closed") {
+  if (
+    value === "open" ||
+    value === "confirmed" ||
+    value === "closed" ||
+    value === "cancelled"
+  ) {
     return value;
   }
 

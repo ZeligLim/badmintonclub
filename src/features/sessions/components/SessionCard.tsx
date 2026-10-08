@@ -123,7 +123,18 @@ export function SessionCard({
             </p>
           </div>
 
-          {!isSessionInProgress && !isSessionOver && (
+          {session.status === "cancelled" && (
+            <p
+              className="mt-3 rounded-lg bg-secondary px-3 py-2 text-sm font-medium text-secondary-foreground"
+              role="status"
+            >
+              This session is not happening. Existing sign-ups have been retained.
+            </p>
+          )}
+
+          {!isSessionInProgress &&
+            !isSessionOver &&
+            session.status !== "cancelled" && (
             <>
               <div className="mt-4 flex items-center gap-3 py-2">
                 <UsersRound aria-hidden="true" className="size-4 shrink-0 text-primary" />
@@ -175,7 +186,9 @@ export function SessionCard({
             </>
           )}
 
-          {showSessionView && playerGameSchedule.length > 0 && (
+          {showSessionView &&
+            session.status !== "cancelled" &&
+            playerGameSchedule.length > 0 && (
             <div aria-label="Your games" className="mt-3">
               <p className="mb-2 text-sm font-medium text-primary">
                 Your games
@@ -192,7 +205,7 @@ export function SessionCard({
             </div>
           )}
 
-          {isWaitlisted && (
+          {isWaitlisted && session.status !== "cancelled" && (
             <p className="mt-3 flex items-center gap-1.5 text-xs font-medium text-amber-800">
               <Clock3 aria-hidden="true" className="size-3.5" />
               You’re on the waitlist. We’ll let you know if a place opens.
@@ -217,6 +230,7 @@ export function SessionCard({
           <div className="mt-4 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
             <SessionSignupStatus
               status={signupStatus}
+              isCancelled={session.status === "cancelled"}
               isConfirmed={isConfirmed}
               isSignedIn={isSignedIn}
               isSessionInProgress={isSessionInProgress}
@@ -224,7 +238,7 @@ export function SessionCard({
             />
             {!isDemo && !isSessionOver && (
               <>
-                {!isSignedIn ? (
+                {!isSignedIn && session.status !== "cancelled" ? (
                   <Link
                     className="text-xs font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     href="https://badmintonclub.vercel.app/sign-in"
@@ -236,6 +250,7 @@ export function SessionCard({
             )}
             {!isPlayed &&
               !isSessionOver &&
+              session.status !== "cancelled" &&
               (session.status === "open" || hasFcfsSpace) &&
               (session.status === "open" ? signupWindowStatus !== "closed" : true) && (
               <Button
@@ -264,7 +279,8 @@ export function SessionCard({
               </Button>
             )}
           </div>
-          {(canMarkPlayed || hasBeenPlayed) && (
+          {session.status !== "cancelled" &&
+            (canMarkPlayed || hasBeenPlayed) && (
             <div className="mt-3 flex items-center justify-between gap-3 pt-2">
               <p className="text-xs text-muted-foreground">
                 {hasBeenPlayed

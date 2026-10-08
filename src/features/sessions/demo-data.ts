@@ -90,7 +90,7 @@ const WEDNESDAY_PLAYERS: AdminPlayer[] = [
   { userId: "b2c3d4e5-0002-4000-8000-000000000018", displayName: "Tomás Carolan", status: "selected", slotNumber: 5 },
   { userId: "b2c3d4e5-0002-4000-8000-000000000019", displayName: "Nuala Fitzpatrick", status: "selected", slotNumber: 5 },
   { userId: "b2c3d4e5-0002-4000-8000-000000000020", displayName: "Ciarán Timoney", status: "selected", slotNumber: 5 },
-  // Waitlisted (capacity is 32, 20 selected → 12 spots remain open for FCFS demo)
+  // Waitlisted (20 of 40 places selected; the remaining places are open for FCFS demo)
   { userId: "b2c3d4e5-0002-4000-8000-000000000021", displayName: "Ailbhe Fagan", status: "waitlisted", slotNumber: null },
   { userId: "b2c3d4e5-0002-4000-8000-000000000022", displayName: "Seamus Larkin", status: "waitlisted", slotNumber: null },
 ];
@@ -101,7 +101,7 @@ export function createDemoAdminSessions(now = new Date()): AdminSession[] {
   return schedule.sessions.map(({ date }) => {
     const dayName = getSessionDayName(date);
     const isMonday = dayName === "Monday";
-    const capacity = isMonday ? 16 : 32;
+    const capacity = isMonday ? 16 : 40;
     const courtCount = capacity / 8;
     const durationMinutes = isMonday ? 60 : 120;
     const startsAt = isMonday ? "18:00" : "20:00";
@@ -119,6 +119,7 @@ export function createDemoAdminSessions(now = new Date()): AdminSession[] {
       capacity,
       courtCount,
       status: "confirmed" as const,
+      availabilityCanChange: true,
       players,
       courtSchedule: buildDemoCourtSchedule(startsAt, durationMinutes, courtCount, selectedPlayers),
     };
@@ -151,7 +152,7 @@ function createDemoSession(
   const confirmationDate = new Date(`${date}T12:00:00Z`);
   confirmationDate.setUTCDate(confirmationDate.getUTCDate() - 1);
 
-  const capacity = dayName === "Monday" ? 16 : 32;
+  const capacity = dayName === "Monday" ? 16 : 40;
   const playersPerSlot = 4;
   const slotCount = capacity / playersPerSlot;
   const durationMinutes = dayName === "Monday" ? 60 : 120;

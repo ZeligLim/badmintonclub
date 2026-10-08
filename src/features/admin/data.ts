@@ -31,6 +31,7 @@ export type AdminSession = {
   capacity: number;
   courtCount: number;
   status: string;
+  availabilityCanChange: boolean;
   players: AdminPlayer[];
   courtSchedule: AdminCourtGame[];
 };
@@ -97,15 +98,16 @@ export async function loadAdminData(): Promise<AdminSession[]> {
   await connection();
   const admin = createAdminClient();
 
-  // Fetch all non-closed sessions with signups + profile display names.
+  // Fetch all sessions that can be managed, including sessions marked as cancelled.
   const { data: sessions, error: sessionsErr } = await admin
     .from("sessions")
     .select("id, event_date, starts_at, duration_minutes, capacity, status")
-    .in("status", ["open", "confirmed"])
+    .in("status", ["open", "confirmed", "cancelled"])
     .order("event_date");
 
   if (sessionsErr) throw new Error(`Could not load sessions: ${sessionsErr.message}`);
   if (!sessions?.length) return [];
+  const londonNow = getLondonDateTime(new Date());
 
   const sessionIds = sessions.map((s) => s.id);
 
@@ -167,10 +169,33 @@ export async function loadAdminData(): Promise<AdminSession[]> {
       capacity: session.capacity,
       courtCount,
       status: session.status,
+      availabilityCanChange:
+        session.event_date > londonNow.date ||
+        (session.event_date === londonNow.date &&
+          session.starts_at.slice(0, 5) > londonNow.time),
       players,
       courtSchedule,
     };
   });
+}
+
+function getLondonDateTime(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/London",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+
+  return {
+    date: `${value("year")}-${value("month")}-${value("day")}`,
+    time: `${value("hour")}:${value("minute")}`,
+  };
 }
 
 function parsePlayerLevel(playerLevel: string): PlayerLevel {

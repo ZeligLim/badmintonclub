@@ -7,7 +7,7 @@ export type SessionSignupStatus =
   | "played"
   | "cancelled";
 
-export type SessionStatus = "open" | "confirmed" | "closed";
+export type SessionStatus = "open" | "confirmed" | "closed" | "cancelled";
 
 export type { PlayerLevel } from "@/types/player";
 

@@ -1,6 +1,6 @@
 begin;
 
-select plan(47);
+select plan(48);
 
 select has_table('public', 'profiles', 'profiles table exists');
 select has_table('public', 'sessions', 'sessions table exists');
@@ -144,8 +144,8 @@ select is(
   (select capacity
    from public.sessions
    where event_date = date_trunc('week', now() at time zone 'Europe/London')::date + 2),
-  32::smallint,
-  'Wednesday sessions have a capacity of 32'
+  40::smallint,
+  'Wednesday sessions have a capacity of 40'
 );
 select is(
   (select confirmation_at
@@ -184,7 +184,7 @@ with generated_players as (
   select
     ('10000000-0000-4000-8000-' || lpad(player_number::text, 12, '0'))::uuid as id,
     player_number
-  from generate_series(1, 34) as player(player_number)
+  from generate_series(1, 42) as player(player_number)
 )
 insert into auth.users (
   id,
@@ -294,7 +294,7 @@ reset role;
 
 select is(
   (select count(*) from public.profiles where id::text like '10000000-0000-4000-8000-%'),
-  34::bigint,
+  42::bigint,
   'auth sign-up creates a profile for every player'
 );
 
@@ -377,7 +377,7 @@ select is(
     where session.event_date = date_trunc('week', now() at time zone 'Europe/London')::date + 7
       and signup.status = 'waitlisted'
   ),
-  18::bigint,
+  26::bigint,
   'players over capacity are waitlisted'
 );
 select is(
@@ -421,8 +421,8 @@ select is(
     where session.event_date = date_trunc('week', now() at time zone 'Europe/London')::date + 9
       and signup.status = 'selected'
   ),
-  32::bigint,
-  'Wednesday selection fills all 32 available places'
+  40::bigint,
+  'Wednesday selection fills all 40 available places'
 );
 select is(
   (
@@ -433,7 +433,7 @@ select is(
       and signup.status = 'waitlisted'
   ),
   2::bigint,
-  'Wednesday players beyond 32 places are waitlisted'
+  'Wednesday players beyond 40 places are waitlisted'
 );
 select is(
   (
@@ -445,6 +445,17 @@ select is(
   ),
   4::smallint,
   'the 16th-priority Wednesday player is assigned to the fourth group'
+);
+select is(
+  (
+    select signup.slot_number
+    from public.session_signups as signup
+    join public.sessions as session on session.id = signup.session_id
+    where session.event_date = date_trunc('week', now() at time zone 'Europe/London')::date + 9
+      and signup.user_id = '10000000-0000-4000-8000-000000000014'
+  ),
+  10::smallint,
+  'the 40th-selected Wednesday player is assigned to the tenth group'
 );
 select is(
   (
