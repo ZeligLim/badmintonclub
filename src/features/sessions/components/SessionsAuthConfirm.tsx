@@ -156,10 +156,8 @@ async function logSessionState(
   getSessionSeesSession: boolean;
   getUserSeesUser: boolean;
 }> {
-  const [sessionResult, userResult] = await Promise.all([
-    supabase.auth.getSession(),
-    supabase.auth.getUser(),
-  ]);
+  const sessionResult = await supabase.auth.getSession();
+  const userResult = await supabase.auth.getUser();
   const sessionState = {
     getSessionSeesSession: Boolean(sessionResult.data.session),
     getUserSeesUser: Boolean(userResult.data.user),

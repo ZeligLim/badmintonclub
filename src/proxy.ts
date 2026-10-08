@@ -15,13 +15,16 @@ export async function proxy(request: NextRequest) {
       getAll() {
         return request.cookies.getAll();
       },
-      setAll(cookiesToSet) {
+      setAll(cookiesToSet, headers) {
         cookiesToSet.forEach(({ name, value }) => {
           request.cookies.set(name, value);
         });
         response = NextResponse.next({ request });
         cookiesToSet.forEach(({ name, value, options }) => {
           response.cookies.set(name, value, options);
+        });
+        Object.entries(headers).forEach(([name, value]) => {
+          response.headers.set(name, value);
         });
       },
     },
@@ -31,14 +34,22 @@ export async function proxy(request: NextRequest) {
   if (code) {
     await supabase.auth.exchangeCodeForSession(code);
     const cookiesToForward = response.cookies.getAll();
+    const headersToForward = ["cache-control", "expires", "pragma"].map(
+      (name) => [name, response.headers.get(name)] as const,
+    );
     const callbackUrl = request.nextUrl.clone();
     callbackUrl.searchParams.delete("code");
     response = NextResponse.redirect(callbackUrl);
     cookiesToForward.forEach((cookie) => response.cookies.set(cookie));
+    for (const [name, value] of headersToForward) {
+      if (value) {
+        response.headers.set(name, value);
+      }
+    }
     return response;
   }
 
-  const { error } = await supabase.auth.getUser();
+  const { error } = await supabase.auth.getClaims();
   const isExpiredSession =
     error?.code === "refresh_token_not_found" ||
     error?.code === "refresh_token_already_used" ||
