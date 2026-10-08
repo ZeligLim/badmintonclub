@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, useTransition, type FormEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+  type FormEvent,
+} from "react";
 import { ArrowRight, Check, LogOut, Pencil, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -36,7 +42,29 @@ export function SessionsHeader({
   const [isEditingName, setIsEditingName] = useState(false);
   const [draftDisplayName, setDraftDisplayName] = useState(displayName ?? "");
   const [nameError, setNameError] = useState("");
-  const compactDisplayName = getCompactDisplayName(displayName ?? "");
+  const displayNameRef = useRef<HTMLHeadingElement>(null);
+  const fullDisplayNameRef = useRef<HTMLSpanElement>(null);
+  const [shouldShortenName, setShouldShortenName] = useState(false);
+
+  useEffect(() => {
+    const nameElement = displayNameRef.current;
+    const fullNameElement = fullDisplayNameRef.current;
+    if (!nameElement || !fullNameElement) {
+      return;
+    }
+
+    const updateNameLength = () => {
+      setShouldShortenName(
+        fullNameElement.getBoundingClientRect().width >
+          nameElement.getBoundingClientRect().width,
+      );
+    };
+
+    updateNameLength();
+    const observer = new ResizeObserver(updateNameLength);
+    observer.observe(nameElement);
+    return () => observer.disconnect();
+  }, [displayName]);
 
   function changePlayerLevel(value: string) {
     if (value !== "BEGINNER" && value !== "INTERMEDIATE") {
@@ -86,7 +114,7 @@ export function SessionsHeader({
 
   return (
     <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex min-w-0 items-center gap-3">
+      <div className="flex w-full min-w-0 items-center gap-3">
         <Link
           aria-label="ATU Galway Badminton Club home"
           className="flex shrink-0 items-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -129,11 +157,16 @@ export function SessionsHeader({
             <div className="flex min-w-0 items-center gap-1 sm:gap-2">
               {!isEditingName ? (
                 <h1
-                  className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight text-foreground sm:text-2xl"
+                  className="relative min-w-0 flex-1 truncate text-lg font-semibold tracking-tight text-foreground sm:text-2xl"
+                  ref={displayNameRef}
                   title={displayName}
                 >
-                  <span className="sm:hidden">{compactDisplayName}</span>
-                  <span className="hidden sm:inline">{displayName}</span>
+                  <span className="absolute invisible whitespace-nowrap" ref={fullDisplayNameRef}>
+                    {displayName}
+                  </span>
+                  {shouldShortenName
+                    ? getCompactDisplayName(displayName)
+                    : displayName}
                 </h1>
               ) : (
                 <form
@@ -253,7 +286,7 @@ export function SessionsHeader({
           </div>
         ) : (
           <Link
-            className="inline-flex items-center gap-1.5 rounded-sm px-2 py-1 text-sm font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-sm px-2 py-1 text-sm font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             href="https://badmintonclub.vercel.app/sign-in"
           >
             Sign in <ArrowRight aria-hidden="true" className="size-4" />
@@ -273,5 +306,5 @@ function getCompactDisplayName(name: string): string {
 
   const firstName = nameParts[0];
   const lastName = nameParts.at(-1);
-  return `${firstName} ${lastName?.[0]}.`;
+  return `${firstName} ${lastName?.[0] ?? ""}`;
 }
