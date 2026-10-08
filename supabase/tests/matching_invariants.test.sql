@@ -106,7 +106,7 @@ select
   '31000000-0000-4000-8000-000000000002',
   ('21000000-0000-4000-8000-' || lpad(player_number::text, 12, '0'))::uuid,
   'requested'
-from unnest(array[7, 8, 9, 10, 11, 12, 13, 14, 15, 16]) as player_number;
+from unnest(array[8, 9, 10, 11, 12, 13, 14, 15, 16]) as player_number;
 
 insert into public.session_signups (
   session_id,
@@ -135,11 +135,6 @@ insert into public.session_friend_preferences (
   friend_user_id
 )
 values
-  (
-    '31000000-0000-4000-8000-000000000002',
-    '21000000-0000-4000-8000-000000000007',
-    '21000000-0000-4000-8000-000000000008'
-  ),
   (
     '31000000-0000-4000-8000-000000000002',
     '21000000-0000-4000-8000-000000000009',
@@ -434,6 +429,43 @@ update auth.users
 set email = 'ineligible-player@example.test'
 where id = '21000000-0000-4000-8000-000000000006';
 
+set local role authenticated;
+select set_config(
+  'request.jwt.claim.sub',
+  '21000000-0000-4000-8000-000000000007',
+  true
+);
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"21000000-0000-4000-8000-000000000007","email":"matching-invariant-7@atu.ie","role":"authenticated"}',
+  true
+);
+select lives_ok(
+  $$select public.request_session_signup(
+    '31000000-0000-4000-8000-000000000002',
+    array[
+      '21000000-0000-4000-8000-000000000008'::uuid,
+      '21000000-0000-4000-8000-000000000009'::uuid
+    ]
+  )$$,
+  'Student A joins the oversubscribed session and selects Students B and C'
+);
+reset role;
+select is(
+  (
+    select count(*)
+    from public.session_friend_preferences
+    where session_id = '31000000-0000-4000-8000-000000000002'
+      and user_id = '21000000-0000-4000-8000-000000000007'
+      and friend_user_id in (
+        '21000000-0000-4000-8000-000000000008',
+        '21000000-0000-4000-8000-000000000009'
+      )
+  ),
+  2::bigint,
+  'the signup RPC persisted exactly Student B and Student C preference IDs'
+);
+
 update public.sessions
 set confirmation_at = now() - interval '1 minute'
 where id in (
@@ -569,6 +601,24 @@ select is(
   ),
   1::bigint,
   'a selected friend pair shares a court when fairness permits'
+);
+select is(
+  (
+    select case
+      when count(*) = 3 and count(distinct signup.slot_number) = 1 then 1
+      else 0
+    end
+    from public.session_signups as signup
+    where signup.session_id = '31000000-0000-4000-8000-000000000002'
+      and signup.user_id in (
+        '21000000-0000-4000-8000-000000000007',
+        '21000000-0000-4000-8000-000000000008',
+        '21000000-0000-4000-8000-000000000009'
+      )
+      and signup.status = 'selected'
+  ),
+  1,
+  'the signup-selected pair and second friend are assigned together after finalization'
 );
 select is(
   (
