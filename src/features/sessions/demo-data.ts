@@ -10,6 +10,7 @@ import type {
   DemoSignupCounts,
   FriendCandidate,
 } from "./types";
+import { getCourtCount } from "./court-schedule";
 import type { AdminPlayer, AdminSession } from "../admin/data";
 import { buildDemoCourtSchedule } from "./demo-court-schedule";
 
@@ -102,7 +103,7 @@ export function createDemoAdminSessions(now = new Date()): AdminSession[] {
     const dayName = getSessionDayName(date);
     const isMonday = dayName === "Monday";
     const capacity = isMonday ? 16 : 40;
-    const courtCount = capacity / 8;
+    const courtCount = getCourtCount(capacity);
     const durationMinutes = isMonday ? 60 : 120;
     const startsAt = isMonday ? "18:00" : "20:00";
     const players = isMonday ? MONDAY_PLAYERS : WEDNESDAY_PLAYERS;
@@ -164,7 +165,7 @@ function createDemoSession(
     dayName,
     startsAt,
     durationMinutes,
-    courtCount: capacity / 8,
+    courtCount: getCourtCount(capacity),
     capacity,
     registeredCount,
     playersPerSlot,

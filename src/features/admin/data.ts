@@ -4,6 +4,7 @@ import { connection } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { addMinutesToTime } from "@/lib/sessions/schedule";
+import { getCourtCount } from "@/features/sessions/court-schedule";
 import type { PlayerLevel } from "@/types/player";
 
 const GAME_DURATION_MINUTES = 15;
@@ -148,7 +149,7 @@ export async function loadAdminData(): Promise<AdminSession[]> {
       slotNumber: s.slot_number,
     }));
 
-    const courtCount = session.capacity / 8;
+    const courtCount = getCourtCount(session.capacity);
     const selectedPlayers = players
       .filter((p) => p.status === "selected" || p.status === "played")
       .sort((a, b) => (a.slotNumber ?? 99) - (b.slotNumber ?? 99));

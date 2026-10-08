@@ -5,7 +5,7 @@ import {
   type MailjetConfig,
   type MailjetEmail,
 } from "../../../../supabase/functions/_shared/mailjet";
-import { createPlayerGameSchedule } from "../court-schedule";
+import { createPlayerGameSchedule, getCourtCount } from "../court-schedule";
 import type { createClient } from "@/lib/supabase/server";
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
@@ -83,7 +83,7 @@ async function createBookingConfirmationEmail(
   const sessionDetails = {
     startsAt: session.starts_at,
     durationMinutes: session.duration_minutes,
-    courtCount: session.capacity / 8,
+    courtCount: getCourtCount(session.capacity),
   };
   const groupCount = Math.ceil(roster.length / 4);
   const playerGames = createPlayerGameSchedule(

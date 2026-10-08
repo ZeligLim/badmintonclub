@@ -11,6 +11,7 @@ import type {
   SessionSignupStatus,
   SessionStatus,
 } from "../types";
+import { getCourtCount } from "../court-schedule";
 
 type DashboardSessionRow =
   Database["public"]["Functions"]["get_dashboard_sessions"]["Returns"][number];
@@ -187,7 +188,7 @@ function mapSession(
     dayName,
     startsAt: row.starts_at,
     durationMinutes: row.duration_minutes,
-    courtCount: row.capacity / 8,
+    courtCount: getCourtCount(row.capacity),
     capacity: row.capacity,
     registeredCount: row.registered_count,
     playersPerSlot: 4,

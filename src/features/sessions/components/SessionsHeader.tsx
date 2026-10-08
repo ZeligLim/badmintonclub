@@ -298,46 +298,44 @@ export function SessionsHeader({
               )}
             </div>
 
-            <div className="mt-2 flex min-w-0 items-center gap-2">
+            <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2">
               {isCommittee && (
                 <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[0.65rem] font-medium text-primary sm:text-xs">
                   Committee
                 </span>
               )}
+              {isCommittee && !isEditingName && (
+                <button
+                  aria-checked={committeeAutoSignup}
+                  aria-label="Automatically sign me up for sessions"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-60"
+                  disabled={isUpdatingAutoSignup}
+                  onClick={changeCommitteeAutoSignup}
+                  role="switch"
+                  type="button"
+                >
+                  <span>Auto Sign-up</span>
+                  <span
+                    className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[0.6rem] font-semibold text-primary"
+                    aria-hidden="true"
+                  >
+                    {committeeAutoSignup ? "ON" : "OFF"}
+                  </span>
+                </button>
+              )}
               {isCommitteeAdmin && (
                 <Link
-                  className="inline-flex h-10 shrink-0 items-center rounded-md px-2 text-xs font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-sm"
+                  className="inline-flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-sm"
                   href="/admin"
                 >
                   Manage club
                 </Link>
               )}
             </div>
-            {isCommittee && !isEditingName && (
-              <div className="mt-2">
-                <button
-                  aria-checked={committeeAutoSignup}
-                  aria-label="Automatically sign me up for sessions"
-                  className="inline-flex max-w-full items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-left text-xs text-foreground transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-60 sm:text-sm"
-                  disabled={isUpdatingAutoSignup}
-                  onClick={changeCommitteeAutoSignup}
-                  role="switch"
-                  type="button"
-                >
-                  <span>Automatically sign me up for sessions</span>
-                  <span
-                    className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[0.65rem] font-semibold text-primary"
-                    aria-hidden="true"
-                  >
-                    {committeeAutoSignup ? "ON" : "OFF"}
-                  </span>
-                </button>
-                {autoSignupError && (
-                  <span className="mt-1 block text-[0.65rem] text-destructive" role="alert">
-                    {autoSignupError}
-                  </span>
-                )}
-              </div>
+            {autoSignupError && (
+              <span className="mt-1 block text-[0.65rem] text-destructive" role="alert">
+                {autoSignupError}
+              </span>
             )}
             {levelError && (
               <span className="mt-1 block text-[0.65rem] text-destructive" role="alert">

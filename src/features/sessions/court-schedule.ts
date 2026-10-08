@@ -3,6 +3,10 @@ import type { ClubSession } from "./types";
 
 const GAME_DURATION_MINUTES = 15;
 
+export function getCourtCount(capacity: number): number {
+  return Math.min(Math.ceil(capacity / 8), 4);
+}
+
 export type PlayerGame = {
   courtNumber: number;
   startAt: string;
