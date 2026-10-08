@@ -1,7 +1,13 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useState } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
 import { Button } from "@/components/ui/button";
 import {
   searchClubMembers,
@@ -16,7 +22,6 @@ type SessionFriendPickerProps = {
   onChange: (friendIds: string[]) => void;
   onSave: (friendIds: string[]) => Promise<void>;
   selectedFriendIds: string[];
-  sessionId: string;
 };
 
 export function SessionFriendPicker({
@@ -27,15 +32,17 @@ export function SessionFriendPicker({
   onChange,
   onSave,
   selectedFriendIds,
-  sessionId,
 }: SessionFriendPickerProps) {
   const [query, setQuery] = useState("");
   const [addedFriends, setAddedFriends] = useState<FriendCandidate[]>([]);
   const [searchResults, setSearchResults] = useState<FriendCandidate[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [activeResultIndex, setActiveResultIndex] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [savedFriendIds, setSavedFriendIds] = useState(selectedFriendIds);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const searchId = useId();
+  const searchRequestId = useRef(0);
   const knownFriends = new Map(
     [...friendCandidates, ...addedFriends].map((friend) => [
       friend.userId,
@@ -54,36 +61,54 @@ export function SessionFriendPicker({
     selectedFriendIds.length !== savedFriendIds.length ||
     selectedFriendIds.some((friendId) => !savedFriendIds.includes(friendId));
 
-  async function searchFriends() {
-    if (isPending || isSearching || selectedFriendIds.length >= 3) {
-      return;
-    }
-    if (normalizedQuery.length < 2 || normalizedQuery.length > 64) {
-      setFeedback("Enter at least two characters to search.");
+  useEffect(() => {
+    const requestId = searchRequestId.current;
+
+    if (
+      normalizedQuery.length < 2 ||
+      normalizedQuery.length > 64 ||
+      selectedFriendIds.length >= 3
+    ) {
       return;
     }
 
-    setIsSearching(true);
-    setFeedback(null);
-    try {
-      const results = isDemo
-        ? friendCandidates.filter((candidate) => {
-            const searchText =
-              `${candidate.displayName} ${candidate.studentId}`.toLowerCase();
-            return searchText.includes(normalizedQuery.toLowerCase());
-          })
-        : await searchClubMembers(normalizedQuery);
-      setSearchResults(results);
-      if (results.length === 0) {
-        setFeedback("No club members found.");
+    const timeoutId = window.setTimeout(async () => {
+      setIsSearching(true);
+      setFeedback(null);
+      try {
+        const results = isDemo
+          ? friendCandidates.filter((candidate) => {
+              const searchText =
+                `${candidate.displayName} ${candidate.studentId}`.toLowerCase();
+              return searchText.includes(normalizedQuery.toLowerCase());
+            })
+          : await searchClubMembers(normalizedQuery);
+
+        if (searchRequestId.current === requestId) {
+          setSearchResults(results);
+          setActiveResultIndex(0);
+          if (results.length === 0) {
+            setFeedback("No club members found.");
+          }
+        }
+      } catch {
+        if (searchRequestId.current === requestId) {
+          setFeedback("Could not search club members. Please try again.");
+        }
+      } finally {
+        if (searchRequestId.current === requestId) {
+          setIsSearching(false);
+        }
       }
-    } catch {
-      setSearchResults([]);
-      setFeedback("Could not search club members. Please try again.");
-    } finally {
-      setIsSearching(false);
-    }
-  }
+    }, 250);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    friendCandidates,
+    isDemo,
+    normalizedQuery,
+    selectedFriendIds.length,
+  ]);
 
   function addSelectedFriend(friend: FriendCandidate) {
     if (isPending || selectedFriendIds.length >= 3) {
@@ -103,7 +128,37 @@ export function SessionFriendPicker({
     onChange([...selectedFriendIds, friend.userId]);
     setQuery("");
     setSearchResults([]);
+    setIsSearching(false);
     setFeedback(`${friend.displayName} added to your friend list.`);
+  }
+
+  function handleSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Escape") {
+      searchRequestId.current += 1;
+      setQuery("");
+      setSearchResults([]);
+      setIsSearching(false);
+      setFeedback(null);
+      return;
+    }
+    if (searchResults.length === 0) {
+      return;
+    }
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActiveResultIndex((index) => (index + 1) % searchResults.length);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveResultIndex(
+        (index) => (index - 1 + searchResults.length) % searchResults.length,
+      );
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      const friend = selectableFriends[activeResultIndex];
+      if (friend) {
+        addSelectedFriend(friend);
+      }
+    }
   }
 
   function removeSelectedFriend(friendId: string) {
@@ -162,63 +217,60 @@ export function SessionFriendPicker({
       ) : (
         <p className="mt-1 text-xs text-muted-foreground">No friends selected.</p>
       )}
-      <div className="mt-2 grid grid-cols-1 items-end gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-        <div className="grid min-w-0 gap-1">
-          <label
-            className="text-xs font-medium"
-            htmlFor={`friend-search-${sessionId}`}
-          >
-            Search by name or student ID
-          </label>
-          <input
-            autoComplete="off"
-            className="h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm"
-            disabled={isPending || isSearching || selectedFriendIds.length >= 3}
-            id={`friend-search-${sessionId}`}
-            maxLength={64}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setSearchResults([]);
-              setFeedback(null);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                void searchFriends();
-              }
-            }}
-            placeholder="Name or ATU student ID"
-            spellCheck={false}
-            value={query}
-          />
-        </div>
-        <Button
-          disabled={
-            isPending ||
-            isSearching ||
-            normalizedQuery.length < 2 ||
-            selectedFriendIds.length >= 3
+      <div className="mt-2 grid min-w-0 gap-1">
+        <label className="text-xs font-medium" htmlFor={`${searchId}-input`}>
+          Search by name or student ID
+        </label>
+        <input
+          aria-activedescendant={
+            selectableFriends[activeResultIndex]
+              ? `${searchId}-option-${activeResultIndex}`
+              : undefined
           }
-          className="h-10 w-full border border-primary/25 text-primary disabled:border-border disabled:text-muted-foreground sm:w-auto"
-          onClick={() => void searchFriends()}
-          size="sm"
-          type="button"
-          variant="outline"
-        >
-          {isSearching ? "Searching…" : "Search"}
-        </Button>
+          aria-autocomplete="list"
+          aria-controls={`${searchId}-results`}
+          aria-expanded={selectableFriends.length > 0}
+          autoComplete="off"
+          className="h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          disabled={isPending || selectedFriendIds.length >= 3}
+          id={`${searchId}-input`}
+          maxLength={64}
+          onChange={(event) => {
+            searchRequestId.current += 1;
+            setQuery(event.target.value);
+            setSearchResults([]);
+            setActiveResultIndex(0);
+            setIsSearching(false);
+            setFeedback(null);
+          }}
+          onKeyDown={handleSearchKeyDown}
+          placeholder="Name or ATU student ID"
+          role="combobox"
+          spellCheck={false}
+          value={query}
+        />
       </div>
       {selectableFriends.length > 0 && (
         <ul
           aria-label="Search results"
-          className="mt-2 grid gap-1 rounded-lg border border-border p-1"
+          className="mt-1 grid max-h-56 gap-1 overflow-y-auto rounded-lg border border-border bg-background p-1 shadow-lg"
+          id={`${searchId}-results`}
+          role="listbox"
         >
-          {selectableFriends.map((friend) => (
-            <li key={friend.userId}>
+          {selectableFriends.map((friend, index) => (
+            <li
+              aria-selected={index === activeResultIndex}
+              id={`${searchId}-option-${index}`}
+              key={friend.userId}
+              role="option"
+            >
               <button
-                className="flex w-full items-center justify-between gap-3 rounded-md px-2.5 py-2 text-left text-sm hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                className={`flex w-full items-center justify-between gap-3 rounded-md px-2.5 py-2 text-left text-sm hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${
+                  index === activeResultIndex ? "bg-accent" : ""
+                }`}
                 disabled={isPending || selectedFriendIds.length >= 3}
                 onClick={() => addSelectedFriend(friend)}
+                onMouseEnter={() => setActiveResultIndex(index)}
                 type="button"
               >
                 <span className="min-w-0 truncate font-medium">
@@ -231,6 +283,11 @@ export function SessionFriendPicker({
             </li>
           ))}
         </ul>
+      )}
+      {isSearching && (
+        <p aria-live="polite" className="mt-2 text-xs text-muted-foreground">
+          Searching…
+        </p>
       )}
       {feedback && (
         <p aria-live="polite" className="mt-2 text-xs text-muted-foreground">

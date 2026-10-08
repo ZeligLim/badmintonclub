@@ -223,7 +223,6 @@ export function SessionCard({
                 onChange={setSelectedFriendIds}
                 onSave={onSaveFriendPreferences}
                 selectedFriendIds={selectedFriendIds}
-                sessionId={session.id}
               />
             )}
 
