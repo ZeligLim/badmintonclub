@@ -172,12 +172,6 @@ export function SessionCard({
                   </p>
                 )}
               </div>
-              {!hasFcfsSpace && (
-                <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                  Everyone can sign up. When places are limited, players who have
-                  waited longest since playing are prioritized.
-                </p>
-              )}
             </>
           )}
 

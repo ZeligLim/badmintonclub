@@ -129,11 +129,6 @@ export function SessionFriendPicker({
   return (
     <fieldset className="mt-4 border-t border-border pt-3">
       <legend className="text-sm font-medium">Play with friends (optional)</legend>
-      <p className="mb-2 mt-1 text-xs leading-4 text-muted-foreground">
-        {isDemo
-          ? "Preview only. Friend choices do not change real bookings or matching."
-          : "Preference only. Committee priority and fairness come first; ineligible friends are skipped."}
-      </p>
       <p className="text-xs font-medium text-muted-foreground">
         Selected friends ({selectedFriends.length}/3)
       </p>
@@ -190,7 +185,7 @@ export function SessionFriendPicker({
                 void addFriend();
               }
             }}
-            placeholder="g00440629"
+            placeholder="g00112233"
             spellCheck={false}
             value={studentId}
           />
