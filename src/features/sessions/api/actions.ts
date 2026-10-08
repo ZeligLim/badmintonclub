@@ -24,6 +24,24 @@ export async function signUp(
   await updateSignup(sessionId, "request_session_signup", friendIds);
 }
 
+export async function updateSessionFriendPreferences(
+  sessionId: string,
+  friendIds: string[],
+): Promise<void> {
+  validateFriendIds(friendIds);
+  validateSessionId(sessionId);
+
+  const supabase = await requireAuthenticatedClient();
+  const { error } = await supabase.rpc("update_session_friend_preferences", {
+    p_session_id: sessionId,
+    p_friend_ids: friendIds,
+  });
+
+  if (error) {
+    throw new Error(`Could not save your friend choices: ${error.message}`);
+  }
+}
+
 export async function findFriendByStudentId(
   studentId: string,
 ): Promise<FriendCandidate | null> {

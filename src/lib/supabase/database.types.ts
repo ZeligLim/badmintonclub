@@ -171,6 +171,9 @@ isOneToOne: false
 "update_my_player_level":
 { Args: { "p_player_level": string }; Returns: undefined
                            }
+"update_session_friend_preferences":
+{ Args: { "p_friend_ids"?: (string)[],"p_session_id": string }; Returns: undefined
+                           }
           }
           Enums: {
             [_ in never]: never

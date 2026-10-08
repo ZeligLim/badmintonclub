@@ -1,6 +1,6 @@
 begin;
 
-select plan(39);
+select plan(45);
 
 alter table public.sessions drop constraint sessions_capacity_check;
 
@@ -295,6 +295,72 @@ select is(
    limit 1),
   'matching-player-16',
   'saved friend details include the student ID needed to render the selection'
+);
+select lives_ok(
+  $$select public.update_session_friend_preferences(
+    '30000000-0000-4000-8000-000000000005',
+    array['20000000-0000-4000-8000-000000000017'::uuid]
+  )$$,
+  'a signed-up member can update friend preferences before confirmation'
+);
+select is(
+  (select user_id::text
+   from public.get_session_friend_preferences(
+     '30000000-0000-4000-8000-000000000005'
+   )
+   limit 1),
+  '20000000-0000-4000-8000-000000000017',
+  'updating preferences replaces the previous selected friends'
+);
+select throws_ok(
+  $$select public.update_session_friend_preferences(
+    '30000000-0000-4000-8000-000000000005',
+    array[
+      '20000000-0000-4000-8000-000000000001'::uuid,
+      '20000000-0000-4000-8000-000000000002'::uuid,
+      '20000000-0000-4000-8000-000000000003'::uuid,
+      '20000000-0000-4000-8000-000000000004'::uuid
+    ]
+  )$$,
+  '22023',
+  'Select no more than three friends.',
+  'the update RPC rejects more than three selected friends'
+);
+select throws_ok(
+  $$select public.update_session_friend_preferences(
+    '30000000-0000-4000-8000-000000000005',
+    array['20000000-0000-4000-8000-000000000015'::uuid]
+  )$$,
+  '22023',
+  'Select existing ATU club members only.',
+  'the update RPC rejects selecting yourself'
+);
+reset role;
+update public.sessions
+set confirmation_at = now() + interval '1 day'
+where id = '30000000-0000-4000-8000-000000000001';
+set local role authenticated;
+select throws_ok(
+  $$select public.update_session_friend_preferences(
+    '30000000-0000-4000-8000-000000000001',
+    '{}'::uuid[]
+  )$$,
+  'P0001',
+  'You need an active session signup to update friend choices.',
+  'members cannot update preferences for another signup'
+);
+reset role;
+update public.sessions
+set confirmation_at = now() - interval '1 minute'
+where id = '30000000-0000-4000-8000-000000000001';
+set local role authenticated;
+select ok(
+  not has_function_privilege(
+    'anon',
+    'public.update_session_friend_preferences(uuid,uuid[])',
+    'execute'
+  ),
+  'anonymous users cannot update session friend preferences'
 );
 select ok(
   has_function_privilege(

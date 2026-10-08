@@ -36,6 +36,7 @@ type SessionCardProps = {
   canMarkPlayed: boolean;
   hasBeenPlayed: boolean;
   onSignup: (friendIds: string[]) => void;
+  onSaveFriendPreferences: (friendIds: string[]) => Promise<void>;
   onMarkPlayed: () => void;
 };
 
@@ -52,6 +53,7 @@ export function SessionCard({
   canMarkPlayed,
   hasBeenPlayed,
   onSignup,
+  onSaveFriendPreferences,
   onMarkPlayed,
 }: SessionCardProps) {
   const friendCandidates = session.friendCandidates ?? [];
@@ -211,12 +213,14 @@ export function SessionCard({
 
           {isSignedIn &&
             session.status === "open" &&
-            !isSignedUp && (
+            (!isSignedUp || signupStatus === "requested") && (
               <SessionFriendPicker
                 friendCandidates={friendCandidates}
+                isAlreadySignedUp={isSignedUp}
                 isDemo={isDemo}
                 isPending={isPending}
                 onChange={setSelectedFriendIds}
+                onSave={onSaveFriendPreferences}
                 selectedFriendIds={selectedFriendIds}
                 sessionId={session.id}
               />

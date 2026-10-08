@@ -10,6 +10,7 @@ export {
   getDashboardData,
   joinConfirmedSessionFcfs,
   markSessionPlayed,
+  saveSessionFriendPreferences,
   signOutFromClub,
   signUpForSession,
   updatePlayerLevelForCurrentUser,

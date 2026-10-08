@@ -9,6 +9,7 @@ import {
   cancelSignup,
   signOut,
   signUp,
+  updateSessionFriendPreferences as updateSessionFriendPreferencesAction,
   updatePlayerLevel,
   joinConfirmedSession as joinConfirmed,
 } from "./actions";
@@ -32,6 +33,13 @@ export async function signUpForSession(
   friendIds: string[] = [],
 ): Promise<void> {
   await signUp(sessionId, friendIds);
+}
+
+export async function saveSessionFriendPreferences(
+  sessionId: string,
+  friendIds: string[],
+): Promise<void> {
+  await updateSessionFriendPreferencesAction(sessionId, friendIds);
 }
 
 export async function updatePlayerLevelForCurrentUser(

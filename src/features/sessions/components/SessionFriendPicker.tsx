@@ -10,24 +10,30 @@ import {
 
 type SessionFriendPickerProps = {
   friendCandidates: FriendCandidate[];
+  isAlreadySignedUp: boolean;
   isDemo: boolean;
   isPending: boolean;
   onChange: (friendIds: string[]) => void;
+  onSave: (friendIds: string[]) => Promise<void>;
   selectedFriendIds: string[];
   sessionId: string;
 };
 
 export function SessionFriendPicker({
   friendCandidates,
+  isAlreadySignedUp,
   isDemo,
   isPending,
   onChange,
+  onSave,
   selectedFriendIds,
   sessionId,
 }: SessionFriendPickerProps) {
   const [studentId, setStudentId] = useState("");
   const [addedFriends, setAddedFriends] = useState<FriendCandidate[]>([]);
   const [isLookingUp, setIsLookingUp] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedFriendIds, setSavedFriendIds] = useState(selectedFriendIds);
   const [feedback, setFeedback] = useState<string | null>(null);
   const knownFriends = new Map(
     [...friendCandidates, ...addedFriends].map((friend) => [
@@ -45,6 +51,9 @@ export function SessionFriendPicker({
       friend.studentId.toLowerCase() === normalizedStudentId &&
       selectedFriendIds.includes(friend.userId),
   );
+  const hasUnsavedChanges =
+    selectedFriendIds.length !== savedFriendIds.length ||
+    selectedFriendIds.some((friendId) => !savedFriendIds.includes(friendId));
 
   async function addFriend() {
     if (isPending || isLookingUp || selectedFriendIds.length >= 3) {
@@ -96,6 +105,24 @@ export function SessionFriendPicker({
 
   function removeSelectedFriend(friendId: string) {
     onChange(selectedFriendIds.filter((selectedId) => selectedId !== friendId));
+  }
+
+  async function saveFriendChoices() {
+    if (isPending || isSaving || !hasUnsavedChanges) {
+      return;
+    }
+
+    setIsSaving(true);
+    setFeedback(null);
+    try {
+      await onSave(selectedFriendIds);
+      setSavedFriendIds(selectedFriendIds);
+      setFeedback("Friend choices saved.");
+    } catch {
+      setFeedback("Could not save your friend choices. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
@@ -186,6 +213,17 @@ export function SessionFriendPicker({
         <p aria-live="polite" className="mt-2 text-xs text-muted-foreground">
           {feedback}
         </p>
+      )}
+      {isAlreadySignedUp && (
+        <Button
+          className="mt-3"
+          disabled={isPending || isSaving || !hasUnsavedChanges}
+          onClick={() => void saveFriendChoices()}
+          size="sm"
+          type="button"
+        >
+          {isSaving ? "Saving…" : "Save friend choices"}
+        </Button>
       )}
     </fieldset>
   );

@@ -7,6 +7,7 @@ import {
   finalizeDueSessions,
   joinConfirmedSessionFcfs,
   markSessionPlayed,
+  saveSessionFriendPreferences,
   signUpForSession,
 } from "@/features/sessions";
 import { getUpcomingSchedule, londonDateTime } from "@/lib/sessions/schedule";
@@ -167,6 +168,26 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
       router.refresh();
     } catch {
       setErrorMessage("We couldn’t update your place. Please try again.");
+    } finally {
+      setPendingSessionId(null);
+    }
+  }
+
+  async function saveFriendPreferences(
+    session: ClubSession,
+    friendIds: string[],
+  ): Promise<void> {
+    setErrorMessage("");
+    setPendingSessionId(session.id);
+
+    try {
+      if (!isDemo) {
+        await saveSessionFriendPreferences(session.id, friendIds);
+        router.refresh();
+      }
+    } catch {
+      setErrorMessage("We couldn’t save your friend choices. Please try again.");
+      throw new Error("Could not save your friend choices.");
     } finally {
       setPendingSessionId(null);
     }
@@ -340,6 +361,9 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
                   isSignedIn={isDemo || Boolean(initialData.user)}
                   isPending={pendingSessionId === session.id}
                   onSignup={(friendIds) => changeSignup(session, friendIds)}
+                  onSaveFriendPreferences={(friendIds) =>
+                    saveFriendPreferences(session, friendIds)
+                  }
                   canMarkPlayed={
                     !isDemo &&
                     Boolean(initialData.user) &&
