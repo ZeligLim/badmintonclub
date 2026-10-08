@@ -110,23 +110,17 @@ export function SessionCard({
     <article className="overflow-hidden rounded-2xl bg-white">
       <div className="flex items-stretch">
         <div className="min-w-0 flex-1 p-4 sm:p-5">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div>
-
-              <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <h3 className="text-lg font-medium tracking-tight">
-                  {formatSessionTime(session.startsAt)}
-                  <span className="ml-2 text-sm font-normal text-muted-foreground">
-                    · {formatDuration(session.durationMinutes)}
-                  </span>
-                </h3>
-                <p className="text-sm font-medium text-muted-foreground">
-                  {session.dayName}, {formatSessionDate(session.date)} ·{" "}
-                  {session.courtCount} courts
-                </p>
-              </div>
-            </div>
-
+          <div className="mt-1 grid gap-y-1 sm:flex sm:flex-wrap sm:items-baseline sm:gap-x-3">
+            <h3 className="text-lg font-medium tracking-tight">
+              {formatSessionTime(session.startsAt)}
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
+                · {formatDuration(session.durationMinutes)}
+              </span>
+            </h3>
+            <p className="text-sm font-medium text-muted-foreground">
+              {session.dayName}, {formatSessionDate(session.date)} ·{" "}
+              {session.courtCount} courts
+            </p>
           </div>
 
           {!isSessionInProgress && !isSessionOver && (
@@ -226,7 +220,7 @@ export function SessionCard({
               />
             )}
 
-          <div className="mt-4 flex items-center justify-between gap-3">
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
             <SessionSignupStatus
               status={signupStatus}
               isConfirmed={isConfirmed}

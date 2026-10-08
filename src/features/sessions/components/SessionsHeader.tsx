@@ -57,7 +57,7 @@ export function SessionsHeader({
   }
 
   return (
-    <header className="flex items-center justify-between">
+    <header className="grid grid-cols-[3.5rem_minmax(0,1fr)] items-start gap-x-3 sm:flex sm:items-center sm:justify-between">
       <Link
         aria-label="ATU Galway Badminton Club home"
         className="flex items-center gap-3 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -74,7 +74,7 @@ export function SessionsHeader({
       </Link>
 
       {isDemo ? (
-        <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center">
+        <div className="flex min-w-0 flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
           <span className="inline-flex items-center gap-2 rounded-full bg-primary/5 px-3 py-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.13em] text-primary">
             <span className="size-1.5 rounded-full bg-primary" />
             Local demo
@@ -83,7 +83,7 @@ export function SessionsHeader({
             Demo playing level
           </label>
           <select
-            className="max-w-44 rounded-md border border-border bg-background px-2 py-1.5 text-xs"
+            className="w-full min-w-0 rounded-md border border-border bg-background px-2 py-1.5 text-xs sm:w-auto sm:max-w-44"
             id="demo-player-level"
             onChange={(event) => changePlayerLevel(event.target.value)}
             value={playerLevel}
@@ -96,14 +96,14 @@ export function SessionsHeader({
           </select>
         </div>
       ) : displayName ? (
-        <div className="flex items-center gap-3">
-          <div className="flex min-w-0 flex-col items-end gap-1">
-            <span className="max-w-56 truncate text-sm text-muted-foreground">
+        <div className="grid min-w-0 gap-2 sm:flex sm:items-center sm:gap-3">
+          <div className="flex min-w-0 flex-col items-start gap-1 sm:items-end">
+            <span className="max-w-full truncate text-sm text-muted-foreground sm:max-w-56">
               {displayName}
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex min-w-0 items-center gap-2">
               {isCommittee && (
-                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                   Committee
                 </span>
               )}
@@ -111,7 +111,7 @@ export function SessionsHeader({
                 Playing level
               </label>
               <select
-                className="max-w-36 rounded-md border border-border bg-background px-2 py-1 text-xs"
+                className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-xs sm:max-w-36 sm:flex-none"
                 disabled={isUpdatingLevel}
                 id="player-level"
                 onChange={(event) => changePlayerLevel(event.target.value)}
@@ -130,7 +130,7 @@ export function SessionsHeader({
               </span>
             )}
           </div>
-          <div className="flex flex-col items-end gap-1">
+          <div className="flex items-center justify-between gap-2 sm:flex-col sm:items-end sm:gap-1">
             {isCommitteeAdmin && (
               <Link
                 className="text-xs font-medium text-primary underline-offset-4 hover:underline"
