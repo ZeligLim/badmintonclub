@@ -62,6 +62,7 @@ export type DashboardData = {
     playerLevel: PlayerLevel;
     isCommittee: boolean;
     isCommitteeAdmin: boolean;
+    committeeAutoSignup: boolean;
   } | null;
   sessions: ClubSession[];
 };

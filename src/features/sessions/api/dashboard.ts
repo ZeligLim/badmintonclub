@@ -75,6 +75,7 @@ export async function loadDashboardData(): Promise<DashboardData> {
           playerLevel: parsePlayerLevel(profile?.player_level ?? "INTERMEDIATE"),
           isCommittee: profile?.is_committee ?? false,
           isCommitteeAdmin: profile?.is_committee_admin ?? false,
+          committeeAutoSignup: profile?.committee_auto_signup ?? false,
         }
       : null,
     sessions: sessionRows.map((row) =>
@@ -89,7 +90,9 @@ async function getProfile(
 ) {
   const { data, error } = await supabase
     .from("profiles")
-    .select("display_name, player_level, is_committee, is_committee_admin")
+    .select(
+      "display_name, player_level, is_committee, is_committee_admin, committee_auto_signup",
+    )
     .eq("id", userId)
     .maybeSingle();
 

@@ -35,14 +35,14 @@ export type Database = {
           Tables: {
             "profiles": {
                   Row: {
-                    "created_at": string,"display_name": string,"id": string,"is_committee": boolean,"is_committee_admin": boolean,"last_played_at": string | null,"player_level": string
+                    "committee_auto_signup": boolean,"created_at": string,"display_name": string,"id": string,"is_committee": boolean,"is_committee_admin": boolean,"last_played_at": string | null,"player_level": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"display_name": string,"id": string,"is_committee"?: boolean,"is_committee_admin"?: boolean,"last_played_at"?: string | null,"player_level"?: string
+                    "committee_auto_signup"?: boolean,"created_at"?: string,"display_name": string,"id": string,"is_committee"?: boolean,"is_committee_admin"?: boolean,"last_played_at"?: string | null,"player_level"?: string
                   }
                   Update: {
-                    "created_at"?: string,"display_name"?: string,"id"?: string,"is_committee"?: boolean,"is_committee_admin"?: boolean,"last_played_at"?: string | null,"player_level"?: string
+                    "committee_auto_signup"?: boolean,"created_at"?: string,"display_name"?: string,"id"?: string,"is_committee"?: boolean,"is_committee_admin"?: boolean,"last_played_at"?: string | null,"player_level"?: string
                   }
                   Relationships: [
 
@@ -167,6 +167,9 @@ isOneToOne: false
                            },
 "request_session_signup":
 { Args: { "p_friend_ids"?: (string)[],"p_session_id": string }; Returns: undefined
+                           },
+"set_my_committee_auto_signup":
+{ Args: { "p_enabled": boolean }; Returns: undefined
                            },
 "update_my_player_level":
 { Args: { "p_player_level": string }; Returns: undefined

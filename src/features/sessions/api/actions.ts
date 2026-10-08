@@ -94,6 +94,17 @@ export async function updatePlayerLevel(
   }
 }
 
+export async function updateCommitteeAutoSignup(enabled: boolean): Promise<void> {
+  const supabase = await requireAuthenticatedClient();
+  const { error } = await supabase.rpc("set_my_committee_auto_signup", {
+    p_enabled: enabled,
+  });
+
+  if (error) {
+    throw new Error(`Could not update automatic signup: ${error.message}`);
+  }
+}
+
 export async function updateDisplayName(
   displayName: string,
 ): Promise<void> {

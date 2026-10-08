@@ -9,6 +9,7 @@ import {
   cancelSignup,
   signOut,
   signUp,
+  updateCommitteeAutoSignup,
   updateDisplayName,
   updateSessionFriendPreferences as updateSessionFriendPreferencesAction,
   updatePlayerLevel,
@@ -53,6 +54,12 @@ export async function updateDisplayNameForCurrentUser(
   displayName: string,
 ): Promise<void> {
   await updateDisplayName(displayName);
+}
+
+export async function updateCommitteeAutoSignupForCurrentUser(
+  enabled: boolean,
+): Promise<void> {
+  await updateCommitteeAutoSignup(enabled);
 }
 
 export async function joinConfirmedSessionFcfs(sessionId: string): Promise<void> {

@@ -12,6 +12,7 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   signOutFromClub,
+  updateCommitteeAutoSignupForCurrentUser,
   updateDisplayNameForCurrentUser,
   updatePlayerLevelForCurrentUser,
   type PlayerLevel,
@@ -23,6 +24,7 @@ type SessionsHeaderProps = {
   displayName: string | null;
   isCommittee: boolean;
   isCommitteeAdmin: boolean;
+  committeeAutoSignup: boolean;
   playerLevel: PlayerLevel;
   onDemoPlayerLevelChange: (playerLevel: "BEGINNER" | "INTERMEDIATE") => void;
 };
@@ -32,6 +34,7 @@ export function SessionsHeader({
   displayName,
   isCommittee,
   isCommitteeAdmin,
+  committeeAutoSignup: initialCommitteeAutoSignup,
   playerLevel: initialPlayerLevel,
   onDemoPlayerLevelChange,
 }: SessionsHeaderProps) {
@@ -39,6 +42,11 @@ export function SessionsHeader({
   const [playerLevel, setPlayerLevel] = useState(initialPlayerLevel);
   const [isUpdatingLevel, startTransition] = useTransition();
   const [levelError, setLevelError] = useState("");
+  const [committeeAutoSignup, setCommitteeAutoSignup] = useState(
+    initialCommitteeAutoSignup,
+  );
+  const [isUpdatingAutoSignup, setIsUpdatingAutoSignup] = useState(false);
+  const [autoSignupError, setAutoSignupError] = useState("");
   const [isEditingName, setIsEditingName] = useState(false);
   const [draftDisplayName, setDraftDisplayName] = useState(displayName ?? "");
   const [nameError, setNameError] = useState("");
@@ -87,6 +95,24 @@ export function SessionsHeader({
         setLevelError("We couldn’t update your playing level. Please try again.");
       }
     });
+  }
+
+  async function changeCommitteeAutoSignup() {
+    const nextValue = !committeeAutoSignup;
+    setIsUpdatingAutoSignup(true);
+    setAutoSignupError("");
+
+    try {
+      await updateCommitteeAutoSignupForCurrentUser(nextValue);
+      setCommitteeAutoSignup(nextValue);
+      router.refresh();
+    } catch {
+      setAutoSignupError(
+        "We couldn’t update automatic signup. Please try again.",
+      );
+    } finally {
+      setIsUpdatingAutoSignup(false);
+    }
   }
 
   async function saveDisplayName(event: FormEvent<HTMLFormElement>) {
@@ -278,6 +304,32 @@ export function SessionsHeader({
                 </Link>
               )}
             </div>
+            {isCommittee && !isEditingName && (
+              <div className="mt-2">
+                <button
+                  aria-checked={committeeAutoSignup}
+                  aria-label="Automatically sign me up for sessions"
+                  className="inline-flex max-w-full items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-left text-xs text-foreground transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-60 sm:text-sm"
+                  disabled={isUpdatingAutoSignup}
+                  onClick={changeCommitteeAutoSignup}
+                  role="switch"
+                  type="button"
+                >
+                  <span>Automatically sign me up for sessions</span>
+                  <span
+                    className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[0.65rem] font-semibold text-primary"
+                    aria-hidden="true"
+                  >
+                    {committeeAutoSignup ? "ON" : "OFF"}
+                  </span>
+                </button>
+                {autoSignupError && (
+                  <span className="mt-1 block text-[0.65rem] text-destructive" role="alert">
+                    {autoSignupError}
+                  </span>
+                )}
+              </div>
+            )}
             {levelError && (
               <span className="mt-1 block text-[0.65rem] text-destructive" role="alert">
                 {levelError}

@@ -296,6 +296,7 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
           displayName={initialData.user?.displayName ?? null}
           isCommittee={initialData.user?.isCommittee ?? false}
           isCommitteeAdmin={initialData.user?.isCommitteeAdmin ?? false}
+          committeeAutoSignup={initialData.user?.committeeAutoSignup ?? false}
           playerLevel={
             isDemo
               ? demoPlayerLevel

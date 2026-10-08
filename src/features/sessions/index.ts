@@ -13,6 +13,7 @@ export {
   saveSessionFriendPreferences,
   signOutFromClub,
   signUpForSession,
+  updateCommitteeAutoSignupForCurrentUser,
   updateDisplayNameForCurrentUser,
   updatePlayerLevelForCurrentUser,
 } from "./api";
