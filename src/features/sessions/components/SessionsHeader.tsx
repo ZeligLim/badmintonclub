@@ -93,7 +93,7 @@ export function SessionsHeader({
         >
           <Image
             alt="ATU Galway Badminton Club"
-            className="size-14 rounded-full object-cover sm:size-16"
+            className="size-16 rounded-full object-cover sm:size-20"
             height={64}
             priority
             src="/logo.png"
@@ -111,7 +111,7 @@ export function SessionsHeader({
               Demo playing level
             </label>
             <select
-              className="w-full min-w-0 rounded-md border border-border bg-background px-2 py-1.5 text-xs sm:w-auto sm:max-w-44"
+              className="h-10 w-full min-w-0 rounded-md border border-border bg-background px-3 text-sm sm:w-auto sm:max-w-44"
               id="demo-player-level"
               onChange={(event) => changePlayerLevel(event.target.value)}
               value={playerLevel}
@@ -119,7 +119,7 @@ export function SessionsHeader({
               <option value="BEGINNER">Your level: Beginner</option>
               <option value="INTERMEDIATE">Your level: Intermediate</option>
               <option disabled value="PROFESSIONAL">
-                Professional · invite-only
+                Professional
               </option>
             </select>
           </div>
@@ -128,7 +128,7 @@ export function SessionsHeader({
             {!isEditingName ? (
               <div className="flex min-w-0 items-center gap-2">
                 <button
-                  className="group inline-flex min-w-0 max-w-full items-center gap-2 rounded-md px-1 py-0.5 text-left text-sm font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="group inline-flex min-w-0 max-w-full items-center gap-2 rounded-md px-1 py-0.5 text-left text-base font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-lg"
                   onClick={() => {
                     setDraftDisplayName(displayName);
                     setNameError("");
@@ -153,21 +153,21 @@ export function SessionsHeader({
                 <div className="flex items-center gap-1">
                   <input
                     autoComplete="name"
-                    className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-sm"
+                    className="h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-base"
                     maxLength={80}
                     onChange={(event) => setDraftDisplayName(event.target.value)}
                     value={draftDisplayName}
                   />
                   <button
                     aria-label="Save name"
-                    className="inline-flex items-center justify-center rounded-md bg-primary p-1.5 text-primary-foreground"
+                    className="inline-flex size-10 items-center justify-center rounded-md bg-primary text-primary-foreground"
                     type="submit"
                   >
                     <Check aria-hidden="true" className="size-3.5" />
                   </button>
                   <button
                     aria-label="Cancel editing name"
-                    className="inline-flex items-center justify-center rounded-md border border-border bg-background p-1.5"
+                    className="inline-flex size-10 items-center justify-center rounded-md border border-border bg-background"
                     onClick={() => {
                       setIsEditingName(false);
                       setNameError("");
@@ -196,7 +196,7 @@ export function SessionsHeader({
                 Playing level
               </label>
               <select
-                className="min-w-[8.5rem] rounded-md border border-border bg-background px-2 py-1 text-xs"
+                className="h-10 min-w-[8.5rem] rounded-md border border-border bg-background px-3 text-sm"
                 disabled={isUpdatingLevel}
                 id="player-level"
                 onChange={(event) => changePlayerLevel(event.target.value)}
@@ -205,7 +205,7 @@ export function SessionsHeader({
                 <option value="BEGINNER">Beginner</option>
                 <option value="INTERMEDIATE">Intermediate</option>
                 <option disabled value="PROFESSIONAL">
-                  Professional · invite-only
+                  Professional
                 </option>
               </select>
             </div>
@@ -226,10 +226,10 @@ export function SessionsHeader({
       </div>
 
       {isDemo || !displayName ? null : (
-        <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-end sm:gap-3">
+        <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-end sm:gap-4">
           {isCommitteeAdmin && (
             <Link
-              className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+              className="inline-flex h-10 items-center text-sm font-medium text-primary underline-offset-4 hover:underline"
               href="/admin"
             >
               Manage club
@@ -244,7 +244,7 @@ export function SessionsHeader({
             }}
           >
             <button
-              className="rounded-sm px-2 py-1 text-sm font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="inline-flex h-10 items-center rounded-sm px-2 text-sm font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               type="submit"
             >
               Sign out
