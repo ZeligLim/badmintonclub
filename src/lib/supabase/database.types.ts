@@ -144,9 +144,14 @@ isOneToOne: false
               "capacity": number,"confirmation_at": string,"current_user_slot": number,"current_user_status": string,"day_name": string,"duration_minutes": number,"event_date": string,"id": string,"registered_count": number,"signup_opens_at": string,"starts_at": string,"status": string
             }[]
                            },
-"get_friend_candidates":
+"find_club_member_by_student_id":
+{ Args: { "p_student_id": string }; Returns: {
+              "display_name": string,"is_selected": boolean,"player_level": string,"student_id": string,"user_id": string
+            }[]
+                           },
+"get_session_friend_preferences":
 { Args: { "p_session_id": string }; Returns: {
-              "display_name": string,"is_selected": boolean,"player_level": string,"user_id": string
+              "display_name": string,"is_selected": boolean,"player_level": string,"student_id": string,"user_id": string
             }[]
                            },
 "get_session_roster":

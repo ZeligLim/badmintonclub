@@ -17,7 +17,7 @@ type DashboardSessionRow =
 type RosterRow =
   Database["public"]["Functions"]["get_session_roster"]["Returns"][number];
 type FriendCandidateRow =
-  Database["public"]["Functions"]["get_friend_candidates"]["Returns"][number];
+  Database["public"]["Functions"]["get_session_friend_preferences"]["Returns"][number];
 
 export async function loadDashboardData(): Promise<DashboardData> {
   if (!hasSupabaseConfig()) {
@@ -57,7 +57,7 @@ export async function loadDashboardData(): Promise<DashboardData> {
     ? await getRosterRows(supabase, sessionRows)
     : [];
   const friendCandidates: Map<string, FriendCandidate[]> = user
-    ? await getFriendCandidates(supabase, sessionRows)
+    ? await getFriendPreferences(supabase, sessionRows)
     : new Map();
   const profile = user
     ? await getProfile(supabase, user.id)
@@ -100,18 +100,18 @@ async function getProfile(
   return data;
 }
 
-async function getFriendCandidates(
+async function getFriendPreferences(
   supabase: Awaited<ReturnType<typeof createClient>>,
   sessions: DashboardSessionRow[],
 ): Promise<Map<string, FriendCandidate[]>> {
   const openSessions = sessions.filter((session) => session.status === "open");
   const candidateRows = await Promise.all(
     openSessions.map(async (session) => {
-      const { data, error } = await supabase.rpc("get_friend_candidates", {
+      const { data, error } = await supabase.rpc("get_session_friend_preferences", {
         p_session_id: session.id,
       });
       if (error) {
-        throw new Error(`Could not load friend choices: ${error.message}`);
+        throw new Error(`Could not load saved friend choices: ${error.message}`);
       }
       return [session.id, data] as const;
     }),
@@ -201,6 +201,7 @@ function mapFriendCandidate(row: FriendCandidateRow): FriendCandidate {
   return {
     userId: row.user_id,
     displayName: row.display_name,
+    studentId: row.student_id,
     playerLevel: parsePlayerLevel(row.player_level),
     isSelected: row.is_selected,
   };

@@ -14,6 +14,7 @@ export type { PlayerLevel } from "@/types/player";
 export type FriendCandidate = {
   userId: string;
   displayName: string;
+  studentId: string;
   playerLevel: PlayerLevel;
   isSelected: boolean;
 };

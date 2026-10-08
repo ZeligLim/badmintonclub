@@ -17,24 +17,28 @@ const DEMO_FRIEND_CANDIDATES: FriendCandidate[] = [
   {
     userId: "demo-friend-aoife",
     displayName: "Aoife Murphy",
+    studentId: "g00440629",
     playerLevel: "BEGINNER",
     isSelected: false,
   },
   {
     userId: "demo-friend-ciaran",
     displayName: "Ciarán Kelly",
+    studentId: "g00440630",
     playerLevel: "INTERMEDIATE",
     isSelected: false,
   },
   {
     userId: "demo-friend-sile",
     displayName: "Síle Brennan",
+    studentId: "g00440631",
     playerLevel: "BEGINNER",
     isSelected: false,
   },
   {
     userId: "demo-friend-darragh",
     displayName: "Darragh Quinn",
+    studentId: "g00440632",
     playerLevel: "PROFESSIONAL",
     isSelected: false,
   },

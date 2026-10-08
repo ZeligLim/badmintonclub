@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   finalizeDueSessions as finalizeDue,
+  findFriendByStudentId as findFriendByStudentIdAction,
   markSessionPlayed as markPlayed,
   cancelSignup,
   signOut,
@@ -20,6 +21,10 @@ export async function getDashboardData(): Promise<DashboardData> {
 
 export async function finalizeDueSessions(): Promise<number> {
   return finalizeDue();
+}
+
+export async function findFriendByStudentId(studentId: string) {
+  return findFriendByStudentIdAction(studentId);
 }
 
 export async function signUpForSession(

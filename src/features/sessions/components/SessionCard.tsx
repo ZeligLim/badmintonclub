@@ -11,10 +11,10 @@ import { Button } from "@/components/ui/button";
 import {
   createPlayerGameSchedule,
   type ClubSession,
-  type PlayerLevel,
 } from "@/features/sessions";
 import Link from "next/link";
 import { useState } from "react";
+import { SessionFriendPicker } from "./SessionFriendPicker";
 import { SessionSignupStatus } from "./SessionSignupStatus";
 
 type SessionSignupState = {
@@ -211,55 +211,15 @@ export function SessionCard({
 
           {isSignedIn &&
             session.status === "open" &&
-            !isSignedUp &&
-            friendCandidates.length > 0 && (
-              <fieldset className="mt-4">
-                <legend className="text-sm font-medium">
-                  Play with friends (optional)
-                </legend>
-                <p className="mb-2 mt-1 text-xs leading-5 text-muted-foreground">
-                  {isDemo
-                    ? "Sample friends for preview only. These choices do not change real bookings or matching."
-                    : "Choose up to 3. This is a preference only; committee priority and longest-since-last-play fairness come first. Friends who are not eligible for this session are ignored."}
-                </p>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {friendCandidates.map((candidate) => {
-                    const isSelected = selectedFriendIds.includes(candidate.userId);
-                    const checkboxId = `friend-${session.id}-${candidate.userId}`;
-
-                    return (
-                      <label
-                        className="flex items-center gap-2 text-sm"
-                        htmlFor={checkboxId}
-                        key={candidate.userId}
-                      >
-                        <input
-                          checked={isSelected}
-                          disabled={
-                            isPending ||
-                            (!isSelected && selectedFriendIds.length >= 3)
-                          }
-                          id={checkboxId}
-                          onChange={(event) => {
-                            setSelectedFriendIds((currentIds) =>
-                              event.target.checked
-                                ? [...currentIds, candidate.userId].slice(0, 3)
-                                : currentIds.filter((userId) => userId !== candidate.userId),
-                            );
-                          }}
-                          type="checkbox"
-                        />
-                        <span>
-                          {candidate.displayName}
-                          <span className="ml-1 text-xs text-muted-foreground">
-                            · {formatPlayerLevel(candidate.playerLevel)}
-                          </span>
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </fieldset>
+            !isSignedUp && (
+              <SessionFriendPicker
+                friendCandidates={friendCandidates}
+                isDemo={isDemo}
+                isPending={isPending}
+                onChange={setSelectedFriendIds}
+                selectedFriendIds={selectedFriendIds}
+                sessionId={session.id}
+              />
             )}
 
           <div className="mt-4 flex items-center justify-between gap-3">
@@ -343,10 +303,6 @@ export function SessionCard({
       </div>
     </article>
   );
-}
-
-function formatPlayerLevel(playerLevel: PlayerLevel): string {
-  return playerLevel.charAt(0) + playerLevel.slice(1).toLowerCase();
 }
 
 function formatSessionDate(value: string) {

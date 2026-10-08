@@ -1,6 +1,6 @@
 begin;
 
-select plan(30);
+select plan(39);
 
 alter table public.sessions drop constraint sessions_capacity_check;
 
@@ -27,7 +27,11 @@ select
   '{}'::jsonb,
   now(),
   now()
-from generate_series(1, 24) as player_number;
+from generate_series(1, 25) as player_number;
+
+update auth.users
+set email = 'g00440629@atu.ie'
+where id = '20000000-0000-4000-8000-000000000025';
 
 insert into public.sessions (
   id, event_date, starts_at, duration_minutes, capacity,
@@ -225,6 +229,103 @@ select is(
   1::bigint,
   'the available requester preference is retained without requiring the friend to sign up'
 );
+set local role authenticated;
+select set_config(
+  'request.jwt.claim.sub',
+  '20000000-0000-4000-8000-000000000015',
+  true
+);
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"20000000-0000-4000-8000-000000000015","email":"matching-player-15@atu.ie","role":"authenticated"}',
+  true
+);
+select is(
+  (select user_id::text
+   from public.find_club_member_by_student_id(' G00440629 ')
+   limit 1),
+  '20000000-0000-4000-8000-000000000025',
+  'members can look up a registered club account by case-insensitive student ID'
+);
+select is(
+  (select count(*)::integer
+   from public.find_club_member_by_student_id('notarealstudent')),
+  0,
+  'a missing student ID returns no account details'
+);
+select set_config(
+  'request.jwt.claim.sub',
+  '20000000-0000-4000-8000-000000000025',
+  true
+);
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"20000000-0000-4000-8000-000000000025","email":"g00440629@atu.ie","role":"authenticated"}',
+  true
+);
+select is(
+  (select count(*)::integer
+   from public.find_club_member_by_student_id('g00440629')),
+  0,
+  'members cannot select themselves'
+);
+select set_config(
+  'request.jwt.claim.sub',
+  '20000000-0000-4000-8000-000000000015',
+  true
+);
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"20000000-0000-4000-8000-000000000015","email":"matching-player-15@atu.ie","role":"authenticated"}',
+  true
+);
+select is(
+  (select count(*)::integer
+   from public.get_session_friend_preferences(
+     '30000000-0000-4000-8000-000000000005'
+   )),
+  1,
+  'saved preferences return only the current member selected for that session'
+);
+select is(
+  (select student_id
+   from public.get_session_friend_preferences(
+     '30000000-0000-4000-8000-000000000005'
+   )
+   limit 1),
+  'matching-player-16',
+  'saved friend details include the student ID needed to render the selection'
+);
+select ok(
+  has_function_privilege(
+    'authenticated',
+    'public.find_club_member_by_student_id(text)',
+    'execute'
+  ),
+  'authenticated club members can use the protected student ID lookup'
+);
+select ok(
+  not has_function_privilege(
+    'anon',
+    'public.find_club_member_by_student_id(text)',
+    'execute'
+  ),
+  'anonymous users cannot use the student ID lookup'
+);
+select ok(
+  not has_function_privilege(
+    'anon',
+    'public.get_session_friend_preferences(uuid)',
+    'execute'
+  ),
+  'anonymous users cannot retrieve saved friend preferences'
+);
+select is(
+  to_regprocedure('public.get_friend_candidates(uuid)') is null,
+  true,
+  'the old unrestricted friend directory RPC is removed'
+);
+reset role;
 
 update public.sessions
 set confirmation_at = now() - interval '1 minute'

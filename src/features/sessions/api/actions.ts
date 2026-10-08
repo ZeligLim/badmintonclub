@@ -3,6 +3,7 @@ import "server-only";
 import { hasSupabaseConfig } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 import { sendBookingConfirmationEmailBestEffort } from "./booking-confirmation-email";
+import type { FriendCandidate } from "../types";
 
 export async function finalizeDueSessions(): Promise<number> {
   const supabase = await requireAuthenticatedClient();
@@ -21,6 +22,45 @@ export async function signUp(
 ): Promise<void> {
   validateFriendIds(friendIds);
   await updateSignup(sessionId, "request_session_signup", friendIds);
+}
+
+export async function findFriendByStudentId(
+  studentId: string,
+): Promise<FriendCandidate | null> {
+  const normalizedStudentId = studentId.trim().toLowerCase();
+  if (!/^[a-z0-9]{1,64}$/.test(normalizedStudentId)) {
+    throw new Error("Enter a valid ATU student ID.");
+  }
+
+  const supabase = await requireAuthenticatedClient();
+  const { data, error } = await supabase.rpc(
+    "find_club_member_by_student_id",
+    { p_student_id: normalizedStudentId },
+  );
+
+  if (error) {
+    throw new Error(`Could not look up this student ID: ${error.message}`);
+  }
+
+  const friend = data[0];
+  if (!friend) {
+    return null;
+  }
+  if (
+    friend.player_level !== "BEGINNER" &&
+    friend.player_level !== "INTERMEDIATE" &&
+    friend.player_level !== "PROFESSIONAL"
+  ) {
+    throw new Error("The club member has an unsupported player level.");
+  }
+
+  return {
+    userId: friend.user_id,
+    displayName: friend.display_name,
+    studentId: friend.student_id,
+    playerLevel: friend.player_level,
+    isSelected: false,
+  };
 }
 
 export async function updatePlayerLevel(
