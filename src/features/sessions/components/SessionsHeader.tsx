@@ -60,6 +60,7 @@ export function SessionsHeader({
   const [autoSignupError, setAutoSignupError] = useState("");
   const [isEditingName, setIsEditingName] = useState(false);
   const [isSavingName, setIsSavingName] = useState(false);
+  const [isNavigatingToAdmin, setIsNavigatingToAdmin] = useState(false);
   const [draftDisplayName, setDraftDisplayName] = useState(displayName ?? "");
   const [nameError, setNameError] = useState("");
   const displayNameRef = useRef<HTMLHeadingElement>(null);
@@ -194,7 +195,7 @@ export function SessionsHeader({
               Demo playing level
             </label>
             <select
-              className="h-10 w-full min-w-0 rounded-md bg-background px-3 text-sm sm:w-auto sm:max-w-44"
+              className="h-10 w-full min-w-0 rounded-md bg-white px-3 text-sm sm:w-auto sm:max-w-44"
               id="demo-player-level"
               onChange={(event) => changePlayerLevel(event.target.value)}
               value={playerLevel}
@@ -236,7 +237,7 @@ export function SessionsHeader({
                     />
                     <button
                       aria-label="Save name"
-                      className="inline-flex size-10 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground"
+                      className="inline-flex size-10 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground hover:bg-primary/80"
                       disabled={isSavingName}
                       type="submit"
                     >
@@ -251,7 +252,7 @@ export function SessionsHeader({
                     </button>
                     <button
                       aria-label="Cancel editing name"
-                      className="inline-flex size-10 shrink-0 items-center justify-center rounded-md bg-background"
+                      className="inline-flex size-10 shrink-0 items-center justify-center rounded-md bg-white hover:bg-white"
                       disabled={isSavingName}
                       onClick={() => {
                         setIsEditingName(false);
@@ -273,7 +274,7 @@ export function SessionsHeader({
               {!isEditingName && (
                 <button
                   aria-label="Edit name"
-                  className="inline-flex size-10 shrink-0 items-center justify-center rounded-md bg-background text-sm font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="inline-flex size-10 shrink-0 items-center justify-center rounded-md bg-white text-sm font-medium text-foreground transition-colors hover:bg-white hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   onClick={() => {
                     setDraftDisplayName(displayName);
                     setNameError("");
@@ -290,7 +291,7 @@ export function SessionsHeader({
                     Playing level
                   </label>
                   <select
-                    className="h-10 min-w-0 flex-1 rounded-md bg-background px-2 text-xs sm:w-auto sm:flex-none sm:px-3 sm:text-sm"
+                    className="h-10 min-w-0 flex-1 rounded-md bg-white px-2 text-xs sm:w-auto sm:flex-none sm:px-3 sm:text-sm"
                     disabled={isUpdatingLevel}
                     id="player-level"
                     onChange={(event) => changePlayerLevel(event.target.value)}
@@ -313,7 +314,7 @@ export function SessionsHeader({
                   >
                     <button
                       aria-label="Sign out"
-                      className="inline-flex size-10 items-center justify-center rounded-md bg-white text-sm font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="inline-flex size-10 items-center justify-center rounded-md bg-white text-sm font-medium text-foreground transition-colors hover:bg-white hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       title="Sign out"
                       type="submit"
                     >
@@ -352,11 +353,34 @@ export function SessionsHeader({
               )}
               {isCommitteeAdmin && (
                 <Button
-                  className="h-10 rounded-md px-3"
-                  render={<Link href="/admin" />}
+                  className="h-10 rounded-md bg-white px-3 hover:bg-white"
+                  render={
+                    <Link
+                      aria-busy={isNavigatingToAdmin}
+                      aria-disabled={isNavigatingToAdmin}
+                      href="/admin"
+                      onClick={(event) => {
+                        if (isNavigatingToAdmin) {
+                          event.preventDefault();
+                          return;
+                        }
+                        setIsNavigatingToAdmin(true);
+                      }}
+                    />
+                  }
                   variant="outline"
                 >
-                  Manage club
+                  {isNavigatingToAdmin ? (
+                    <>
+                      <LoaderCircle
+                        aria-hidden="true"
+                        className="size-4 animate-spin"
+                      />
+                      Loading club…
+                    </>
+                  ) : (
+                    "Manage club"
+                  )}
                 </Button>
               )}
             </div>
