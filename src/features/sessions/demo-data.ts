@@ -105,7 +105,7 @@ export function createDemoAdminSessions(now = new Date()): AdminSession[] {
     const capacity = isMonday ? 16 : 40;
     const courtCount = getCourtCount(capacity);
     const durationMinutes = isMonday ? 60 : 120;
-    const startsAt = isMonday ? "18:00" : "20:00";
+    const startsAt = isMonday ? "18:00" : "19:30";
     const players = isMonday ? MONDAY_PLAYERS : WEDNESDAY_PLAYERS;
     const selectedPlayers = players.filter(
       (p) => p.status === "selected" || p.status === "played",
@@ -157,7 +157,7 @@ function createDemoSession(
   const playersPerSlot = 4;
   const slotCount = capacity / playersPerSlot;
   const durationMinutes = dayName === "Monday" ? 60 : 120;
-  const startsAt = dayName === "Monday" ? "18:00" : "20:00";
+  const startsAt = dayName === "Monday" ? "18:00" : "19:30";
 
   return {
     id: `demo-${dayName.toLowerCase()}-${date}`,

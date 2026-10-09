@@ -322,6 +322,7 @@ export function SessionFriendPicker({
                   }
                   onClick={() => void addSelectedFriend(friend)}
                   onMouseEnter={() => setActiveResultIndex(index)}
+                  onPointerDown={(event) => event.preventDefault()}
                   type="button"
                 >
                   <span className="min-w-0 truncate font-medium">

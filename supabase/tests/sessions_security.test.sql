@@ -122,16 +122,16 @@ select is(
 select is(
   (select starts_at
    from public.sessions
-   where event_date = date_trunc('week', now() at time zone 'Europe/London')::date + 2),
-  time '20:00',
-  'Wednesday sessions start at 20:00'
+   where event_date = date_trunc('week', now() at time zone 'Europe/London')::date + 9),
+  time '19:30',
+  'next Wednesday sessions start at 19:30'
 );
 select is(
   (select duration_minutes
    from public.sessions
-   where event_date = date_trunc('week', now() at time zone 'Europe/London')::date + 2),
+   where event_date = date_trunc('week', now() at time zone 'Europe/London')::date + 9),
   120::smallint,
-  'Wednesday sessions last two hours'
+  'next Wednesday sessions last two hours'
 );
 select is(
   (select capacity

@@ -1,6 +1,6 @@
 begin;
 
-select plan(47);
+select plan(49);
 
 alter table public.sessions drop constraint sessions_capacity_check;
 
@@ -226,6 +226,44 @@ select lives_ok(
 );
 reset role;
 
+update public.session_signups
+set status = 'selected',
+    slot_number = 1
+where session_id = '30000000-0000-4000-8000-000000000005'
+  and user_id = '20000000-0000-4000-8000-000000000015';
+set local role authenticated;
+select set_config(
+  'request.jwt.claim.sub',
+  '20000000-0000-4000-8000-000000000015',
+  true
+);
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"20000000-0000-4000-8000-000000000015","email":"matching-player-15@atu.ie","role":"authenticated"}',
+  true
+);
+select lives_ok(
+  $$select public.update_session_friend_preferences(
+    '30000000-0000-4000-8000-000000000005',
+    array['20000000-0000-4000-8000-000000000014'::uuid]
+  )$$,
+  'a selected signup can update friend choices while the session is open'
+);
+reset role;
+select is(
+  (select friend_user_id::text
+   from public.session_friend_preferences
+   where session_id = '30000000-0000-4000-8000-000000000005'
+     and user_id = '20000000-0000-4000-8000-000000000015'),
+  '20000000-0000-4000-8000-000000000014',
+  'updated friend choices are saved for a selected signup'
+);
+update public.session_signups
+set status = 'requested',
+    slot_number = null
+where session_id = '30000000-0000-4000-8000-000000000005'
+  and user_id = '20000000-0000-4000-8000-000000000015';
+
 select is(
   (select count(*) from public.session_friend_preferences
    where session_id = '30000000-0000-4000-8000-000000000005'
@@ -311,7 +349,7 @@ select is(
      '30000000-0000-4000-8000-000000000005'
    )
    limit 1),
-  'matching-player-16',
+  'matching-player-14',
   'saved friend details include the student ID needed to render the selection'
 );
 select lives_ok(

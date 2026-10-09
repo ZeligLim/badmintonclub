@@ -220,7 +220,7 @@ export function SessionCard({
 
           {isSignedIn &&
             session.status === "open" &&
-            (!isSignedUp || signupStatus === "requested") && (
+            !isPlayed && (
               <SessionFriendPicker
                 friendCandidates={friendCandidates}
                 friendList={friendList}
