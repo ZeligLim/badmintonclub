@@ -357,9 +357,7 @@ export function SessionsHeader({
                   />
                 </div>
               )}
-            </div>
-            {isCommitteeAdmin && (
-              <div className="mt-2 flex items-center gap-2">
+              {isCommitteeAdmin && (
                 <Button
                   className="h-10 rounded-md bg-white px-3 font-normal hover:bg-white"
                   render={<Link href="/admin" />}
@@ -367,8 +365,8 @@ export function SessionsHeader({
                 >
                   Manage club
                 </Button>
-              </div>
-            )}
+              )}
+            </div>
             {autoSignupError && (
               <span className="mt-1 block text-[0.65rem] text-destructive" role="alert">
                 {autoSignupError}
