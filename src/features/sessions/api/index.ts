@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
+  addClubFriend as addClubFriendAction,
   finalizeDueSessions as finalizeDue,
+  removeClubFriend as removeClubFriendAction,
   searchClubMembers as searchClubMembersAction,
   markSessionPlayed as markPlayed,
   cancelSignup,
@@ -28,6 +30,14 @@ export async function finalizeDueSessions(): Promise<number> {
 
 export async function searchClubMembers(query: string) {
   return searchClubMembersAction(query);
+}
+
+export async function addFriendToList(friendId: string): Promise<void> {
+  await addClubFriendAction(friendId);
+}
+
+export async function removeFriendFromList(friendId: string): Promise<void> {
+  await removeClubFriendAction(friendId);
 }
 
 export async function signUpForSession(

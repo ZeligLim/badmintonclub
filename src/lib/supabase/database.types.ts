@@ -47,6 +47,32 @@ export type Database = {
                   Relationships: [
 
                   ]
+                },"club_friend_list": {
+                  Row: {
+                    "created_at": string,"friend_user_id": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"friend_user_id": string,"user_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"friend_user_id"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "club_friend_list_friend_user_id_fkey"
+      columns: ["friend_user_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "club_friend_list_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"session_friend_preferences": {
                   Row: {
                     "created_at": string,"friend_user_id": string,"session_id": string,"user_id": string
@@ -163,10 +189,21 @@ isOneToOne: false
               "display_name": string,"is_selected": boolean,"player_level": string,"student_id": string,"user_id": string
             }[]
                            },
+"add_my_friend":
+{ Args: { "p_friend_user_id": string }; Returns: undefined
+                           },
+"get_my_friend_list":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "display_name": string,"player_level": string,"student_id": string,"user_id": string
+            }[]
+                           },
 "get_session_friend_preferences":
 { Args: { "p_session_id": string }; Returns: {
               "display_name": string,"is_selected": boolean,"player_level": string,"student_id": string,"user_id": string
             }[]
+                           },
+"remove_my_friend":
+{ Args: { "p_friend_user_id": string }; Returns: undefined
                            },
 "get_session_roster":
 { Args: { "p_session_id": string }; Returns: {

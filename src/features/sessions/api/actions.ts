@@ -78,6 +78,30 @@ export async function searchClubMembers(
   });
 }
 
+export async function addClubFriend(friendId: string): Promise<void> {
+  validateFriendId(friendId);
+  const supabase = await requireAuthenticatedClient();
+  const { error } = await supabase.rpc("add_my_friend", {
+    p_friend_user_id: friendId,
+  });
+
+  if (error) {
+    throw new Error(`Could not add this friend: ${error.message}`);
+  }
+}
+
+export async function removeClubFriend(friendId: string): Promise<void> {
+  validateFriendId(friendId);
+  const supabase = await requireAuthenticatedClient();
+  const { error } = await supabase.rpc("remove_my_friend", {
+    p_friend_user_id: friendId,
+  });
+
+  if (error) {
+    throw new Error(`Could not remove this friend: ${error.message}`);
+  }
+}
+
 export async function updatePlayerLevel(
   playerLevel: "BEGINNER" | "INTERMEDIATE" | "PROFESSIONAL",
 ): Promise<void> {
@@ -227,5 +251,15 @@ function validateFriendIds(friendIds: string[]): void {
   );
   if (friendIds.length > 3 || hasInvalidId) {
     throw new Error("Select up to three valid club members.");
+  }
+}
+
+function validateFriendId(friendId: string): void {
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      friendId,
+    )
+  ) {
+    throw new Error("Choose a valid club member.");
   }
 }

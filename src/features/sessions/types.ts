@@ -64,6 +64,7 @@ export type DashboardData = {
     isCommittee: boolean;
     isCommitteeAdmin: boolean;
     committeeAutoSignup: boolean;
+    friendList: FriendCandidate[];
   } | null;
   sessions: ClubSession[];
 };

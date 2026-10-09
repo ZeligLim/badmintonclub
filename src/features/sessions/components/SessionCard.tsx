@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import {
   createPlayerGameSchedule,
   type ClubSession,
+  type FriendCandidate,
 } from "@/features/sessions";
 import Link from "next/link";
 import { useState } from "react";
@@ -36,6 +37,7 @@ type SessionCardProps = {
   canMarkPlayed: boolean;
   hasBeenPlayed: boolean;
   onSignup: (friendIds: string[]) => void;
+  onAddToFriendList: (friend: FriendCandidate) => Promise<void>;
   onSaveFriendPreferences: (friendIds: string[]) => Promise<void>;
   onMarkPlayed: () => void;
 };
@@ -53,6 +55,7 @@ export function SessionCard({
   canMarkPlayed,
   hasBeenPlayed,
   onSignup,
+  onAddToFriendList,
   onSaveFriendPreferences,
   onMarkPlayed,
 }: SessionCardProps) {
@@ -220,6 +223,7 @@ export function SessionCard({
                 isAlreadySignedUp={isSignedUp}
                 isDemo={isDemo}
                 isPending={isPending}
+                onAddToFriendList={onAddToFriendList}
                 onChange={setSelectedFriendIds}
                 onSave={onSaveFriendPreferences}
                 selectedFriendIds={selectedFriendIds}

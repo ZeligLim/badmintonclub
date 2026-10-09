@@ -4,10 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   cancelSignupForSession,
+  addFriendToList,
   finalizeDueSessions,
   joinConfirmedSessionFcfs,
   markSessionPlayed,
   saveSessionFriendPreferences,
+  removeFriendFromList,
   signUpForSession,
 } from "@/features/sessions";
 import { getUpcomingSchedule, londonDateTime } from "@/lib/sessions/schedule";
@@ -31,12 +33,14 @@ import {
 import { useBrowserClock } from "../use-browser-clock";
 import { SessionsHeader } from "./SessionsHeader";
 import { SessionCard } from "./SessionCard";
+import { FriendListCard } from "./FriendListCard";
 import { DemoClock } from "./DemoClock";
 import { DemoSignupCountsControl } from "./DemoSignupCountsControl";
 import type {
   ClubSession,
   DashboardData,
   DemoSignupCounts,
+  FriendCandidate,
 } from "@/features/sessions";
 
 type SessionsDashboardProps = {
@@ -52,6 +56,7 @@ type SignupOverride = {
 
 export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
   const router = useRouter();
+  const serverFriendList = initialData.user?.friendList;
   const [demoSessions, setDemoSessions] = useState<DemoSessionState[]>(() =>
     initialData.sessions.map((session, index) =>
       createDemoSessionState(session, index),
@@ -71,6 +76,12 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
   const [demoSignupCounts, setDemoSignupCounts] = useState<DemoSignupCounts>(
     DEFAULT_DEMO_SIGNUP_COUNTS,
   );
+  const [friendList, setFriendList] = useState(
+    serverFriendList ?? [],
+  );
+  const [previousServerFriendList, setPreviousServerFriendList] =
+    useState(serverFriendList);
+  const [pendingFriendId, setPendingFriendId] = useState<string | null>(null);
   const finalizedSessionIds = useRef(new Set<string>());
   const isFinalizationPending = useRef(false);
   const isScheduleRefreshPending = useRef(false);
@@ -95,6 +106,11 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
           }),
         )
       : initialData.sessions;
+
+  if (serverFriendList !== previousServerFriendList) {
+    setPreviousServerFriendList(serverFriendList);
+    setFriendList(serverFriendList ?? []);
+  }
 
   if (!isDemo && initialData.sessions !== previousServerSessions) {
     setPreviousServerSessions(initialData.sessions);
@@ -240,6 +256,37 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
       throw new Error("Could not save your friend choices.");
     } finally {
       setPendingSessionId(null);
+    }
+  }
+
+  async function addFriendToSharedList(friend: FriendCandidate): Promise<void> {
+    setErrorMessage("");
+    if (!isDemo) {
+      await addFriendToList(friend.userId);
+    }
+    setFriendList((currentFriends) =>
+      currentFriends.some((currentFriend) => currentFriend.userId === friend.userId)
+        ? currentFriends
+        : [...currentFriends, friend].toSorted((a, b) =>
+            a.displayName.localeCompare(b.displayName),
+          ),
+    );
+  }
+
+  async function removeFriendFromSharedList(friendId: string): Promise<void> {
+    setErrorMessage("");
+    setPendingFriendId(friendId);
+    try {
+      if (!isDemo) {
+        await removeFriendFromList(friendId);
+      }
+      setFriendList((currentFriends) =>
+        currentFriends.filter((friend) => friend.userId !== friendId),
+      );
+    } catch {
+      setErrorMessage("We couldn’t remove this friend. Please try again.");
+    } finally {
+      setPendingFriendId(null);
     }
   }
 
@@ -429,6 +476,7 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
                   isDemo={isDemo}
                   isSignedIn={isDemo || Boolean(initialData.user)}
                   isPending={pendingSessionId === session.id}
+                  onAddToFriendList={addFriendToSharedList}
                   onSignup={(friendIds) => changeSignup(session, friendIds)}
                   onSaveFriendPreferences={(friendIds) =>
                     saveFriendPreferences(session, friendIds)
@@ -447,6 +495,13 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
               );
             })}
           </div>
+          {(isDemo || initialData.user) && (
+            <FriendListCard
+              friends={friendList}
+              onRemove={(friendId) => void removeFriendFromSharedList(friendId)}
+              pendingFriendId={pendingFriendId}
+            />
+          )}
         </section>
 
         {errorMessage && (

@@ -19,6 +19,7 @@ type SessionFriendPickerProps = {
   isAlreadySignedUp: boolean;
   isDemo: boolean;
   isPending: boolean;
+  onAddToFriendList: (friend: FriendCandidate) => Promise<void>;
   onChange: (friendIds: string[]) => void;
   onSave: (friendIds: string[]) => Promise<void>;
   selectedFriendIds: string[];
@@ -29,6 +30,7 @@ export function SessionFriendPicker({
   isAlreadySignedUp,
   isDemo,
   isPending,
+  onAddToFriendList,
   onChange,
   onSave,
   selectedFriendIds,
@@ -38,6 +40,7 @@ export function SessionFriendPicker({
   const [searchResults, setSearchResults] = useState<FriendCandidate[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [activeResultIndex, setActiveResultIndex] = useState(0);
+  const [isAddingFriend, setIsAddingFriend] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [savedFriendIds, setSavedFriendIds] = useState(selectedFriendIds);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -110,8 +113,8 @@ export function SessionFriendPicker({
     selectedFriendIds.length,
   ]);
 
-  function addSelectedFriend(friend: FriendCandidate) {
-    if (isPending || selectedFriendIds.length >= 3) {
+  async function addSelectedFriend(friend: FriendCandidate) {
+    if (isPending || isAddingFriend || selectedFriendIds.length >= 3) {
       return;
     }
     if (selectedFriendIds.includes(friend.userId)) {
@@ -119,17 +122,26 @@ export function SessionFriendPicker({
       return;
     }
 
-    setAddedFriends((currentFriends) => [
-      ...currentFriends.filter(
-        (currentFriend) => currentFriend.userId !== friend.userId,
-      ),
-      friend,
-    ]);
-    onChange([...selectedFriendIds, friend.userId]);
-    setQuery("");
-    setSearchResults([]);
-    setIsSearching(false);
-    setFeedback(`${friend.displayName} added to your friend list.`);
+    setIsAddingFriend(true);
+    setFeedback(null);
+    try {
+      await onAddToFriendList(friend);
+      setAddedFriends((currentFriends) => [
+        ...currentFriends.filter(
+          (currentFriend) => currentFriend.userId !== friend.userId,
+        ),
+        friend,
+      ]);
+      onChange([...selectedFriendIds, friend.userId]);
+      setQuery("");
+      setSearchResults([]);
+      setIsSearching(false);
+      setFeedback(`${friend.displayName} added to your friend list.`);
+    } catch {
+      setFeedback("Could not add this friend. Please try again.");
+    } finally {
+      setIsAddingFriend(false);
+    }
   }
 
   function handleSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -156,7 +168,7 @@ export function SessionFriendPicker({
       event.preventDefault();
       const friend = selectableFriends[activeResultIndex];
       if (friend) {
-        addSelectedFriend(friend);
+        void addSelectedFriend(friend);
       }
     }
   }
@@ -232,7 +244,7 @@ export function SessionFriendPicker({
           aria-expanded={selectableFriends.length > 0}
           autoComplete="off"
           className="h-10 w-full min-w-0 rounded-md bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          disabled={isPending || selectedFriendIds.length >= 3}
+          disabled={isPending || isAddingFriend || selectedFriendIds.length >= 3}
           id={`${searchId}-input`}
           maxLength={64}
           onChange={(event) => {
@@ -268,8 +280,8 @@ export function SessionFriendPicker({
                 className={`flex w-full items-center justify-between gap-3 rounded-md px-2.5 py-2 text-left text-sm hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${
                   index === activeResultIndex ? "bg-accent" : ""
                 }`}
-                disabled={isPending || selectedFriendIds.length >= 3}
-                onClick={() => addSelectedFriend(friend)}
+                disabled={isPending || isAddingFriend || selectedFriendIds.length >= 3}
+                onClick={() => void addSelectedFriend(friend)}
                 onMouseEnter={() => setActiveResultIndex(index)}
                 type="button"
               >

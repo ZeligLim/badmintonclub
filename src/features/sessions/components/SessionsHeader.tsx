@@ -167,6 +167,7 @@ export function SessionsHeader({
   }
 
   return (
+    <>
     <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex w-full min-w-0 items-start gap-3">
         <div className="flex shrink-0 flex-col items-start gap-2">
@@ -326,55 +327,6 @@ export function SessionsHeader({
               )}
             </div>
 
-            <div className="mt-2 grid min-w-0 justify-start gap-2">
-              {isCommittee && !isEditingName && (
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex h-10 shrink-0 items-center rounded-full bg-primary/10 px-3 text-[0.65rem] font-medium text-primary sm:text-xs">
-                    Committee
-                  </span>
-                  <div className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md bg-white px-3 text-xs text-foreground">
-                    <label
-                      className="whitespace-nowrap"
-                      htmlFor="committee-auto-signup"
-                    >
-                      Auto Sign-up
-                    </label>
-                    <Switch
-                      aria-label="Automatically sign me up for sessions"
-                      checked={committeeAutoSignup}
-                      disabled={isUpdatingAutoSignup}
-                      id="committee-auto-signup"
-                      onCheckedChange={changeCommitteeAutoSignup}
-                      size="sm"
-                    />
-                  </div>
-                </div>
-              )}
-              {isCommitteeAdmin && (
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex h-10 shrink-0 items-center rounded-full bg-primary/10 px-3 text-[0.65rem] font-medium text-primary sm:text-xs">
-                    Admin
-                  </span>
-                  <Button
-                    className="h-10 rounded-md bg-white px-3 text-xs font-normal hover:bg-white"
-                    render={<Link href="/admin" />}
-                    variant="outline"
-                  >
-                    Manage club
-                  </Button>
-                </div>
-              )}
-            </div>
-            {autoSignupError && (
-              <span className="mt-1 block text-[0.65rem] text-destructive" role="alert">
-                {autoSignupError}
-              </span>
-            )}
-            {levelError && (
-              <span className="mt-1 block text-[0.65rem] text-destructive" role="alert">
-                {levelError}
-              </span>
-            )}
           </div>
         ) : (
           <Link
@@ -387,6 +339,58 @@ export function SessionsHeader({
       </div>
 
     </header>
+    {(isCommittee || isCommitteeAdmin) && (
+      <div className="mt-3 grid w-full gap-2">
+        {isCommittee && !isEditingName && (
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-10 shrink-0 items-center rounded-full bg-primary/10 px-3 text-[0.65rem] font-medium text-primary sm:text-xs">
+              Committee
+            </span>
+            <div className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md bg-white px-3 text-xs text-foreground">
+              <label
+                className="whitespace-nowrap"
+                htmlFor="committee-auto-signup"
+              >
+                Auto Sign-up
+              </label>
+              <Switch
+                aria-label="Automatically sign me up for sessions"
+                checked={committeeAutoSignup}
+                disabled={isUpdatingAutoSignup}
+                id="committee-auto-signup"
+                onCheckedChange={changeCommitteeAutoSignup}
+                size="sm"
+              />
+            </div>
+          </div>
+        )}
+        {isCommitteeAdmin && (
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-10 shrink-0 items-center rounded-full bg-primary/10 px-3 text-[0.65rem] font-medium text-primary sm:text-xs">
+              Admin
+            </span>
+            <Button
+              className="h-10 rounded-md bg-white px-3 text-xs font-normal hover:bg-white"
+              render={<Link href="/admin" />}
+              variant="outline"
+            >
+              Manage club
+            </Button>
+          </div>
+        )}
+        {autoSignupError && (
+          <span className="text-[0.65rem] text-destructive" role="alert">
+            {autoSignupError}
+          </span>
+        )}
+      </div>
+    )}
+    {levelError && (
+      <span className="mt-1 block text-[0.65rem] text-destructive" role="alert">
+        {levelError}
+      </span>
+    )}
+    </>
   );
 }
 

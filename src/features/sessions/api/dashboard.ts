@@ -19,6 +19,8 @@ type RosterRow =
   Database["public"]["Functions"]["get_session_roster"]["Returns"][number];
 type FriendCandidateRow =
   Database["public"]["Functions"]["get_session_friend_preferences"]["Returns"][number];
+type FriendListRow =
+  Database["public"]["Functions"]["get_my_friend_list"]["Returns"][number];
 
 export async function loadDashboardData(): Promise<DashboardData> {
   if (!hasSupabaseConfig()) {
@@ -63,6 +65,9 @@ export async function loadDashboardData(): Promise<DashboardData> {
   const profile = user
     ? await getProfile(supabase, user.id)
     : null;
+  const friendList = user
+    ? await getFriendList(supabase)
+    : [];
 
   return {
     mode: "live",
@@ -78,12 +83,30 @@ export async function loadDashboardData(): Promise<DashboardData> {
           isCommittee: profile?.is_committee ?? false,
           isCommitteeAdmin: profile?.is_committee_admin ?? false,
           committeeAutoSignup: profile?.committee_auto_signup ?? false,
+          friendList,
         }
       : null,
     sessions: sessionRows.map((row) =>
       mapSession(row, rosterRows, friendCandidates.get(row.id) ?? []),
     ),
   };
+}
+
+async function getFriendList(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<FriendCandidate[]> {
+  const { data, error } = await supabase.rpc("get_my_friend_list");
+  if (error) {
+    throw new Error(`Could not load your friend list: ${error.message}`);
+  }
+
+  return data.map((friend: FriendListRow) => ({
+    userId: friend.user_id,
+    displayName: friend.display_name,
+    studentId: friend.student_id,
+    playerLevel: parsePlayerLevel(friend.player_level),
+    isSelected: false,
+  }));
 }
 
 async function getProfile(

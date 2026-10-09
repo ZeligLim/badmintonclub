@@ -5,11 +5,13 @@ export { SessionsAuthConfirm } from "./components/SessionsAuthConfirm";
 export { createPlayerGameSchedule } from "./court-schedule";
 export {
   cancelSignupForSession,
+  addFriendToList,
   finalizeDueSessions,
   getDashboardData,
   joinConfirmedSessionFcfs,
   markSessionPlayed,
   saveSessionFriendPreferences,
+  removeFriendFromList,
   searchClubMembers,
   signOutFromClub,
   signUpForSession,
