@@ -49,7 +49,10 @@ select
     then time '18:00' else time '20:00' end,
   case when extract(isodow from session.event_date) = 1
     then 60 else 120 end,
-  4,
+  case
+    when session.id = '32000000-0000-4000-8000-000000000002' then 8
+    else 4
+  end,
   session.signup_opens_at,
   session.confirmation_at,
   'open'
@@ -66,6 +69,12 @@ from (
       date_trunc('week', now() at time zone 'Europe/London')::date + 9,
       now() + interval '1 day',
       now() + interval '4 days'
+    ),
+    (
+      '32000000-0000-4000-8000-000000000003'::uuid,
+      date_trunc('week', now() at time zone 'Europe/London')::date + 14,
+      now() - interval '1 day',
+      now() + interval '5 days'
     )
 ) as session(id, event_date, signup_opens_at, confirmation_at);
 
@@ -95,6 +104,14 @@ select
   ('22000000-0000-4000-8000-' || lpad(player_number::text, 12, '0'))::uuid,
   'requested'
 from unnest(array[6, 8, 9, 10, 11, 12]) as player_number;
+
+insert into public.session_signups (session_id, user_id, status, slot_number)
+select
+  '32000000-0000-4000-8000-000000000003',
+  ('22000000-0000-4000-8000-' || lpad(player_number::text, 12, '0'))::uuid,
+  'selected',
+  1
+from unnest(array[6, 8, 9, 10]) as player_number;
 
 select is(
   (
@@ -128,7 +145,7 @@ select is(
     from public.session_signups
     where session_id = '32000000-0000-4000-8000-000000000001'
       and user_id = '22000000-0000-4000-8000-000000000001'
-      and status = 'requested'
+      and status = 'selected'
   ),
   1::bigint,
   'the same opt-in immediately adds the member to the upcoming Monday session'
@@ -139,10 +156,42 @@ select is(
     from public.session_signups
     where session_id = '32000000-0000-4000-8000-000000000002'
       and user_id = '22000000-0000-4000-8000-000000000001'
-      and status = 'requested'
+      and status = 'selected'
   ),
   1::bigint,
   'enabling automatic signup immediately adds the member to every upcoming open session, even before signup opens'
+);
+select is(
+  (
+    select status
+    from public.session_signups
+    where session_id = '32000000-0000-4000-8000-000000000001'
+      and user_id = '22000000-0000-4000-8000-000000000001'
+  ),
+  'selected',
+  'the automatic signup is persisted as confirmed when capacity is available'
+);
+select is(
+  (
+    select current_user_status
+    from public.get_dashboard_sessions(
+      date_trunc('week', now() at time zone 'Europe/London')::date + 7,
+      date_trunc('week', now() at time zone 'Europe/London')::date + 7
+    )
+    where id = '32000000-0000-4000-8000-000000000001'
+  ),
+  'selected',
+  'a fresh dashboard fetch returns the confirmed automatic signup'
+);
+select is(
+  (
+    select status
+    from public.session_signups
+    where session_id = '32000000-0000-4000-8000-000000000003'
+      and user_id = '22000000-0000-4000-8000-000000000001'
+  ),
+  'waitlisted',
+  'automatic signup does not exceed a full session capacity'
 );
 reset role;
 
@@ -220,8 +269,8 @@ select is(
     where session_id = '32000000-0000-4000-8000-000000000001'
       and user_id = '22000000-0000-4000-8000-000000000005'
   ),
-  'requested',
-  'explicit opt-in restores the cancelled signup as an ordinary request'
+  'selected',
+  'explicit opt-in restores and confirms the cancelled automatic signup'
 );
 select ok(
   exists (
@@ -326,7 +375,7 @@ select is(
     from public.session_signups
     where session_id = '32000000-0000-4000-8000-000000000002'
       and user_id = '22000000-0000-4000-8000-000000000001'
-      and status = 'requested'
+      and status = 'selected'
   ),
   1::bigint,
   'an opted-in committee member is added once when the signup window opens'
@@ -527,7 +576,7 @@ select is(
     from public.session_signups
     where session_id = '32000000-0000-4000-8000-000000000001'
       and user_id = '22000000-0000-4000-8000-000000000001'
-      and status = 'requested'
+      and status = 'selected'
   ),
   1::bigint,
   'page-load auto-signup includes the upcoming session after its signup cutoff'
@@ -594,13 +643,13 @@ select is(
       and user_id in (
         '22000000-0000-4000-8000-000000000001',
         '22000000-0000-4000-8000-000000000003',
-        '22000000-0000-4000-8000-000000000004',
-        '22000000-0000-4000-8000-000000000013'
+        '22000000-0000-4000-8000-000000000013',
+        '22000000-0000-4000-8000-000000000004'
       )
       and status = 'selected'
   ),
   4::bigint,
-  'the finalizer enrolls a late opted-in committee member before selecting committee members first'
+  'automatically confirmed committee signups remain confirmed through finalization'
 );
 
 select is(
