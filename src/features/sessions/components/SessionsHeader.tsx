@@ -60,23 +60,11 @@ export function SessionsHeader({
   const [autoSignupError, setAutoSignupError] = useState("");
   const [isEditingName, setIsEditingName] = useState(false);
   const [isSavingName, setIsSavingName] = useState(false);
-  const [isNavigatingToAdmin, setIsNavigatingToAdmin] = useState(false);
   const [draftDisplayName, setDraftDisplayName] = useState(displayName ?? "");
   const [nameError, setNameError] = useState("");
   const displayNameRef = useRef<HTMLHeadingElement>(null);
   const fullDisplayNameRef = useRef<HTMLSpanElement>(null);
   const [shouldShortenName, setShouldShortenName] = useState(false);
-
-  useEffect(() => {
-    const resetAdminNavigation = () => setIsNavigatingToAdmin(false);
-    window.addEventListener("pageshow", resetAdminNavigation);
-    window.addEventListener("popstate", resetAdminNavigation);
-
-    return () => {
-      window.removeEventListener("pageshow", resetAdminNavigation);
-      window.removeEventListener("popstate", resetAdminNavigation);
-    };
-  }, []);
 
   useEffect(() => {
     const nameElement = displayNameRef.current;
@@ -365,33 +353,10 @@ export function SessionsHeader({
               {isCommitteeAdmin && (
                 <Button
                   className="h-10 rounded-md bg-white px-3 hover:bg-white"
-                  render={
-                    <Link
-                      aria-busy={isNavigatingToAdmin}
-                      aria-disabled={isNavigatingToAdmin}
-                      href="/admin"
-                      onClick={(event) => {
-                        if (isNavigatingToAdmin) {
-                          event.preventDefault();
-                          return;
-                        }
-                        setIsNavigatingToAdmin(true);
-                      }}
-                    />
-                  }
+                  render={<Link href="/admin" />}
                   variant="outline"
                 >
-                  {isNavigatingToAdmin ? (
-                    <>
-                      <LoaderCircle
-                        aria-hidden="true"
-                        className="size-4 animate-spin"
-                      />
-                      Loading club…
-                    </>
-                  ) : (
-                    "Manage club"
-                  )}
+                  Manage club
                 </Button>
               )}
             </div>
