@@ -126,6 +126,17 @@ select is(
   (
     select count(*)
     from public.session_signups
+    where session_id = '32000000-0000-4000-8000-000000000001'
+      and user_id = '22000000-0000-4000-8000-000000000001'
+      and status = 'requested'
+  ),
+  1::bigint,
+  'the same opt-in immediately adds the member to the upcoming Monday session'
+);
+select is(
+  (
+    select count(*)
+    from public.session_signups
     where session_id = '32000000-0000-4000-8000-000000000002'
       and user_id = '22000000-0000-4000-8000-000000000001'
       and status = 'requested'

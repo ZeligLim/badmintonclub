@@ -28,7 +28,7 @@ type SessionFriendPickerProps = {
 
 export function SessionFriendPicker({
   friendCandidates,
-  friendList,
+  friendList = [],
   isAlreadySignedUp,
   isDemo,
   isPending,
@@ -57,10 +57,17 @@ export function SessionFriendPicker({
     ]),
   );
   const availableFriends =
-    normalizedQuery.length === 0 ? friendList : searchResults;
-  const selectableFriends = availableFriends.filter(
-    (friend) => !selectedFriendIds.includes(friend.userId),
-  );
+    normalizedQuery.length === 0
+      ? isDemo
+        ? [
+            ...friendList,
+            ...friendCandidates.filter(
+              (candidate) =>
+                !friendList.some((friend) => friend.userId === candidate.userId),
+            ),
+          ]
+        : friendList
+      : searchResults;
   const selectedFriends = selectedFriendIds.flatMap((userId) => {
     const friend = knownFriends.get(userId);
     return friend ? [friend] : [];
@@ -158,20 +165,20 @@ export function SessionFriendPicker({
       setFeedback(null);
       return;
     }
-    if (selectableFriends.length === 0) {
+    if (availableFriends.length === 0) {
       return;
     }
     if (event.key === "ArrowDown") {
       event.preventDefault();
-      setActiveResultIndex((index) => (index + 1) % selectableFriends.length);
+      setActiveResultIndex((index) => (index + 1) % availableFriends.length);
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
       setActiveResultIndex(
-        (index) => (index - 1 + selectableFriends.length) % selectableFriends.length,
+        (index) => (index - 1 + availableFriends.length) % availableFriends.length,
       );
     } else if (event.key === "Enter") {
       event.preventDefault();
-      const friend = selectableFriends[activeResultIndex];
+      const friend = availableFriends[activeResultIndex];
       if (friend) {
         void addSelectedFriend(friend);
       }
@@ -237,12 +244,12 @@ export function SessionFriendPicker({
       <div
         className="mt-2 grid min-w-0 gap-1"
         onBlur={(event) => {
-          if (
-            !(event.relatedTarget instanceof Node) ||
-            !event.currentTarget.contains(event.relatedTarget)
-          ) {
-            setIsSearchFocused(false);
-          }
+          const searchContainer = event.currentTarget;
+          window.setTimeout(() => {
+            if (!searchContainer.contains(document.activeElement)) {
+              setIsSearchFocused(false);
+            }
+          }, 0);
         }}
       >
         <label className="text-xs font-medium" htmlFor={`${searchId}-input`}>
@@ -250,13 +257,13 @@ export function SessionFriendPicker({
         </label>
         <input
           aria-activedescendant={
-            selectableFriends[activeResultIndex]
+            availableFriends[activeResultIndex]
               ? `${searchId}-option-${activeResultIndex}`
               : undefined
           }
           aria-autocomplete="list"
           aria-controls={`${searchId}-results`}
-          aria-expanded={isSearchFocused && selectableFriends.length > 0}
+          aria-expanded={isSearchFocused && availableFriends.length > 0}
           autoComplete="off"
           className="h-10 w-full min-w-0 rounded-md border-0 bg-background px-3 text-sm outline-none focus:border-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0"
           disabled={isPending || isAddingFriend || selectedFriendIds.length >= 3}
@@ -277,38 +284,47 @@ export function SessionFriendPicker({
           spellCheck={false}
           value={query}
         />
-      {isSearchFocused && selectableFriends.length > 0 && (
+      {isSearchFocused && availableFriends.length > 0 && (
         <ul
           aria-label="Search results"
           className="mt-1 grid max-h-56 gap-1 overflow-y-auto rounded-lg border border-border bg-background p-1 shadow-lg"
           id={`${searchId}-results`}
           role="listbox"
         >
-          {selectableFriends.map((friend, index) => (
-            <li
-              aria-selected={index === activeResultIndex}
-              id={`${searchId}-option-${index}`}
-              key={friend.userId}
-              role="option"
-            >
-              <button
-                className={`flex w-full items-center justify-between gap-3 rounded-md px-2.5 py-2 text-left text-sm hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${
-                  index === activeResultIndex ? "bg-accent" : ""
-                }`}
-                disabled={isPending || isAddingFriend || selectedFriendIds.length >= 3}
-                onClick={() => void addSelectedFriend(friend)}
-                onMouseEnter={() => setActiveResultIndex(index)}
-                type="button"
+          {availableFriends.map((friend, index) => {
+            const isSelected = selectedFriendIds.includes(friend.userId);
+
+            return (
+              <li
+                aria-selected={index === activeResultIndex}
+                id={`${searchId}-option-${index}`}
+                key={friend.userId}
+                role="option"
               >
-                <span className="min-w-0 truncate font-medium">
-                  {friend.displayName}
-                </span>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {friend.studentId}
-                </span>
-              </button>
-            </li>
-          ))}
+                <button
+                  className={`flex w-full items-center justify-between gap-3 rounded-md px-2.5 py-2 text-left text-sm hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${
+                    index === activeResultIndex ? "bg-accent" : ""
+                  }`}
+                  disabled={
+                    isPending ||
+                    isAddingFriend ||
+                    isSelected ||
+                    selectedFriendIds.length >= 3
+                  }
+                  onClick={() => void addSelectedFriend(friend)}
+                  onMouseEnter={() => setActiveResultIndex(index)}
+                  type="button"
+                >
+                  <span className="min-w-0 truncate font-medium">
+                    {friend.displayName}
+                  </span>
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {isSelected ? "Selected" : friend.studentId}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
       </div>
@@ -324,7 +340,7 @@ export function SessionFriendPicker({
       )}
       {isAlreadySignedUp && hasUnsavedChanges && (
         <Button
-          className="mt-2 w-full sm:w-auto"
+          className="mt-2 h-10 w-full sm:w-auto"
           disabled={isPending || isSaving || !hasUnsavedChanges}
           onClick={() => void saveFriendChoices()}
           type="button"

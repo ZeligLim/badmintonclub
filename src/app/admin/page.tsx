@@ -22,7 +22,7 @@ export default async function AdminPage() {
   ]);
 
   return (
-    <main className="min-h-screen px-4 pb-16 pt-6 sm:px-8">
+    <main className="min-h-screen bg-background px-4 pb-16 pt-6 sm:px-8">
       <div className="mx-auto w-full max-w-6xl">
         <header className="mb-8 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
           <Button

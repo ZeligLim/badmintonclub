@@ -51,14 +51,19 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
         </p>
       ) : session.courtSchedule.length > 0 ? (
         <div className="overflow-x-auto rounded-xl border border-border">
-          <table className="w-full text-sm">
+          <table className="w-full table-fixed text-sm">
+            <colgroup>
+              <col className="w-24 sm:w-32" />
+              <col className="w-14 sm:w-20" />
+              <col />
+            </colgroup>
             <thead>
               <tr className="border-b border-border bg-muted/50">
                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
                   Time
                 </th>
                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                  Court
+                  #
                 </th>
                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
                   Players
@@ -72,10 +77,11 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
                   className={i % 2 === 0 ? "bg-card" : "bg-muted/20"}
                 >
                   <td className="whitespace-nowrap px-4 py-2.5 tabular-nums text-muted-foreground">
-                    {game.startAt}–{game.endAt}
+                    <span className="block">{game.startAt}</span>
+                    <span className="block">{game.endAt}</span>
                   </td>
-                  <td className="px-4 py-2.5 font-medium">Court {game.courtNumber}</td>
-                  <td className="px-4 py-2.5">{game.players.join(", ")}</td>
+                  <td className="px-3 py-2.5 font-medium">{game.courtNumber}</td>
+                  <td className="break-words px-4 py-2.5">{game.players.join(", ")}</td>
                 </tr>
               ))}
             </tbody>
