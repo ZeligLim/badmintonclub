@@ -42,7 +42,7 @@ export function SessionSignupStatus({
   if (status) {
     if (status === "requested") {
       return (
-        <span className="rounded-full bg-secondary px-2.5 py-1 text-[0.65rem] font-semibold text-secondary-foreground">
+        <span className="inline-flex h-10 items-center rounded-full bg-secondary px-3 text-[0.65rem] font-semibold text-secondary-foreground">
           Awaiting confirmation
         </span>
       );
