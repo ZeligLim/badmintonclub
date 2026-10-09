@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import {
   ClubPlayerAccessTable,
   CourtScheduleTable,
@@ -22,17 +24,19 @@ export default async function AdminPage() {
   return (
     <main className="min-h-screen px-4 pb-16 pt-6 sm:px-8">
       <div className="mx-auto w-full max-w-6xl">
-        <header className="mb-8 flex items-center justify-between">
+        <header className="mb-8 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+          <Button
+            className="h-10 rounded-md bg-white px-3 hover:bg-white"
+            render={<Link href="/" />}
+            variant="outline"
+          >
+            <ArrowLeft aria-hidden="true" />
+            Sessions
+          </Button>
           <div>
             <h1 className="text-xl font-semibold tracking-tight">Admin — Court Schedule</h1>
             <p className="mt-1 text-sm text-muted-foreground">{user.email}</p>
           </div>
-          <Link
-            className="text-sm font-medium text-primary underline-offset-4 hover:underline"
-            href="/"
-          >
-            ← Back to sessions
-          </Link>
         </header>
 
         <ClubPlayerAccessTable players={players} />

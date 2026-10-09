@@ -194,7 +194,7 @@ export function SessionsHeader({
               Demo playing level
             </label>
             <select
-              className="h-10 w-full min-w-0 rounded-md bg-white px-3 text-sm sm:w-auto sm:max-w-44"
+              className="h-10 w-full min-w-0 rounded-md border-0 bg-white px-3 text-sm outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-auto sm:max-w-44"
               id="demo-player-level"
               onChange={(event) => changePlayerLevel(event.target.value)}
               value={playerLevel}
@@ -290,7 +290,7 @@ export function SessionsHeader({
                     Playing level
                   </label>
                   <select
-                    className="h-10 min-w-0 flex-1 rounded-md bg-white px-2 text-xs sm:w-auto sm:flex-none sm:px-3 sm:text-sm"
+                    className="h-10 min-w-0 flex-1 rounded-md border-0 bg-white px-2 text-xs outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-auto sm:flex-none sm:px-3 sm:text-sm"
                     disabled={isUpdatingLevel}
                     id="player-level"
                     onChange={(event) => changePlayerLevel(event.target.value)}

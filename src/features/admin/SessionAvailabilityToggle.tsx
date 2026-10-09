@@ -55,12 +55,6 @@ export function SessionAvailabilityToggle({
   return (
     <div className="flex flex-col items-start gap-1">
       <div className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-card px-3">
-        <Switch
-          checked={isHappening}
-          disabled={isPending}
-          id={`session-happening-${sessionId}`}
-          onCheckedChange={toggleAvailability}
-        />
         <label
           className="cursor-pointer whitespace-nowrap text-xs font-medium"
           htmlFor={`session-happening-${sessionId}`}
@@ -71,6 +65,12 @@ export function SessionAvailabilityToggle({
               ? "Happening"
               : "Not happening"}
         </label>
+        <Switch
+          checked={isHappening}
+          disabled={isPending}
+          id={`session-happening-${sessionId}`}
+          onCheckedChange={toggleAvailability}
+        />
       </div>
       {errorMessage ? (
         <p className="max-w-xs text-xs text-destructive" role="alert">
