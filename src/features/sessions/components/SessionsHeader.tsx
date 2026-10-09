@@ -7,7 +7,14 @@ import {
   useTransition,
   type FormEvent,
 } from "react";
-import { ArrowRight, Check, LogOut, Pencil, X } from "lucide-react";
+import {
+  ArrowRight,
+  Check,
+  LoaderCircle,
+  LogOut,
+  Pencil,
+  X,
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -52,6 +59,7 @@ export function SessionsHeader({
   const [isUpdatingAutoSignup, setIsUpdatingAutoSignup] = useState(false);
   const [autoSignupError, setAutoSignupError] = useState("");
   const [isEditingName, setIsEditingName] = useState(false);
+  const [isSavingName, setIsSavingName] = useState(false);
   const [draftDisplayName, setDraftDisplayName] = useState(displayName ?? "");
   const [nameError, setNameError] = useState("");
   const displayNameRef = useRef<HTMLHeadingElement>(null);
@@ -146,12 +154,15 @@ export function SessionsHeader({
     }
 
     setNameError("");
+    setIsSavingName(true);
     try {
       await updateDisplayNameForCurrentUser(trimmedName);
       setIsEditingName(false);
       router.refresh();
     } catch {
       setNameError("We couldn’t update your name. Please try again.");
+    } finally {
+      setIsSavingName(false);
     }
   }
 
@@ -218,6 +229,7 @@ export function SessionsHeader({
                       autoComplete="name"
                       aria-label="Display name"
                       className="h-10 min-w-0 flex-1 rounded-md bg-background px-3 text-base"
+                      disabled={isSavingName}
                       maxLength={80}
                       onChange={(event) => setDraftDisplayName(event.target.value)}
                       value={draftDisplayName}
@@ -225,13 +237,22 @@ export function SessionsHeader({
                     <button
                       aria-label="Save name"
                       className="inline-flex size-10 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground"
+                      disabled={isSavingName}
                       type="submit"
                     >
-                      <Check aria-hidden="true" className="size-4" />
+                      {isSavingName ? (
+                        <LoaderCircle
+                          aria-hidden="true"
+                          className="size-4 animate-spin"
+                        />
+                      ) : (
+                        <Check aria-hidden="true" className="size-4" />
+                      )}
                     </button>
                     <button
                       aria-label="Cancel editing name"
                       className="inline-flex size-10 shrink-0 items-center justify-center rounded-md bg-background"
+                      disabled={isSavingName}
                       onClick={() => {
                         setIsEditingName(false);
                         setNameError("");
@@ -292,7 +313,7 @@ export function SessionsHeader({
                   >
                     <button
                       aria-label="Sign out"
-                      className="inline-flex size-10 items-center justify-center rounded-md bg-background text-sm font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="inline-flex size-10 items-center justify-center rounded-md bg-white text-sm font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       title="Sign out"
                       type="submit"
                     >
