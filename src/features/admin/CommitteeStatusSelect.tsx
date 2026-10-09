@@ -49,21 +49,21 @@ export function CommitteeStatusSelect({
 
   return (
     <div className="flex flex-col gap-1">
-      <select
-        aria-label={`${displayName} committee status`}
-        className="rounded-md border-0 bg-background px-2 py-1 outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        disabled={isPending}
-        onChange={(event) => changeCommitteeStatus(event.target.value)}
-        value={isCommittee ? "true" : "false"}
-      >
-        <option value="false">Member</option>
-        <option value="true">Committee</option>
-      </select>
       {isPending ? (
         <span className="text-xs text-muted-foreground" role="status">
           Saving…
         </span>
-      ) : null}
+      ) : (
+        <select
+          aria-label={`${displayName} committee status`}
+          className="rounded-md border-0 bg-background px-2 py-1 outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          onChange={(event) => changeCommitteeStatus(event.target.value)}
+          value={isCommittee ? "true" : "false"}
+        >
+          <option value="false">Member</option>
+          <option value="true">Committee</option>
+        </select>
+      )}
       {errorMessage ? (
         <p className="max-w-48 text-xs text-destructive" role="alert">
           {errorMessage}

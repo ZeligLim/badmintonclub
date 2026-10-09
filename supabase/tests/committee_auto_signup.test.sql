@@ -426,8 +426,8 @@ select is(
     where session_id = '32000000-0000-4000-8000-000000000002'
       and user_id = '22000000-0000-4000-8000-000000000014'
   ),
-  'requested',
-  'committee removal does not cancel a manually renewed signup'
+  'selected',
+  'committee removal does not cancel a manually renewed confirmed signup'
 );
 
 select is(

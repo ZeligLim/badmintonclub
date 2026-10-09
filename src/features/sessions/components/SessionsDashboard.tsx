@@ -218,19 +218,37 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
         await signUpForSession(session.id, friendIds);
       }
 
-      setSignupOverrides((currentOverrides) => ({
-        ...currentOverrides,
-        [session.id]: {
-          sourceStatus: session.currentUserStatus,
-          sourceSlot: session.currentUserSlot,
-          currentUserStatus: isCancelling
-            ? null
-            : session.status === "confirmed"
-              ? "selected"
-              : "requested",
-          currentUserSlot: isCancelling ? null : session.currentUserSlot,
-        },
-      }));
+      const committeeOpenSignup =
+        !isCancelling &&
+        !isDemo &&
+        initialData.user?.isCommittee &&
+        session.status === "open";
+
+      if (committeeOpenSignup) {
+        setSignupOverrides((currentOverrides) => {
+          if (!currentOverrides[session.id]) {
+            return currentOverrides;
+          }
+
+          const nextOverrides = { ...currentOverrides };
+          delete nextOverrides[session.id];
+          return nextOverrides;
+        });
+      } else {
+        setSignupOverrides((currentOverrides) => ({
+          ...currentOverrides,
+          [session.id]: {
+            sourceStatus: session.currentUserStatus,
+            sourceSlot: session.currentUserSlot,
+            currentUserStatus: isCancelling
+              ? null
+              : session.status === "confirmed"
+                ? "selected"
+                : "requested",
+            currentUserSlot: isCancelling ? null : session.currentUserSlot,
+          },
+        }));
+      }
       router.refresh();
     } catch (error: unknown) {
       console.error("Could not update a session signup.", {
