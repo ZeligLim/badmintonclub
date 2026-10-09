@@ -68,6 +68,17 @@ export function SessionsHeader({
   const [shouldShortenName, setShouldShortenName] = useState(false);
 
   useEffect(() => {
+    const resetAdminNavigation = () => setIsNavigatingToAdmin(false);
+    window.addEventListener("pageshow", resetAdminNavigation);
+    window.addEventListener("popstate", resetAdminNavigation);
+
+    return () => {
+      window.removeEventListener("pageshow", resetAdminNavigation);
+      window.removeEventListener("popstate", resetAdminNavigation);
+    };
+  }, []);
+
+  useEffect(() => {
     const nameElement = displayNameRef.current;
     const fullNameElement = fullDisplayNameRef.current;
     if (!nameElement || !fullNameElement) {
@@ -314,7 +325,7 @@ export function SessionsHeader({
                   >
                     <button
                       aria-label="Sign out"
-                      className="inline-flex size-10 items-center justify-center rounded-md bg-white text-sm font-medium text-foreground transition-colors hover:bg-white hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="inline-flex size-10 items-center justify-center rounded-md bg-primary text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       title="Sign out"
                       type="submit"
                     >
@@ -333,7 +344,7 @@ export function SessionsHeader({
               )}
               {isCommittee && !isEditingName && (
                 <div
-                  className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md bg-background px-3 text-xs text-foreground"
+                  className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md bg-white px-3 text-xs text-foreground"
                 >
                   <label
                     className="whitespace-nowrap"
