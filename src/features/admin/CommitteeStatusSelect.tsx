@@ -51,7 +51,7 @@ export function CommitteeStatusSelect({
     <div className="flex flex-col gap-1">
       <select
         aria-label={`${displayName} committee status`}
-        className="rounded-md border border-border bg-background px-2 py-1"
+        className="rounded-md bg-background px-2 py-1"
         disabled={isPending}
         onChange={(event) => changeCommitteeStatus(event.target.value)}
         value={isCommittee ? "true" : "false"}

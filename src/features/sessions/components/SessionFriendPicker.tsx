@@ -231,7 +231,7 @@ export function SessionFriendPicker({
           aria-controls={`${searchId}-results`}
           aria-expanded={selectableFriends.length > 0}
           autoComplete="off"
-          className="h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="h-10 w-full min-w-0 rounded-md bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           disabled={isPending || selectedFriendIds.length >= 3}
           id={`${searchId}-input`}
           maxLength={64}

@@ -183,7 +183,7 @@ export function SessionsHeader({
               Demo playing level
             </label>
             <select
-              className="h-10 w-full min-w-0 rounded-md border border-border bg-background px-3 text-sm sm:w-auto sm:max-w-44"
+              className="h-10 w-full min-w-0 rounded-md bg-background px-3 text-sm sm:w-auto sm:max-w-44"
               id="demo-player-level"
               onChange={(event) => changePlayerLevel(event.target.value)}
               value={playerLevel}
@@ -217,7 +217,7 @@ export function SessionsHeader({
                     <input
                       autoComplete="name"
                       aria-label="Display name"
-                      className="h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-base"
+                      className="h-10 min-w-0 flex-1 rounded-md bg-background px-3 text-base"
                       maxLength={80}
                       onChange={(event) => setDraftDisplayName(event.target.value)}
                       value={draftDisplayName}
@@ -231,7 +231,7 @@ export function SessionsHeader({
                     </button>
                     <button
                       aria-label="Cancel editing name"
-                      className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-border bg-background"
+                      className="inline-flex size-10 shrink-0 items-center justify-center rounded-md bg-background"
                       onClick={() => {
                         setIsEditingName(false);
                         setNameError("");
@@ -252,7 +252,7 @@ export function SessionsHeader({
               {!isEditingName && (
                 <button
                   aria-label="Edit name"
-                  className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-border bg-background text-sm font-medium text-foreground transition-colors hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="inline-flex size-10 shrink-0 items-center justify-center rounded-md bg-background text-sm font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   onClick={() => {
                     setDraftDisplayName(displayName);
                     setNameError("");
@@ -269,7 +269,7 @@ export function SessionsHeader({
                     Playing level
                   </label>
                   <select
-                    className="h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-xs sm:w-auto sm:flex-none sm:px-3 sm:text-sm"
+                    className="h-10 min-w-0 flex-1 rounded-md bg-background px-2 text-xs sm:w-auto sm:flex-none sm:px-3 sm:text-sm"
                     disabled={isUpdatingLevel}
                     id="player-level"
                     onChange={(event) => changePlayerLevel(event.target.value)}
@@ -292,7 +292,7 @@ export function SessionsHeader({
                   >
                     <button
                       aria-label="Sign out"
-                      className="inline-flex size-10 items-center justify-center rounded-md border border-border bg-background text-sm font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="inline-flex size-10 items-center justify-center rounded-md bg-background text-sm font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       title="Sign out"
                       type="submit"
                     >
@@ -311,7 +311,7 @@ export function SessionsHeader({
               )}
               {isCommittee && !isEditingName && (
                 <div
-                  className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md border border-border bg-background px-3 text-xs text-foreground"
+                  className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md bg-background px-3 text-xs text-foreground"
                 >
                   <label
                     className="whitespace-nowrap"

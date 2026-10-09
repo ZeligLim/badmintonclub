@@ -54,7 +54,7 @@ export function SessionAvailabilityToggle({
 
   return (
     <div className="flex flex-col items-start gap-1">
-      <div className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-border bg-card px-3">
+      <div className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-card px-3">
         <Switch
           checked={isHappening}
           disabled={isPending}
