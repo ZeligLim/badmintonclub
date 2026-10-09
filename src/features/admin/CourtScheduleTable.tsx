@@ -81,7 +81,7 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
                     <span className="block">{game.endAt}</span>
                   </td>
                   <td className="px-3 py-2.5 font-medium">{game.courtNumber}</td>
-                  <td className="break-words px-4 py-2.5">{game.players.join(", ")}</td>
+                  <td className="wrap-break-word px-4 py-2.5">{game.players.join(", ")}</td>
                 </tr>
               ))}
             </tbody>

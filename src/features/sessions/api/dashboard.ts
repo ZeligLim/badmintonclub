@@ -97,7 +97,10 @@ async function getFriendList(
 ): Promise<FriendCandidate[]> {
   const { data, error } = await supabase.rpc("get_my_friend_list");
   if (error) {
-    throw new Error(`Could not load your friend list: ${error.message}`);
+    console.error("Could not load the shared friend list.", {
+      code: error.code,
+    });
+    throw new Error("Could not load your friend list.");
   }
 
   return data.map((friend: FriendListRow) => ({
@@ -139,7 +142,10 @@ async function getFriendPreferences(
         p_session_id: session.id,
       });
       if (error) {
-        throw new Error(`Could not load saved friend choices: ${error.message}`);
+        console.error("Could not load saved session friend choices.", {
+          code: error.code,
+        });
+        throw new Error("Could not load saved friend choices.");
       }
       return [session.id, data] as const;
     }),

@@ -38,7 +38,10 @@ export async function updateSessionFriendPreferences(
   });
 
   if (error) {
-    throw new Error(`Could not save your friend choices: ${error.message}`);
+    console.error("Could not save session friend preferences.", {
+      code: error.code,
+    });
+    throw new Error("Could not save your friend choices.");
   }
 }
 
@@ -56,7 +59,8 @@ export async function searchClubMembers(
   });
 
   if (error) {
-    throw new Error(`Could not search club members: ${error.message}`);
+    console.error("Could not search club members.", { code: error.code });
+    throw new Error("Could not search club members.");
   }
 
   return data.map((friend) => {
@@ -86,7 +90,8 @@ export async function addClubFriend(friendId: string): Promise<void> {
   });
 
   if (error) {
-    throw new Error(`Could not add this friend: ${error.message}`);
+    console.error("Could not add a club friend.", { code: error.code });
+    throw new Error("Could not add this friend.");
   }
 }
 
@@ -98,7 +103,8 @@ export async function removeClubFriend(friendId: string): Promise<void> {
   });
 
   if (error) {
-    throw new Error(`Could not remove this friend: ${error.message}`);
+    console.error("Could not remove a club friend.", { code: error.code });
+    throw new Error("Could not remove this friend.");
   }
 }
 
@@ -208,10 +214,14 @@ async function updateSignup(
       : await supabase.rpc(functionName, { p_session_id: sessionId });
 
   if (error) {
+    console.error("Could not update session signup.", {
+      operation: functionName,
+      code: error.code,
+    });
     throw new Error(
       functionName === "request_session_signup"
-        ? `Could not join this session: ${error.message}`
-        : `Could not cancel this session: ${error.message}`,
+        ? "Could not join this session."
+        : "Could not cancel this session.",
     );
   }
 }

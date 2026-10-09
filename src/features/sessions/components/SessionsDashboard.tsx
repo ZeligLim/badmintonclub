@@ -232,7 +232,10 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
         },
       }));
       router.refresh();
-    } catch {
+    } catch (error: unknown) {
+      console.error("Could not update a session signup.", {
+        errorType: error instanceof Error ? error.name : "unknown",
+      });
       setErrorMessage("We couldn’t update your place. Please try again.");
     } finally {
       setPendingSessionId(null);
@@ -251,7 +254,10 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
         await saveSessionFriendPreferences(session.id, friendIds);
         router.refresh();
       }
-    } catch {
+    } catch (error: unknown) {
+      console.error("Could not save session friend choices.", {
+        errorType: error instanceof Error ? error.name : "unknown",
+      });
       setErrorMessage("We couldn’t save your friend choices. Please try again.");
       throw new Error("Could not save your friend choices.");
     } finally {
@@ -261,8 +267,15 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
 
   async function addFriendToSharedList(friend: FriendCandidate): Promise<void> {
     setErrorMessage("");
-    if (!isDemo) {
-      await addFriendToList(friend.userId);
+    try {
+      if (!isDemo) {
+        await addFriendToList(friend.userId);
+      }
+    } catch (error: unknown) {
+      console.error("Could not add a friend to the shared list.", {
+        errorType: error instanceof Error ? error.name : "unknown",
+      });
+      throw error;
     }
     setFriendList((currentFriends) => [
       friend,
@@ -282,7 +295,10 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
       setFriendList((currentFriends) =>
         currentFriends.filter((friend) => friend.userId !== friendId),
       );
-    } catch {
+    } catch (error: unknown) {
+      console.error("Could not remove a friend from the shared list.", {
+        errorType: error instanceof Error ? error.name : "unknown",
+      });
       setErrorMessage("We couldn’t remove this friend. Please try again.");
     } finally {
       setPendingFriendId(null);
@@ -449,10 +465,16 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
           <div className="grid gap-4 lg:grid-cols-2">
             {sessions.map((session) => {
               const signupState = getSignupState(session);
+              const friendSelectionKey = JSON.stringify(
+                (session.friendCandidates ?? [])
+                  .filter((candidate) => candidate.isSelected)
+                  .map((candidate) => candidate.userId)
+                  .sort(),
+              );
 
               return (
                 <SessionCard
-                  key={session.id}
+                  key={`${session.id}:${friendSelectionKey}`}
                   session={session}
                   signupState={signupState}
                   showSessionView={

@@ -67,6 +67,7 @@ export function SessionCard({
       .filter((candidate) => candidate.isSelected)
       .map((candidate) => candidate.userId),
   );
+
   const signupStatus = signupState.currentUserStatus?.toLowerCase() ?? "";
   const isWaitlisted = signupStatus.includes("waitlist");
   const isPlayed = signupStatus === "played";

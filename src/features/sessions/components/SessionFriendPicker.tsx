@@ -106,7 +106,10 @@ export function SessionFriendPicker({
             setFeedback("No club members found.");
           }
         }
-      } catch {
+      } catch (error: unknown) {
+        console.error("Could not search club members.", {
+          errorType: error instanceof Error ? error.name : "unknown",
+        });
         if (searchRequestId.current === requestId) {
           setFeedback("Could not search club members. Please try again.");
         }
@@ -149,7 +152,10 @@ export function SessionFriendPicker({
       setSearchResults([]);
       setIsSearching(false);
       setFeedback(`${friend.displayName} added to your friend list.`);
-    } catch {
+    } catch (error: unknown) {
+      console.error("Could not add this friend.", {
+        errorType: error instanceof Error ? error.name : "unknown",
+      });
       setFeedback("Could not add this friend. Please try again.");
     } finally {
       setIsAddingFriend(false);
@@ -200,7 +206,10 @@ export function SessionFriendPicker({
       await onSave(selectedFriendIds);
       setSavedFriendIds(selectedFriendIds);
       setFeedback("Friend choices saved.");
-    } catch {
+    } catch (error: unknown) {
+      console.error("Could not save friend choices.", {
+        errorType: error instanceof Error ? error.name : "unknown",
+      });
       setFeedback("Could not save your friend choices. Please try again.");
     } finally {
       setIsSaving(false);
