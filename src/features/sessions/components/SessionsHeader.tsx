@@ -169,20 +169,32 @@ export function SessionsHeader({
   return (
     <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex w-full min-w-0 items-start gap-3">
-        <Link
-          aria-label="ATU Galway Badminton Club home"
-          className="flex shrink-0 items-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          href="/"
-        >
-          <Image
-            alt="ATU Galway Badminton Club"
-            className="size-16 rounded-full object-cover sm:size-20"
-            height={64}
-            priority
-            src="/logo.png"
-            width={64}
-          />
-        </Link>
+        <div className="flex shrink-0 flex-col items-start gap-2">
+          <Link
+            aria-label="ATU Galway Badminton Club home"
+            className="flex shrink-0 items-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            href="/"
+          >
+            <Image
+              alt="ATU Galway Badminton Club"
+              className="size-16 rounded-full object-cover sm:size-20"
+              height={64}
+              priority
+              src="/logo.png"
+              width={64}
+            />
+          </Link>
+          {isCommittee && (
+            <span className="inline-flex h-10 shrink-0 items-center rounded-full bg-primary/10 px-3 text-[0.65rem] font-medium text-primary sm:text-xs">
+              Committee
+            </span>
+          )}
+          {isCommitteeAdmin && (
+            <span className="inline-flex h-10 shrink-0 items-center rounded-full bg-primary/10 px-3 text-[0.65rem] font-medium text-primary sm:text-xs">
+              Admin
+            </span>
+          )}
+        </div>
 
         {isDemo ? (
           <div className="flex min-w-0 flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
@@ -325,11 +337,6 @@ export function SessionsHeader({
             </div>
 
             <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2">
-              {isCommittee && (
-                <span className="inline-flex h-10 shrink-0 items-center rounded-full bg-primary/10 px-3 text-[0.65rem] font-medium text-primary sm:text-xs">
-                  Committee
-                </span>
-              )}
               {isCommittee && !isEditingName && (
                 <div
                   className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md bg-white px-3 text-xs text-foreground"
@@ -353,11 +360,8 @@ export function SessionsHeader({
             </div>
             {isCommitteeAdmin && (
               <div className="mt-2 flex items-center gap-2">
-                <span className="inline-flex h-10 shrink-0 items-center rounded-full bg-primary/10 px-3 text-[0.65rem] font-medium text-primary sm:text-xs">
-                  Admin
-                </span>
                 <Button
-                  className="h-10 rounded-md bg-white px-3 hover:bg-white"
+                  className="h-10 rounded-md bg-white px-3 font-normal hover:bg-white"
                   render={<Link href="/admin" />}
                   variant="outline"
                 >
