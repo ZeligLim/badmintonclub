@@ -10,6 +10,8 @@ import {
 import { ArrowRight, Check, LogOut, Pencil, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import {
   signOutFromClub,
   updateCommitteeAutoSignupForCurrentUser,
@@ -109,8 +111,11 @@ export function SessionsHeader({
     });
   }
 
-  async function changeCommitteeAutoSignup() {
-    const nextValue = !committeeAutoSignup;
+  async function changeCommitteeAutoSignup(nextValue: boolean) {
+    if (nextValue === committeeAutoSignup) {
+      return;
+    }
+
     setIsUpdatingAutoSignup(true);
     setAutoSignupError("");
 
@@ -152,7 +157,7 @@ export function SessionsHeader({
 
   return (
     <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex w-full min-w-0 items-center gap-3">
+      <div className="flex w-full min-w-0 items-start gap-3">
         <Link
           aria-label="ATU Galway Badminton Club home"
           className="flex shrink-0 items-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -178,7 +183,7 @@ export function SessionsHeader({
               Demo playing level
             </label>
             <select
-              className="h-10 w-full min-w-0 rounded-lg border border-border bg-background px-3 text-sm sm:w-auto sm:max-w-44"
+              className="h-10 w-full min-w-0 rounded-md border border-border bg-background px-3 text-sm sm:w-auto sm:max-w-44"
               id="demo-player-level"
               onChange={(event) => changePlayerLevel(event.target.value)}
               value={playerLevel}
@@ -264,7 +269,7 @@ export function SessionsHeader({
                     Playing level
                   </label>
                   <select
-                    className="h-10 min-w-0 flex-1 rounded-lg border border-border bg-background px-2 text-xs sm:w-auto sm:flex-none sm:px-3 sm:text-sm"
+                    className="h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-xs sm:w-auto sm:flex-none sm:px-3 sm:text-sm"
                     disabled={isUpdatingLevel}
                     id="player-level"
                     onChange={(event) => changePlayerLevel(event.target.value)}
@@ -305,31 +310,33 @@ export function SessionsHeader({
                 </span>
               )}
               {isCommittee && !isEditingName && (
-                <button
-                  aria-checked={committeeAutoSignup}
-                  aria-label="Automatically sign me up for sessions"
-                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-60"
-                  disabled={isUpdatingAutoSignup}
-                  onClick={changeCommitteeAutoSignup}
-                  role="switch"
-                  type="button"
+                <div
+                  className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md border border-border bg-background px-3 text-xs text-foreground"
                 >
-                  <span>Auto Sign-up</span>
-                  <span
-                    className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[0.6rem] font-semibold text-primary"
-                    aria-hidden="true"
+                  <label
+                    className="whitespace-nowrap"
+                    htmlFor="committee-auto-signup"
                   >
-                    {committeeAutoSignup ? "ON" : "OFF"}
-                  </span>
-                </button>
+                    Auto Sign-up
+                  </label>
+                  <Switch
+                    aria-label="Automatically sign me up for sessions"
+                    checked={committeeAutoSignup}
+                    disabled={isUpdatingAutoSignup}
+                    id="committee-auto-signup"
+                    onCheckedChange={changeCommitteeAutoSignup}
+                    size="sm"
+                  />
+                </div>
               )}
               {isCommitteeAdmin && (
-                <Link
-                  className="inline-flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-sm"
-                  href="/admin"
+                <Button
+                  className="h-10 rounded-md px-3"
+                  render={<Link href="/admin" />}
+                  variant="outline"
                 >
                   Manage club
-                </Link>
+                </Button>
               )}
             </div>
             {autoSignupError && (
