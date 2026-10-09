@@ -56,7 +56,7 @@ export function SessionsHeader({
   const [committeeAutoSignup, setCommitteeAutoSignup] = useState(
     initialCommitteeAutoSignup,
   );
-  const [isUpdatingAutoSignup, setIsUpdatingAutoSignup] = useState(false);
+  const [isUpdatingAutoSignup, startAutoSignupTransition] = useTransition();
   const [autoSignupError, setAutoSignupError] = useState("");
   const [isEditingName, setIsEditingName] = useState(false);
   const [isSavingName, setIsSavingName] = useState(false);
@@ -119,25 +119,24 @@ export function SessionsHeader({
     });
   }
 
-  async function changeCommitteeAutoSignup(nextValue: boolean) {
+  function changeCommitteeAutoSignup(nextValue: boolean) {
     if (nextValue === committeeAutoSignup) {
       return;
     }
 
-    setIsUpdatingAutoSignup(true);
     setAutoSignupError("");
 
-    try {
-      await updateCommitteeAutoSignupForCurrentUser(nextValue);
-      setCommitteeAutoSignup(nextValue);
-      router.refresh();
-    } catch {
-      setAutoSignupError(
-        "We couldn’t update automatic signup. Please try again.",
-      );
-    } finally {
-      setIsUpdatingAutoSignup(false);
-    }
+    startAutoSignupTransition(async () => {
+      try {
+        await updateCommitteeAutoSignupForCurrentUser(nextValue);
+        setCommitteeAutoSignup(nextValue);
+        router.refresh();
+      } catch {
+        setAutoSignupError(
+          "We couldn’t update automatic signup. Please try again.",
+        );
+      }
+    });
   }
 
   async function saveDisplayName(event: FormEvent<HTMLFormElement>) {
@@ -169,7 +168,7 @@ export function SessionsHeader({
   return (
     <>
     <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex w-full min-w-0 items-start gap-3">
+      <div className="flex w-full min-w-0 items-center gap-3">
         <div className="flex shrink-0 flex-col items-start gap-2">
           <Link
             aria-label="ATU Galway Badminton Club home"
@@ -353,6 +352,13 @@ export function SessionsHeader({
               >
                 Auto Sign-up
               </label>
+              {isUpdatingAutoSignup && (
+                <LoaderCircle
+                  aria-label="Updating automatic signup"
+                  className="size-3.5 animate-spin"
+                  role="status"
+                />
+              )}
               <Switch
                 aria-label="Automatically sign me up for sessions"
                 checked={committeeAutoSignup}

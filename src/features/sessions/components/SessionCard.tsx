@@ -34,6 +34,7 @@ type SessionCardProps = {
   isDemo: boolean;
   isSignedIn: boolean;
   isPending: boolean;
+  friendList: FriendCandidate[];
   canMarkPlayed: boolean;
   hasBeenPlayed: boolean;
   onSignup: (friendIds: string[]) => void;
@@ -52,6 +53,7 @@ export function SessionCard({
   isDemo,
   isSignedIn,
   isPending,
+  friendList,
   canMarkPlayed,
   hasBeenPlayed,
   onSignup,
@@ -220,6 +222,7 @@ export function SessionCard({
             (!isSignedUp || signupStatus === "requested") && (
               <SessionFriendPicker
                 friendCandidates={friendCandidates}
+                friendList={friendList}
                 isAlreadySignedUp={isSignedUp}
                 isDemo={isDemo}
                 isPending={isPending}

@@ -264,13 +264,12 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
     if (!isDemo) {
       await addFriendToList(friend.userId);
     }
-    setFriendList((currentFriends) =>
-      currentFriends.some((currentFriend) => currentFriend.userId === friend.userId)
-        ? currentFriends
-        : [...currentFriends, friend].toSorted((a, b) =>
-            a.displayName.localeCompare(b.displayName),
-          ),
-    );
+    setFriendList((currentFriends) => [
+      friend,
+      ...currentFriends.filter(
+        (currentFriend) => currentFriend.userId !== friend.userId,
+      ),
+    ]);
   }
 
   async function removeFriendFromSharedList(friendId: string): Promise<void> {
@@ -476,6 +475,7 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
                   isDemo={isDemo}
                   isSignedIn={isDemo || Boolean(initialData.user)}
                   isPending={pendingSessionId === session.id}
+                  friendList={friendList}
                   onAddToFriendList={addFriendToSharedList}
                   onSignup={(friendIds) => changeSignup(session, friendIds)}
                   onSaveFriendPreferences={(friendIds) =>

@@ -16,6 +16,7 @@ import {
 
 type SessionFriendPickerProps = {
   friendCandidates: FriendCandidate[];
+  friendList: FriendCandidate[];
   isAlreadySignedUp: boolean;
   isDemo: boolean;
   isPending: boolean;
@@ -27,6 +28,7 @@ type SessionFriendPickerProps = {
 
 export function SessionFriendPicker({
   friendCandidates,
+  friendList,
   isAlreadySignedUp,
   isDemo,
   isPending,
@@ -36,6 +38,7 @@ export function SessionFriendPicker({
   selectedFriendIds,
 }: SessionFriendPickerProps) {
   const [query, setQuery] = useState("");
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [addedFriends, setAddedFriends] = useState<FriendCandidate[]>([]);
   const [searchResults, setSearchResults] = useState<FriendCandidate[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -46,20 +49,22 @@ export function SessionFriendPicker({
   const [feedback, setFeedback] = useState<string | null>(null);
   const searchId = useId();
   const searchRequestId = useRef(0);
+  const normalizedQuery = query.trim();
   const knownFriends = new Map(
-    [...friendCandidates, ...addedFriends].map((friend) => [
+    [...friendCandidates, ...friendList, ...addedFriends].map((friend) => [
       friend.userId,
       friend,
     ]),
   );
-  const selectableFriends = searchResults.filter(
+  const availableFriends =
+    normalizedQuery.length === 0 ? friendList : searchResults;
+  const selectableFriends = availableFriends.filter(
     (friend) => !selectedFriendIds.includes(friend.userId),
   );
   const selectedFriends = selectedFriendIds.flatMap((userId) => {
     const friend = knownFriends.get(userId);
     return friend ? [friend] : [];
   });
-  const normalizedQuery = query.trim();
   const hasUnsavedChanges =
     selectedFriendIds.length !== savedFriendIds.length ||
     selectedFriendIds.some((friendId) => !savedFriendIds.includes(friendId));
@@ -153,16 +158,16 @@ export function SessionFriendPicker({
       setFeedback(null);
       return;
     }
-    if (searchResults.length === 0) {
+    if (selectableFriends.length === 0) {
       return;
     }
     if (event.key === "ArrowDown") {
       event.preventDefault();
-      setActiveResultIndex((index) => (index + 1) % searchResults.length);
+      setActiveResultIndex((index) => (index + 1) % selectableFriends.length);
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
       setActiveResultIndex(
-        (index) => (index - 1 + searchResults.length) % searchResults.length,
+        (index) => (index - 1 + selectableFriends.length) % selectableFriends.length,
       );
     } else if (event.key === "Enter") {
       event.preventDefault();
@@ -229,7 +234,17 @@ export function SessionFriendPicker({
       ) : (
         <p className="mt-1 text-xs text-muted-foreground">No friends selected.</p>
       )}
-      <div className="mt-2 grid min-w-0 gap-1">
+      <div
+        className="mt-2 grid min-w-0 gap-1"
+        onBlur={(event) => {
+          if (
+            !(event.relatedTarget instanceof Node) ||
+            !event.currentTarget.contains(event.relatedTarget)
+          ) {
+            setIsSearchFocused(false);
+          }
+        }}
+      >
         <label className="text-xs font-medium" htmlFor={`${searchId}-input`}>
           Search by name or student ID
         </label>
@@ -241,12 +256,13 @@ export function SessionFriendPicker({
           }
           aria-autocomplete="list"
           aria-controls={`${searchId}-results`}
-          aria-expanded={selectableFriends.length > 0}
+          aria-expanded={isSearchFocused && selectableFriends.length > 0}
           autoComplete="off"
-          className="h-10 w-full min-w-0 rounded-md bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="h-10 w-full min-w-0 rounded-md border-0 bg-background px-3 text-sm outline-none focus:border-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0"
           disabled={isPending || isAddingFriend || selectedFriendIds.length >= 3}
           id={`${searchId}-input`}
           maxLength={64}
+          onFocus={() => setIsSearchFocused(true)}
           onChange={(event) => {
             searchRequestId.current += 1;
             setQuery(event.target.value);
@@ -261,8 +277,7 @@ export function SessionFriendPicker({
           spellCheck={false}
           value={query}
         />
-      </div>
-      {selectableFriends.length > 0 && (
+      {isSearchFocused && selectableFriends.length > 0 && (
         <ul
           aria-label="Search results"
           className="mt-1 grid max-h-56 gap-1 overflow-y-auto rounded-lg border border-border bg-background p-1 shadow-lg"
@@ -296,6 +311,7 @@ export function SessionFriendPicker({
           ))}
         </ul>
       )}
+      </div>
       {isSearching && (
         <p aria-live="polite" className="mt-2 text-xs text-muted-foreground">
           Searching…
@@ -311,7 +327,6 @@ export function SessionFriendPicker({
           className="mt-2 w-full sm:w-auto"
           disabled={isPending || isSaving || !hasUnsavedChanges}
           onClick={() => void saveFriendChoices()}
-          size="sm"
           type="button"
         >
           {isSaving ? "Saving…" : "Save friend choices"}

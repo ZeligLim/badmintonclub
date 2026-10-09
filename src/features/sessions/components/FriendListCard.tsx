@@ -44,7 +44,15 @@ export function FriendListCard({
                 aria-label={`Remove ${friend.displayName} from friend list`}
                 className="shrink-0 rounded-full p-1 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
                 disabled={pendingFriendId === friend.userId}
-                onClick={() => onRemove(friend.userId)}
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      `Remove ${friend.displayName} from your friend list?`,
+                    )
+                  ) {
+                    onRemove(friend.userId);
+                  }
+                }}
                 type="button"
               >
                 <X aria-hidden="true" className="size-4" />
