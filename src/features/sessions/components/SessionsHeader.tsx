@@ -184,16 +184,6 @@ export function SessionsHeader({
               width={64}
             />
           </Link>
-          {isCommittee && (
-            <span className="inline-flex h-10 shrink-0 items-center rounded-full bg-primary/10 px-3 text-[0.65rem] font-medium text-primary sm:text-xs">
-              Committee
-            </span>
-          )}
-          {isCommitteeAdmin && (
-            <span className="inline-flex h-10 shrink-0 items-center rounded-full bg-primary/10 px-3 text-[0.65rem] font-medium text-primary sm:text-xs">
-              Admin
-            </span>
-          )}
         </div>
 
         {isDemo ? (
@@ -336,35 +326,43 @@ export function SessionsHeader({
               )}
             </div>
 
-            <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2">
+            <div className="mt-2 grid min-w-0 justify-start gap-2">
               {isCommittee && !isEditingName && (
-                <div
-                  className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md bg-white px-3 text-xs text-foreground"
-                >
-                  <label
-                    className="whitespace-nowrap"
-                    htmlFor="committee-auto-signup"
-                  >
-                    Auto Sign-up
-                  </label>
-                  <Switch
-                    aria-label="Automatically sign me up for sessions"
-                    checked={committeeAutoSignup}
-                    disabled={isUpdatingAutoSignup}
-                    id="committee-auto-signup"
-                    onCheckedChange={changeCommitteeAutoSignup}
-                    size="sm"
-                  />
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex h-10 shrink-0 items-center rounded-full bg-primary/10 px-3 text-[0.65rem] font-medium text-primary sm:text-xs">
+                    Committee
+                  </span>
+                  <div className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md bg-white px-3 text-xs text-foreground">
+                    <label
+                      className="whitespace-nowrap"
+                      htmlFor="committee-auto-signup"
+                    >
+                      Auto Sign-up
+                    </label>
+                    <Switch
+                      aria-label="Automatically sign me up for sessions"
+                      checked={committeeAutoSignup}
+                      disabled={isUpdatingAutoSignup}
+                      id="committee-auto-signup"
+                      onCheckedChange={changeCommitteeAutoSignup}
+                      size="sm"
+                    />
+                  </div>
                 </div>
               )}
               {isCommitteeAdmin && (
-                <Button
-                  className="h-10 rounded-md bg-white px-3 font-normal hover:bg-white"
-                  render={<Link href="/admin" />}
-                  variant="outline"
-                >
-                  Manage club
-                </Button>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex h-10 shrink-0 items-center rounded-full bg-primary/10 px-3 text-[0.65rem] font-medium text-primary sm:text-xs">
+                    Admin
+                  </span>
+                  <Button
+                    className="h-10 rounded-md bg-white px-3 text-xs font-normal hover:bg-white"
+                    render={<Link href="/admin" />}
+                    variant="outline"
+                  >
+                    Manage club
+                  </Button>
+                </div>
               )}
             </div>
             {autoSignupError && (
