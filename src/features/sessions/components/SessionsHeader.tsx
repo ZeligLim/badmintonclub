@@ -351,13 +351,18 @@ export function SessionsHeader({
                 </div>
               )}
               {isCommitteeAdmin && (
-                <Button
-                  className="h-10 rounded-md bg-white px-3 hover:bg-white"
-                  render={<Link href="/admin" />}
-                  variant="outline"
-                >
-                  Manage club
-                </Button>
+                <>
+                  <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[0.65rem] font-medium text-primary sm:text-xs">
+                    Admin
+                  </span>
+                  <Button
+                    className="h-10 rounded-md bg-white px-3 hover:bg-white"
+                    render={<Link href="/admin" />}
+                    variant="outline"
+                  >
+                    Manage club
+                  </Button>
+                </>
               )}
             </div>
             {autoSignupError && (
