@@ -43,6 +43,13 @@ type SessionsDashboardProps = {
   initialData: DashboardData;
 };
 
+type SignupOverride = {
+  sourceStatus: string | null;
+  sourceSlot: number | null;
+  currentUserStatus: string | null;
+  currentUserSlot: number | null;
+};
+
 export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
   const router = useRouter();
   const [demoSessions, setDemoSessions] = useState<DemoSessionState[]>(() =>
@@ -51,6 +58,12 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
     ),
   );
   const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
+  const [signupOverrides, setSignupOverrides] = useState<
+    Record<string, SignupOverride>
+  >({});
+  const [previousServerSessions, setPreviousServerSessions] = useState(
+    initialData.sessions,
+  );
   const [demoTimeOverride, setDemoTimeOverride] = useState<Date | null>(null);
   const [demoPlayerLevel, setDemoPlayerLevel] = useState<
     "BEGINNER" | "INTERMEDIATE"
@@ -82,6 +95,28 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
           }),
         )
       : initialData.sessions;
+
+  if (!isDemo && initialData.sessions !== previousServerSessions) {
+    setPreviousServerSessions(initialData.sessions);
+    setSignupOverrides((currentOverrides) => {
+      let hasChanged = false;
+      const nextOverrides = { ...currentOverrides };
+
+      for (const session of initialData.sessions) {
+        const override = nextOverrides[session.id];
+        if (
+          override &&
+          (session.currentUserStatus !== override.sourceStatus ||
+            session.currentUserSlot !== override.sourceSlot)
+        ) {
+          delete nextOverrides[session.id];
+          hasChanged = true;
+        }
+      }
+
+      return hasChanged ? nextOverrides : currentOverrides;
+    });
+  }
 
   useEffect(() => {
     if (isDemo || !sessionClockTime) {
@@ -157,7 +192,9 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
         return;
       }
 
-      if (session.currentUserStatus) {
+      const currentUserStatus = getSignupState(session).currentUserStatus;
+      const isCancelling = currentUserStatus !== null;
+      if (isCancelling) {
         await cancelSignupForSession(session.id);
       } else if (session.status === "confirmed") {
         await joinConfirmedSessionFcfs(session.id);
@@ -165,6 +202,19 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
         await signUpForSession(session.id, friendIds);
       }
 
+      setSignupOverrides((currentOverrides) => ({
+        ...currentOverrides,
+        [session.id]: {
+          sourceStatus: session.currentUserStatus,
+          sourceSlot: session.currentUserSlot,
+          currentUserStatus: isCancelling
+            ? null
+            : session.status === "confirmed"
+              ? "selected"
+              : "requested",
+          currentUserSlot: isCancelling ? null : session.currentUserSlot,
+        },
+      }));
       router.refresh();
     } catch {
       setErrorMessage("We couldn’t update your place. Please try again.");
@@ -249,10 +299,25 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
       );
     }
 
-    return {
+    const serverState = {
       registeredCount: session.registeredCount,
       currentUserStatus: session.currentUserStatus,
       currentUserSlot: session.currentUserSlot,
+    };
+    const override = signupOverrides[session.id];
+
+    if (
+      !override ||
+      serverState.currentUserStatus !== override.sourceStatus ||
+      serverState.currentUserSlot !== override.sourceSlot
+    ) {
+      return serverState;
+    }
+
+    return {
+      ...serverState,
+      currentUserStatus: override.currentUserStatus,
+      currentUserSlot: override.currentUserSlot,
     };
   }
 
