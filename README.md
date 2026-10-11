@@ -45,6 +45,8 @@ project's Auth settings.
 - Signup requests open Thursday at 00:00 and close at 00:00 the day before the
   event (Europe/London time). Both the signup UI and database enforce these
   time windows.
+- Members can cancel their own signup, including a confirmed place, until the
+  session starts.
 - The browser clock checks session periods every 60 seconds and uses the
   browser's current time. Session dates and deadlines remain anchored to
   Europe/London.

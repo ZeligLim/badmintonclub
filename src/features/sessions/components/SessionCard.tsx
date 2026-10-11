@@ -111,6 +111,16 @@ export function SessionCard({
       : signupWindowStatus === "not-open" && !hasFcfsSpace
         ? "Sign-ups not open"
         : "Join session";
+  const canCancelSignup =
+    isSignedUp &&
+    !isSessionInProgress &&
+    !isSessionOver &&
+    (session.status === "confirmed" ||
+      (session.status === "open" && signupWindowStatus !== "closed"));
+  const canJoinSession =
+    !isSignedUp &&
+    (session.status === "open" || hasFcfsSpace) &&
+    (session.status !== "open" || signupWindowStatus !== "closed");
 
   function handleSignupClick() {
     if (isSignedUp && !window.confirm("Are you sure you want to cancel?")) {
@@ -264,10 +274,8 @@ export function SessionCard({
               </>
             )}
             {!isPlayed &&
-              !isSessionOver &&
               session.status !== "cancelled" &&
-              (session.status === "open" || hasFcfsSpace) &&
-              (session.status === "open" ? signupWindowStatus !== "closed" : true) && (
+              (canCancelSignup || canJoinSession) && (
               <Button
                 className="h-auto min-h-10 py-2.5"
                 disabled={
