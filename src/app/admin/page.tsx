@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import {
   ClubPlayerAccessTable,
   CourtScheduleTable,
+  loadAdminAccountCount,
   loadAdminData,
   loadClubPlayers,
   requireAdminUser,
@@ -16,9 +17,10 @@ export default async function AdminPage() {
   const user = await requireAdminUser();
   if (!user) redirect("/sign-in");
 
-  const [sessions, players] = await Promise.all([
+  const [sessions, players, accountCount] = await Promise.all([
     loadAdminData(),
     loadClubPlayers(),
+    loadAdminAccountCount(),
   ]);
 
   return (
@@ -35,7 +37,9 @@ export default async function AdminPage() {
           </Button>
           <div>
             <h1 className="text-xl font-semibold tracking-tight">Admin — Court Schedule</h1>
-            <p className="mt-1 text-sm text-muted-foreground">{user.email}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {user.email} · {accountCount} {accountCount === 1 ? "account" : "accounts"}
+            </p>
           </div>
         </header>
 

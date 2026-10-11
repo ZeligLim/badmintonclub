@@ -122,7 +122,13 @@ export function createDemoAdminSessions(now = new Date()): AdminSession[] {
       status: "confirmed" as const,
       availabilityCanChange: true,
       players,
-      courtSchedule: buildDemoCourtSchedule(startsAt, durationMinutes, courtCount, selectedPlayers),
+      courtSchedule: buildDemoCourtSchedule(
+        `demo-${dayName.toLowerCase()}-${date}`,
+        startsAt,
+        durationMinutes,
+        courtCount,
+        selectedPlayers,
+      ),
     };
   });
 }

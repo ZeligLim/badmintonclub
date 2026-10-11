@@ -494,6 +494,7 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
                 <SessionCard
                   key={`${session.id}:${friendSelectionKey}`}
                   session={session}
+                  currentUserId={initialData.user?.id ?? null}
                   signupState={signupState}
                   showSessionView={
                     sessionClockTime !== null &&

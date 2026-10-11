@@ -2,7 +2,12 @@ export { SessionsDashboard } from "./components/SessionsDashboard";
 export { SessionsPage } from "./components/SessionsPage";
 export { SessionsSignIn } from "./components/SessionsSignIn";
 export { SessionsAuthConfirm } from "./components/SessionsAuthConfirm";
-export { createPlayerGameSchedule } from "./court-schedule";
+export {
+  allocateCourtSchedule,
+  createPlayerGameSchedule,
+  getCourtCount,
+} from "./court-schedule";
+export type { CourtRosterPlayer } from "./court-schedule";
 export {
   cancelSignupForSession,
   addFriendToList,

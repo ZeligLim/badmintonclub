@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   createPlayerGameSchedule,
+  type CourtRosterPlayer,
   type ClubSession,
   type FriendCandidate,
 } from "@/features/sessions";
@@ -26,6 +27,7 @@ type SessionSignupState = {
 
 type SessionCardProps = {
   session: ClubSession;
+  currentUserId: string | null;
   signupState: SessionSignupState;
   showSessionView: boolean;
   isSessionInProgress: boolean;
@@ -45,6 +47,7 @@ type SessionCardProps = {
 
 export function SessionCard({
   session,
+  currentUserId,
   signupState,
   showSessionView,
   isSessionInProgress,
@@ -74,23 +77,28 @@ export function SessionCard({
   const isSignedUp = signupStatus.length > 0 && !isPlayed;
   const isConfirmed =
     session.status === "confirmed" || session.status === "closed";
-  const playerGroupCount = isDemo
-    ? Math.ceil(
-        Math.min(signupState.registeredCount, session.capacity) /
-          session.playersPerSlot,
+  const currentPlayerId = isDemo ? "demo-current-player" : currentUserId;
+  const scheduleRoster: CourtRosterPlayer[] = isDemo
+    ? createDemoScheduleRoster(
+        signupState.registeredCount,
+        session.capacity,
+        signupState.currentUserSlot,
       )
-    : session.timeSlots.length;
-  const currentUserSlot = signupState.currentUserSlot;
-  const hasConfirmedPlayerGroup =
+    : session.timeSlots.flatMap((slot) =>
+        slot.players.map((player) => ({
+          id: player.id,
+          displayName: player.displayName,
+          priority: slot.number,
+        })),
+      );
+  const playerGameSchedule =
     signupStatus === "selected" &&
-    currentUserSlot !== null &&
-    currentUserSlot >= 1 &&
-    currentUserSlot <= playerGroupCount;
-  const playerGameSchedule = hasConfirmedPlayerGroup
+    currentPlayerId &&
+    scheduleRoster.some((player) => player.id === currentPlayerId)
     ? createPlayerGameSchedule(
-        session,
-        currentUserSlot,
-        playerGroupCount,
+        { ...session, id: session.id },
+        scheduleRoster,
+        currentPlayerId,
       )
     : [];
   const hasFcfsSpace =
@@ -318,6 +326,26 @@ export function SessionCard({
       </div>
     </article>
   );
+}
+
+function createDemoScheduleRoster(
+  registeredCount: number,
+  capacity: number,
+  currentUserSlot: number | null,
+): CourtRosterPlayer[] {
+  const count = Math.min(registeredCount, capacity);
+  if (count === 0) {
+    return [];
+  }
+
+  const currentPlayerIndex =
+    currentUserSlot === null ? -1 : (currentUserSlot - 1) * 4;
+
+  return Array.from({ length: count }, (_, index) => ({
+    id: index === currentPlayerIndex ? "demo-current-player" : `demo-player-${index + 1}`,
+    displayName: index === currentPlayerIndex ? "You" : `Demo Player ${index + 1}`,
+    priority: Math.floor(index / 4) + 1,
+  }));
 }
 
 function formatSessionDate(value: string) {

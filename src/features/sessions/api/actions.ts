@@ -2,18 +2,15 @@ import "server-only";
 
 import { hasSupabaseConfig } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
-import { sendBookingConfirmationEmailBestEffort } from "./booking-confirmation-email";
+import {
+  finalizeDueSessionsAndEmail,
+  sendBookingConfirmationEmailBestEffort,
+} from "./booking-confirmation-email";
 import type { FriendCandidate } from "../types";
 
 export async function finalizeDueSessions(): Promise<number> {
   const supabase = await requireAuthenticatedClient();
-  const { data, error } = await supabase.rpc("finalize_due_sessions");
-
-  if (error) {
-    throw new Error(`Could not finalize due sessions: ${error.message}`);
-  }
-
-  return data;
+  return finalizeDueSessionsAndEmail(supabase);
 }
 
 export async function signUp(

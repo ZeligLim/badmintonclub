@@ -1,6 +1,7 @@
 export { ClubPlayerAccessTable } from "./ClubPlayerAccessTable";
 export {
   loadAdminData,
+  loadAdminAccountCount,
   loadClubPlayers,
   requireAdminUser,
 } from "./data";

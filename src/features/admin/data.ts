@@ -3,11 +3,8 @@ import "server-only";
 import { connection } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { addMinutesToTime } from "@/lib/sessions/schedule";
-import { getCourtCount } from "@/features/sessions/court-schedule";
+import { allocateCourtSchedule, getCourtCount } from "@/features/sessions";
 import type { PlayerLevel } from "@/types/player";
-
-const GAME_DURATION_MINUTES = 15;
 
 export type AdminPlayer = {
   userId: string;
@@ -97,6 +94,23 @@ export async function loadClubPlayers(): Promise<AdminClubPlayer[]> {
   }));
 }
 
+export async function loadAdminAccountCount(): Promise<number> {
+  if (!(await requireAdminUser())) {
+    throw new Error("Only a club administrator can view the account count.");
+  }
+
+  const admin = createAdminClient();
+  const { count, error } = await admin
+    .from("profiles")
+    .select("id", { count: "exact", head: true });
+
+  if (error || count === null) {
+    throw new Error(`Could not load account count: ${error?.message ?? "Unknown error"}`);
+  }
+
+  return count;
+}
+
 export async function loadAdminData(): Promise<AdminSession[]> {
   await connection();
   const admin = createAdminClient();
@@ -154,12 +168,24 @@ export async function loadAdminData(): Promise<AdminSession[]> {
       .filter((p) => p.status === "selected" || p.status === "played")
       .sort((a, b) => (a.slotNumber ?? 99) - (b.slotNumber ?? 99));
 
-    const courtSchedule = buildCourtSchedule(
-      session.starts_at,
-      session.duration_minutes,
-      courtCount,
-      selectedPlayers,
-    );
+    const courtSchedule = selectedPlayers.length
+      ? allocateCourtSchedule(
+          {
+            id: session.id,
+            startsAt: session.starts_at,
+            durationMinutes: session.duration_minutes,
+            courtCount,
+          },
+          selectedPlayers.map((player) => ({
+            id: player.userId,
+            displayName: player.displayName,
+            priority: player.slotNumber ?? 1,
+          })),
+        ).map((game) => ({
+          ...game,
+          players: game.players.map(({ displayName }) => displayName),
+        }))
+      : [];
 
     const dow = new Date(`${session.event_date}T12:00:00Z`).getUTCDay();
 
@@ -211,72 +237,4 @@ function parsePlayerLevel(playerLevel: string): PlayerLevel {
   }
 
   throw new Error("A club member has an unsupported player level.");
-}
-
-function buildCourtSchedule(
-  startsAt: string,
-  durationMinutes: number,
-  courtCount: number,
-  selectedPlayers: AdminPlayer[],
-): AdminCourtGame[] {
-  if (!selectedPlayers.length) return [];
-
-  // Group players into slot groups (4 per slot).
-  const slotNumbers = [...new Set(selectedPlayers.map((p) => p.slotNumber ?? 1))].sort(
-    (a, b) => a - b,
-  );
-  const groups = slotNumbers.map((slot) =>
-    selectedPlayers
-      .filter((p) => p.slotNumber === slot)
-      .map((p) => p.displayName),
-  );
-  const groupCount = groups.length;
-  const activeCourtCount = Math.min(courtCount, groupCount);
-  const roundCount = Math.ceil(durationMinutes / GAME_DURATION_MINUTES);
-
-  const gamesPlayed = Array.from({ length: groupCount }, () => 0);
-  const lastPlayedRound = Array.from({ length: groupCount }, () => -1);
-  const schedule: AdminCourtGame[] = [];
-
-  for (let round = 0; round < roundCount; round++) {
-    const activeGroupIndices = Array.from({ length: groupCount }, (_, i) => i)
-      .sort(
-        (a, b) =>
-          gamesPlayed[a] - gamesPlayed[b] ||
-          lastPlayedRound[a] - lastPlayedRound[b],
-      )
-      .slice(0, activeCourtCount);
-
-    const occupiedCourts = new Set<number>();
-
-    for (const groupIdx of activeGroupIndices) {
-      let court =
-        ((groupIdx + gamesPlayed[groupIdx]) % courtCount) + 1;
-
-      while (occupiedCourts.has(court)) {
-        court = (court % courtCount) + 1;
-      }
-      occupiedCourts.add(court);
-
-      const startOffset = round * GAME_DURATION_MINUTES;
-      const endOffset = Math.min(startOffset + GAME_DURATION_MINUTES, durationMinutes);
-
-      schedule.push({
-        courtNumber: court,
-        startAt: addMinutesToTime(startsAt, startOffset),
-        endAt: addMinutesToTime(startsAt, endOffset),
-        players: groups[groupIdx],
-      });
-
-      gamesPlayed[groupIdx]++;
-      lastPlayedRound[groupIdx] = round;
-    }
-  }
-
-  // Sort for display: by startAt then courtNumber.
-  schedule.sort((a, b) =>
-    a.startAt.localeCompare(b.startAt) || a.courtNumber - b.courtNumber,
-  );
-
-  return schedule;
 }
