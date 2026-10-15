@@ -15,17 +15,23 @@ export function getUpcomingSchedule(now = new Date()): UpcomingSessionSchedule {
   const [year, month, day] = today.split("-").map(Number);
   const todayUtc = new Date(Date.UTC(year, month - 1, day));
   // Find the Monday of the upcoming (or current) week's regular schedule.
+  // The club runs sessions on Monday (18:00), Wednesday (19:30), and Friday (15:00).
+  // Monday and Wednesday signups open on Thursday prior at 00:00.
+  // Friday signups open on Saturday prior at 00:00.
+  // Monday through Friday show the current week; on Saturday it rolls over to the next week.
   const daysFromMonday = (todayUtc.getUTCDay() + 6) % 7;
-  const mondayOffset = daysFromMonday <= 2 ? -daysFromMonday : 7 - daysFromMonday;
+  const mondayOffset = daysFromMonday <= 4 ? -daysFromMonday : 7 - daysFromMonday;
   const monday = addDays(todayUtc, mondayOffset);
-  const signupOpensAt = londonDateTime(addDays(monday, -4), 0, 0);
+  const monWedSignupOpensAt = londonDateTime(addDays(monday, -4), 0, 0);
+  const friSignupOpensAt = londonDateTime(addDays(monday, -2), 0, 0);
 
   return {
     // Always start from today so any one-off sessions earlier in the week appear.
     fromDate: today,
     sessions: [
-      { date: formatDate(monday), signupOpensAt },
-      { date: formatDate(addDays(monday, 2)), signupOpensAt },
+      { date: formatDate(monday), signupOpensAt: monWedSignupOpensAt },
+      { date: formatDate(addDays(monday, 2)), signupOpensAt: monWedSignupOpensAt },
+      { date: formatDate(addDays(monday, 4)), signupOpensAt: friSignupOpensAt },
     ],
   };
 }

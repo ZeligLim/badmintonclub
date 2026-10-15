@@ -147,8 +147,32 @@ export function SessionCard({
             <p className="text-sm font-medium text-muted-foreground">
               {session.dayName}, {formatSessionDate(session.date)} ·{" "}
               {session.courtCount} courts
+              {session.dayName === "Friday" && (
+                <>
+                  {" · "}
+                  <span className="font-semibold text-emerald-700 dark:text-emerald-400">
+                    €3 / person
+                  </span>
+                </>
+              )}
             </p>
           </div>
+
+          {session.dayName === "Friday" && session.status !== "cancelled" && (
+            <div className="mt-3 flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/70 px-3.5 py-2 text-xs text-emerald-950 dark:border-emerald-800/40 dark:bg-emerald-950/20 dark:text-emerald-200">
+              <span className="flex items-center gap-2">
+                <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-200 font-bold text-emerald-900 dark:bg-emerald-800 dark:text-emerald-100">
+                  €
+                </span>
+                <span>
+                  Need to pay <strong>€3 per person</strong> to play
+                </span>
+              </span>
+              <span className="text-[0.7rem] font-medium text-emerald-700 dark:text-emerald-300">
+                Pay on arrival
+              </span>
+            </div>
+          )}
 
           {session.status === "cancelled" && (
             <p
@@ -198,11 +222,11 @@ export function SessionCard({
                   <p>
                     Session confirmed · spaces still available on a{" "}
                     <span className="font-medium text-foreground">first-come, first-served</span>{" "}
-                    basis
+                    basis · <span className="font-semibold text-foreground">€3 per person</span>
                   </p>
                 ) : session.dayName === "Friday" ? (
                   <p>
-                    First-come, first-served · sign-ups open until{" "}
+                    First-come, first-served · <span className="font-semibold text-foreground">€3 per person</span> · sign-ups open until{" "}
                     {formatRuleDateTime(session.confirmationAt)}
                   </p>
                 ) : (
