@@ -114,17 +114,20 @@ export async function loadAdminAccountCount(): Promise<number> {
 export async function loadAdminData(): Promise<AdminSession[]> {
   await connection();
   const admin = createAdminClient();
+  const londonNow = getLondonDateTime(new Date());
 
   // Fetch all sessions that can be managed, including sessions marked as cancelled.
+  // Only include sessions from today onwards (London date) — past sessions are
+  // no longer actionable and should not appear on the admin schedule view.
   const { data: sessions, error: sessionsErr } = await admin
     .from("sessions")
     .select("id, event_date, starts_at, duration_minutes, capacity, status")
     .in("status", ["open", "confirmed", "cancelled"])
+    .gte("event_date", londonNow.date)
     .order("event_date");
 
   if (sessionsErr) throw new Error(`Could not load sessions: ${sessionsErr.message}`);
   if (!sessions?.length) return [];
-  const londonNow = getLondonDateTime(new Date());
 
   const sessionIds = sessions.map((s) => s.id);
 

@@ -27,6 +27,7 @@ import {
 import {
   getSessionPeriod,
   getSignupWindowStatus,
+  getSessionStartTimestamp,
   isSessionInProgress,
   isSessionViewVisible,
 } from "../session-timing";
@@ -512,6 +513,11 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
                     sessionClockTime === null
                       ? "not-open"
                       : getSignupWindowStatus(session, sessionClockTime)
+                  }
+                  isPastCancellationDeadline={
+                    sessionClockTime !== null &&
+                    sessionClockTime.getTime() >=
+                      getSessionStartTimestamp(session) - 30 * 60_000
                   }
                   isDemo={isDemo}
                   isSignedIn={isDemo || Boolean(initialData.user)}

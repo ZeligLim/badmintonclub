@@ -43,8 +43,6 @@ export default async function AdminPage() {
           </div>
         </header>
 
-        <ClubPlayerAccessTable players={players} />
-
         {sessions.length === 0 ? (
           <p className="text-sm text-muted-foreground">No upcoming sessions found.</p>
         ) : (
@@ -54,6 +52,10 @@ export default async function AdminPage() {
             ))}
           </div>
         )}
+
+        <div className="mt-16">
+          <ClubPlayerAccessTable players={players} />
+        </div>
       </div>
     </main>
   );

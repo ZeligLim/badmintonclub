@@ -33,6 +33,8 @@ type SessionCardProps = {
   isSessionInProgress: boolean;
   isSessionOver: boolean;
   signupWindowStatus: "not-open" | "open" | "closed";
+  /** True once the clock passes session start − 30 min. The timetable is released at that point and no further changes are accepted. */
+  isPastCancellationDeadline: boolean;
   isDemo: boolean;
   isSignedIn: boolean;
   isPending: boolean;
@@ -53,6 +55,7 @@ export function SessionCard({
   isSessionInProgress,
   isSessionOver,
   signupWindowStatus,
+  isPastCancellationDeadline,
   isDemo,
   isSignedIn,
   isPending,
@@ -115,8 +118,8 @@ export function SessionCard({
     isSignedUp &&
     !isSessionInProgress &&
     !isSessionOver &&
-    (session.status === "confirmed" ||
-      (session.status === "open" && signupWindowStatus !== "closed"));
+    !isPastCancellationDeadline &&
+    (session.status === "confirmed" || session.status === "open");
   const canJoinSession =
     !isSignedUp &&
     (session.status === "open" || hasFcfsSpace) &&
