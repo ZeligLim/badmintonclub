@@ -226,8 +226,27 @@ export function SessionCard({
                   </p>
                 ) : session.dayName === "Friday" ? (
                   <p>
-                    First-come, first-served · <span className="font-semibold text-foreground">€3 per person</span> · sign-ups open until{" "}
-                    {formatRuleDateTime(session.confirmationAt)}
+                    First-come, first-served · <span className="font-semibold text-foreground">€3 per person</span> ·{" "}
+                    {signupWindowStatus === "not-open" ? (
+                      <>
+                        sign-ups open{" "}
+                        <span className="font-medium text-foreground">
+                          {formatRuleDateTime(session.signupOpensAt)}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        sign-ups open until{" "}
+                        {formatRuleDateTime(session.confirmationAt)}
+                      </>
+                    )}
+                  </p>
+                ) : signupWindowStatus === "not-open" ? (
+                  <p>
+                    Sign-ups open{" "}
+                    <span className="font-medium text-foreground">
+                      {formatRuleDateTime(session.signupOpensAt)}
+                    </span>
                   </p>
                 ) : (
                   <p>
