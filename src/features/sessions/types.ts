@@ -1,4 +1,5 @@
 import type { PlayerLevel } from "@/types/player";
+import type { ClubSessionDay } from "@/lib/sessions/schedule";
 
 export type SessionSignupStatus =
   | "requested"
@@ -33,7 +34,7 @@ export type SessionTimeSlot = {
 export type ClubSession = {
   id: string;
   date: string;
-  dayName: "Monday" | "Wednesday";
+  dayName: ClubSessionDay;
   startsAt: string;
   durationMinutes: number;
   courtCount: number;
@@ -52,6 +53,7 @@ export type ClubSession = {
 export type DemoSignupCounts = {
   Monday: number;
   Wednesday: number;
+  Friday: number;
 };
 
 export type DashboardData = {

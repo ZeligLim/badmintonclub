@@ -20,8 +20,8 @@ export function DemoSignupCountsControl({
           Set total sign-ups to preview full sessions and waitlists.
         </p>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        {(["Monday", "Wednesday"] as const).map((dayName) => (
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {(["Monday", "Wednesday", "Friday"] as const).map((dayName) => (
           <label
             className="flex items-center gap-2 text-sm"
             htmlFor={`demo-signups-${dayName.toLowerCase()}`}

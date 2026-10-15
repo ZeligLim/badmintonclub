@@ -4,6 +4,7 @@ import { connection } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { allocateCourtSchedule, getCourtCount } from "@/features/sessions";
+import { getSessionDayName } from "@/lib/sessions/schedule";
 import type { PlayerLevel } from "@/types/player";
 
 export type AdminPlayer = {
@@ -190,12 +191,10 @@ export async function loadAdminData(): Promise<AdminSession[]> {
         }))
       : [];
 
-    const dow = new Date(`${session.event_date}T12:00:00Z`).getUTCDay();
-
     return {
       id: session.id,
       date: session.event_date,
-      dayName: dow === 1 ? "Monday" : "Wednesday",
+      dayName: getSessionDayName(session.event_date),
       startsAt: session.starts_at,
       durationMinutes: session.duration_minutes,
       capacity: session.capacity,

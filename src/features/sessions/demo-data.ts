@@ -3,6 +3,7 @@ import {
   getSessionDayName,
   getUpcomingSchedule,
   londonDateTime,
+  type ClubSessionDay,
 } from "@/lib/sessions/schedule";
 import type {
   ClubSession,
@@ -48,6 +49,7 @@ const DEMO_FRIEND_CANDIDATES: FriendCandidate[] = [
 export const DEFAULT_DEMO_SIGNUP_COUNTS: DemoSignupCounts = {
   Monday: 12,
   Wednesday: 8,
+  Friday: 10,
 };
 
 // Deterministic fake UUIDs for demo players — version 4 format, fixed values.
@@ -102,11 +104,12 @@ export function createDemoAdminSessions(now = new Date()): AdminSession[] {
   return schedule.sessions.map(({ date }) => {
     const dayName = getSessionDayName(date);
     const isMonday = dayName === "Monday";
-    const capacity = isMonday ? 16 : 40;
+    const isFriday = dayName === "Friday";
+    const capacity = isMonday || isFriday ? 16 : 40;
     const courtCount = getCourtCount(capacity);
-    const durationMinutes = isMonday ? 60 : 120;
-    const startsAt = isMonday ? "18:00" : "19:30";
-    const players = isMonday ? MONDAY_PLAYERS : WEDNESDAY_PLAYERS;
+    const durationMinutes = isFriday ? 180 : isMonday ? 60 : 120;
+    const startsAt = isFriday ? "15:00" : isMonday ? "18:00" : "19:30";
+    const players = isMonday || isFriday ? MONDAY_PLAYERS : WEDNESDAY_PLAYERS;
     const selectedPlayers = players.filter(
       (p) => p.status === "selected" || p.status === "played",
     );
@@ -144,7 +147,7 @@ export function createDemoDashboardData(
     user: null,
     sessions: schedule.sessions.map(({ date, signupOpensAt }) => {
       const dayName = getSessionDayName(date);
-      const registeredCount = signupCounts[dayName];
+      const registeredCount = signupCounts[dayName] ?? 0;
       return createDemoSession(date, dayName, signupOpensAt, registeredCount);
     }),
   };
@@ -152,18 +155,23 @@ export function createDemoDashboardData(
 
 function createDemoSession(
   date: string,
-  dayName: "Monday" | "Wednesday",
+  dayName: ClubSessionDay,
   signupOpensAt: string,
   registeredCount: number,
 ): ClubSession {
   const confirmationDate = new Date(`${date}T12:00:00Z`);
   confirmationDate.setUTCDate(confirmationDate.getUTCDate() - 1);
 
-  const capacity = dayName === "Monday" ? 16 : 40;
+  const isMonday = dayName === "Monday";
+  const isFriday = dayName === "Friday";
+  const capacity = isMonday || isFriday ? 16 : 40;
   const playersPerSlot = 4;
   const slotCount = capacity / playersPerSlot;
-  const durationMinutes = dayName === "Monday" ? 60 : 120;
-  const startsAt = dayName === "Monday" ? "18:00" : "19:30";
+  const durationMinutes = isFriday ? 180 : isMonday ? 60 : 120;
+  const startsAt = isFriday ? "15:00" : isMonday ? "18:00" : "19:30";
+  const confirmationAt = isFriday
+    ? londonDateTime(new Date(`${date}T14:30:00Z`), 14, 30)
+    : londonDateTime(confirmationDate, 0, 0);
 
   return {
     id: `demo-${dayName.toLowerCase()}-${date}`,
@@ -176,7 +184,7 @@ function createDemoSession(
     registeredCount,
     playersPerSlot,
     signupOpensAt,
-    confirmationAt: londonDateTime(confirmationDate, 0, 0),
+    confirmationAt,
     status: "open",
     currentUserStatus: null,
     currentUserSlot: null,

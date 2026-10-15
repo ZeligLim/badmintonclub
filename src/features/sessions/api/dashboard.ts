@@ -1,6 +1,10 @@
 import "server-only";
 
-import { addMinutesToTime, getUpcomingSchedule } from "@/lib/sessions/schedule";
+import {
+  addMinutesToTime,
+  getUpcomingSchedule,
+  type ClubSessionDay,
+} from "@/lib/sessions/schedule";
 import { hasSupabaseConfig } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
@@ -45,11 +49,20 @@ export async function loadDashboardData(): Promise<DashboardData> {
   }
 
   const schedule = getUpcomingSchedule();
+  const fromDate =
+    schedule.fromDate <= schedule.sessions[0].date
+      ? schedule.fromDate
+      : schedule.sessions[0].date;
+  const lastScheduledDate =
+    schedule.sessions[schedule.sessions.length - 1].date;
+  const throughDate =
+    lastScheduledDate < fromDate ? fromDate : lastScheduledDate;
+
   const { data: sessionRows, error: sessionsError } = await supabase.rpc(
     "get_dashboard_sessions",
     {
-      p_from_date: schedule.sessions[0].date,
-      p_through_date: schedule.sessions[schedule.sessions.length - 1].date,
+      p_from_date: fromDate,
+      p_through_date: throughDate,
     },
   );
   if (sessionsError) {
@@ -253,8 +266,8 @@ function parsePlayerLevel(playerLevel: string): FriendCandidate["playerLevel"] {
   throw new Error("A club member has an unsupported player level.");
 }
 
-function getDayName(value: string): "Monday" | "Wednesday" {
-  if (value === "Monday" || value === "Wednesday") {
+function getDayName(value: string): ClubSessionDay {
+  if (value === "Monday" || value === "Wednesday" || value === "Friday") {
     return value;
   }
 
