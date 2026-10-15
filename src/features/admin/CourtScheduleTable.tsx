@@ -139,9 +139,6 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
                   <th className="px-4 py-2 text-left font-medium text-muted-foreground">
                     Status
                   </th>
-                  <th className="px-4 py-2 text-left font-medium text-muted-foreground">
-                    Slot
-                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -156,9 +153,6 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
                       <td className="px-4 py-2">{player.displayName}</td>
                       <td className="px-4 py-2 capitalize text-muted-foreground">
                         {player.status}
-                      </td>
-                      <td className="px-4 py-2 tabular-nums text-muted-foreground">
-                        {player.slotNumber ?? "—"}
                       </td>
                     </tr>
                   ))}
