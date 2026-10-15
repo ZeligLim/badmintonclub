@@ -219,13 +219,13 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
         await signUpForSession(session.id, friendIds);
       }
 
-      const committeeOpenSignup =
+      const immediateConfirmSignup =
         !isCancelling &&
         !isDemo &&
-        initialData.user?.isCommittee &&
-        session.status === "open";
+        session.status === "open" &&
+        (session.dayName === "Friday" || initialData.user?.isCommittee);
 
-      if (committeeOpenSignup) {
+      if (immediateConfirmSignup) {
         setSignupOverrides((currentOverrides) => {
           if (!currentOverrides[session.id]) {
             return currentOverrides;

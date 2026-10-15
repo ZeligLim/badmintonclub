@@ -169,7 +169,7 @@ export function SessionCard({
                   <p className="text-sm font-medium tabular-nums">
                     {signupState.registeredCount}/{session.capacity}{" "}
                     <span className="font-normal text-muted-foreground">
-                      players {isConfirmed ? "confirmed" : "signed up"}
+                      players {isConfirmed || session.dayName === "Friday" ? "confirmed" : "signed up"}
                     </span>
                   </p>
                 </div>
@@ -199,6 +199,11 @@ export function SessionCard({
                     Session confirmed · spaces still available on a{" "}
                     <span className="font-medium text-foreground">first-come, first-served</span>{" "}
                     basis
+                  </p>
+                ) : session.dayName === "Friday" ? (
+                  <p>
+                    First-come, first-served · sign-ups open until{" "}
+                    {formatRuleDateTime(session.confirmationAt)}
                   </p>
                 ) : (
                   <p>
