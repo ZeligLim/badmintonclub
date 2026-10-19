@@ -22,6 +22,7 @@ const DEMO_FRIEND_CANDIDATES: FriendCandidate[] = [
     studentId: "g00440629",
     playerLevel: "BEGINNER",
     isSelected: false,
+    isSignedUp: true,
   },
   {
     userId: "demo-friend-ciaran",
@@ -29,6 +30,7 @@ const DEMO_FRIEND_CANDIDATES: FriendCandidate[] = [
     studentId: "g00440630",
     playerLevel: "INTERMEDIATE",
     isSelected: false,
+    isSignedUp: true,
   },
   {
     userId: "demo-friend-sile",
@@ -36,6 +38,7 @@ const DEMO_FRIEND_CANDIDATES: FriendCandidate[] = [
     studentId: "g00440631",
     playerLevel: "BEGINNER",
     isSelected: false,
+    isSignedUp: false,
   },
   {
     userId: "demo-friend-darragh",
@@ -43,6 +46,7 @@ const DEMO_FRIEND_CANDIDATES: FriendCandidate[] = [
     studentId: "g00440632",
     playerLevel: "PROFESSIONAL",
     isSelected: false,
+    isSignedUp: true,
   },
 ];
 

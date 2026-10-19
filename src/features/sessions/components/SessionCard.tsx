@@ -86,6 +86,8 @@ export function SessionCard({
         signupState.registeredCount,
         session.capacity,
         signupState.currentUserSlot,
+        selectedFriendIds,
+        friendCandidates,
       )
     : session.timeSlots.flatMap((slot) =>
         slot.players.map((player) => ({
@@ -293,15 +295,28 @@ export function SessionCard({
             session.status !== "cancelled" &&
             playerGameSchedule.length > 0 && (
             <div aria-label="Your games" className="mt-3">
-              <p className="mb-2 text-sm font-medium text-primary">
+              <p className="mb-2 text-sm font-semibold text-foreground">
                 Your games
               </p>
-              <ul className="grid gap-1.5 text-sm text-primary sm:grid-cols-2">
+              <ul className="grid gap-2 text-sm sm:grid-cols-2">
                 {playerGameSchedule.map((game) => (
-                  <li key={`${game.startAt}-${game.courtNumber}`}>
-                    Court {game.courtNumber} ·{" "}
-                    {formatSessionTime(game.startAt)}–
-                    {formatSessionTime(game.endAt)}
+                  <li
+                    key={`${game.startAt}-${game.courtNumber}`}
+                    className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-foreground"
+                  >
+                    <div className="font-semibold text-primary">
+                      Court {game.courtNumber} ·{" "}
+                      {formatSessionTime(game.startAt)}–
+                      {formatSessionTime(game.endAt)}
+                    </div>
+                    {game.courtPlayers.length > 0 && (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        with{" "}
+                        <span className="font-medium text-foreground">
+                          {game.courtPlayers.join(", ")}
+                        </span>
+                      </p>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -328,6 +343,7 @@ export function SessionCard({
                 isAlreadySignedUp={isSignedUp}
                 isDemo={isDemo}
                 isPending={isPending}
+                sessionId={session.id}
                 onAddToFriendList={onAddToFriendList}
                 onChange={setSelectedFriendIds}
                 onSave={onSaveFriendPreferences}
@@ -423,20 +439,53 @@ function createDemoScheduleRoster(
   registeredCount: number,
   capacity: number,
   currentUserSlot: number | null,
+  selectedFriendIds: string[] = [],
+  friendCandidates: FriendCandidate[] = [],
 ): CourtRosterPlayer[] {
   const count = Math.min(registeredCount, capacity);
   if (count === 0) {
     return [];
   }
 
-  const currentPlayerIndex =
-    currentUserSlot === null ? -1 : (currentUserSlot - 1) * 4;
+  const userSlot = currentUserSlot ?? 1;
+  const roster: CourtRosterPlayer[] = [
+    {
+      id: "demo-current-player",
+      displayName: "You",
+      priority: userSlot,
+    },
+  ];
 
-  return Array.from({ length: count }, (_, index) => ({
-    id: index === currentPlayerIndex ? "demo-current-player" : `demo-player-${index + 1}`,
-    displayName: index === currentPlayerIndex ? "You" : `Demo Player ${index + 1}`,
-    priority: Math.floor(index / 4) + 1,
-  }));
+  const candidateMap = new Map(
+    friendCandidates.map((candidate) => [candidate.userId, candidate]),
+  );
+
+  for (const friendId of selectedFriendIds) {
+    if (roster.length >= count) break;
+    const candidate = candidateMap.get(friendId);
+    if (candidate && candidate.isSignedUp !== false) {
+      roster.push({
+        id: candidate.userId,
+        displayName: candidate.displayName,
+        priority: userSlot,
+      });
+    }
+  }
+
+  let playerNum = 1;
+  while (roster.length < count) {
+    const candidateId = `demo-player-${playerNum}`;
+    if (!roster.some((player) => player.id === candidateId)) {
+      roster.push({
+        id: candidateId,
+        displayName: `Demo Player ${playerNum}`,
+        priority: Math.floor(roster.length / 4) + 1,
+      });
+    }
+    playerNum += 1;
+  }
+
+  return roster;
 }
 
 function formatSessionDate(value: string) {

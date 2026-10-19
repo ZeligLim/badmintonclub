@@ -20,6 +20,7 @@ type SessionFriendPickerProps = {
   isAlreadySignedUp: boolean;
   isDemo: boolean;
   isPending: boolean;
+  sessionId: string;
   onAddToFriendList: (friend: FriendCandidate) => Promise<void>;
   onChange: (friendIds: string[]) => void;
   onSave: (friendIds: string[]) => Promise<void>;
@@ -32,6 +33,7 @@ export function SessionFriendPicker({
   isAlreadySignedUp,
   isDemo,
   isPending,
+  sessionId,
   onAddToFriendList,
   onChange,
   onSave,
@@ -50,24 +52,39 @@ export function SessionFriendPicker({
   const searchId = useId();
   const searchRequestId = useRef(0);
   const normalizedQuery = query.trim();
-  const knownFriends = new Map(
-    [...friendCandidates, ...friendList, ...addedFriends].map((friend) => [
-      friend.userId,
-      friend,
-    ]),
-  );
-  const availableFriends =
-    normalizedQuery.length === 0
-      ? isDemo
-        ? [
-            ...friendList,
-            ...friendCandidates.filter(
-              (candidate) =>
-                !friendList.some((friend) => friend.userId === candidate.userId),
-            ),
-          ]
-        : friendList
-      : searchResults;
+  const knownFriends = new Map<string, FriendCandidate>();
+  for (const friend of friendList) {
+    knownFriends.set(friend.userId, friend);
+  }
+  for (const friend of friendCandidates) {
+    const existing = knownFriends.get(friend.userId);
+    knownFriends.set(friend.userId, {
+      ...existing,
+      ...friend,
+      isSignedUp: friend.isSignedUp ?? existing?.isSignedUp,
+    });
+  }
+  for (const friend of addedFriends) {
+    const existing = knownFriends.get(friend.userId);
+    knownFriends.set(friend.userId, {
+      ...existing,
+      ...friend,
+      isSignedUp: friend.isSignedUp ?? existing?.isSignedUp,
+    });
+  }
+
+  const baseFriends = [
+    ...friendList,
+    ...friendCandidates.filter(
+      (candidate) =>
+        !friendList.some((friend) => friend.userId === candidate.userId),
+    ),
+  ];
+
+  const availableFriends = (
+    normalizedQuery.length === 0 ? baseFriends : searchResults
+  ).map((friend) => knownFriends.get(friend.userId) ?? friend);
+
   const selectedFriends = selectedFriendIds.flatMap((userId) => {
     const friend = knownFriends.get(userId);
     return friend ? [friend] : [];
@@ -97,7 +114,7 @@ export function SessionFriendPicker({
                 `${candidate.displayName} ${candidate.studentId}`.toLowerCase();
               return searchText.includes(normalizedQuery.toLowerCase());
             })
-          : await searchClubMembers(normalizedQuery);
+          : await searchClubMembers(normalizedQuery, sessionId);
 
         if (searchRequestId.current === requestId) {
           setSearchResults(results);
@@ -126,6 +143,7 @@ export function SessionFriendPicker({
     isDemo,
     normalizedQuery,
     selectedFriendIds.length,
+    sessionId,
   ]);
 
   async function addSelectedFriend(friend: FriendCandidate) {
@@ -223,30 +241,48 @@ export function SessionFriendPicker({
         Selected friends ({selectedFriends.length}/3)
       </p>
       {selectedFriends.length > 0 ? (
-        <ul className="mt-1.5 flex flex-wrap gap-1.5">
-          {selectedFriends.map((friend) => (
-            <li
-              className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-sm text-foreground"
-              key={friend.userId}
-            >
-              <span>
-                {friend.displayName}
-                <span className="ml-1 text-xs text-muted-foreground">
-                  · {friend.studentId}
-                </span>
-              </span>
-              <button
-                aria-label={`Remove ${friend.displayName}`}
-                className="rounded-full p-0.5 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                disabled={isPending}
-                onClick={() => removeSelectedFriend(friend.userId)}
-                type="button"
+        <>
+          <ul className="mt-1.5 flex flex-wrap gap-1.5">
+            {selectedFriends.map((friend) => (
+              <li
+                className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-sm text-foreground"
+                key={friend.userId}
               >
-                <X aria-hidden="true" className="size-3.5" />
-              </button>
-            </li>
-          ))}
-        </ul>
+                <span className="flex items-center gap-1.5">
+                  <span>
+                    {friend.displayName}
+                    <span className="ml-1 text-xs text-muted-foreground">
+                      · {friend.studentId}
+                    </span>
+                  </span>
+                  {friend.isSignedUp ? (
+                    <span className="inline-flex items-center rounded-full bg-emerald-100 px-1.5 py-0.5 text-[0.65rem] font-semibold text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
+                      Signed up
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-[0.65rem] font-medium text-muted-foreground">
+                      Not signed up
+                    </span>
+                  )}
+                </span>
+                <button
+                  aria-label={`Remove ${friend.displayName}`}
+                  className="rounded-full p-0.5 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  disabled={isPending}
+                  onClick={() => removeSelectedFriend(friend.userId)}
+                  type="button"
+                >
+                  <X aria-hidden="true" className="size-3.5" />
+                </button>
+              </li>
+            ))}
+          </ul>
+          {selectedFriends.some((friend) => !friend.isSignedUp) && (
+            <p className="mt-1.5 text-xs text-amber-800 dark:text-amber-300">
+              Friends marked &ldquo;Not signed up&rdquo; must join this session before they can be placed on your court.
+            </p>
+          )}
+        </>
       ) : (
         <p className="mt-1 text-xs text-muted-foreground">No friends selected.</p>
       )}
@@ -328,9 +364,20 @@ export function SessionFriendPicker({
                   <span className="min-w-0 truncate font-medium">
                     {friend.displayName}
                   </span>
-                  <span className="shrink-0 text-xs text-muted-foreground">
-                    {isSelected ? "Selected" : friend.studentId}
-                  </span>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {friend.isSignedUp ? (
+                      <span className="inline-flex items-center rounded-full bg-emerald-100 px-1.5 py-0.5 text-[0.65rem] font-semibold text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
+                        Signed up
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-[0.65rem] font-medium text-muted-foreground">
+                        Not signed up
+                      </span>
+                    )}
+                    <span className="text-xs text-muted-foreground">
+                      {isSelected ? "Selected" : friend.studentId}
+                    </span>
+                  </div>
                 </button>
               </li>
             );

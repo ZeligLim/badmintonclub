@@ -44,6 +44,7 @@ export async function updateSessionFriendPreferences(
 
 export async function searchClubMembers(
   query: string,
+  sessionId?: string,
 ): Promise<FriendCandidate[]> {
   const normalizedQuery = query.trim();
   if (normalizedQuery.length < 2 || normalizedQuery.length > 64) {
@@ -53,6 +54,7 @@ export async function searchClubMembers(
   const supabase = await requireAuthenticatedClient();
   const { data, error } = await supabase.rpc("find_club_members", {
     p_query: normalizedQuery,
+    ...(sessionId ? { p_session_id: sessionId } : {}),
   });
 
   if (error) {
@@ -75,9 +77,11 @@ export async function searchClubMembers(
       studentId: friend.student_id,
       playerLevel: friend.player_level,
       isSelected: false,
+      isSignedUp: friend.is_signed_up ?? false,
     };
   });
 }
+
 
 export async function addClubFriend(friendId: string): Promise<void> {
   validateFriendId(friendId);

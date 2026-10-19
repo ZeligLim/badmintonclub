@@ -253,6 +253,7 @@ function mapFriendCandidate(row: FriendCandidateRow): FriendCandidate {
     studentId: row.student_id,
     playerLevel: parsePlayerLevel(row.player_level),
     isSelected: row.is_selected,
+    isSignedUp: (row as FriendCandidateRow & { is_signed_up?: boolean }).is_signed_up ?? false,
   };
 }
 

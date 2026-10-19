@@ -18,6 +18,7 @@ export type FriendCandidate = {
   studentId: string;
   playerLevel: PlayerLevel;
   isSelected: boolean;
+  isSignedUp?: boolean;
 };
 
 export type SessionPlayer = {

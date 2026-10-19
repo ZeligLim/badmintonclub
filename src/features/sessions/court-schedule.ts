@@ -25,6 +25,7 @@ export type PlayerGame = {
   courtNumber: number;
   startAt: string;
   endAt: string;
+  courtPlayers: string[];
 };
 
 export function allocateCourtSchedule(
@@ -51,16 +52,6 @@ export function allocateCourtSchedule(
       (left.priority ?? 0) - (right.priority ?? 0) ||
       left.id.localeCompare(right.id),
   );
-  const random = createSeededRandom(
-    `${session.id}:${orderedRoster.map((player) => player.id).join(",")}`,
-  );
-  for (let index = orderedRoster.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(random() * (index + 1));
-    [orderedRoster[index], orderedRoster[swapIndex]] = [
-      orderedRoster[swapIndex],
-      orderedRoster[index],
-    ];
-  }
 
   const roundCount = Math.ceil(
     session.durationMinutes / GAME_DURATION_MINUTES,
@@ -95,12 +86,22 @@ export function allocateCourtSchedule(
           candidates = notOnThisCourt;
         }
 
-        candidates.sort(
-          (left, right) =>
+        const targetPriority = players[0]?.priority ?? courtNumber;
+
+        candidates.sort((left, right) => {
+          const leftMatches = left.priority === targetPriority ? 0 : 1;
+          const rightMatches = right.priority === targetPriority ? 0 : 1;
+          if (leftMatches !== rightMatches) {
+            return leftMatches - rightMatches;
+          }
+
+          return (
             gamesPlayed.get(left.id)! - gamesPlayed.get(right.id)! ||
             lastPlayedRound.get(left.id)! - lastPlayedRound.get(right.id)! ||
-            orderedRoster.indexOf(left) - orderedRoster.indexOf(right),
-        );
+            (left.priority ?? 0) - (right.priority ?? 0) ||
+            orderedRoster.indexOf(left) - orderedRoster.indexOf(right)
+          );
+        });
 
         const selectedPlayer = candidates[0];
         if (!selectedPlayer) {
@@ -146,10 +147,13 @@ export function createPlayerGameSchedule(
 ): PlayerGame[] {
   return allocateCourtSchedule(session, roster)
     .filter((game) => game.players.some((player) => player.id === playerId))
-    .map(({ courtNumber, startAt, endAt }) => ({
+    .map(({ courtNumber, startAt, endAt, players }) => ({
       courtNumber,
       startAt,
       endAt,
+      courtPlayers: players
+        .filter((player) => player.id !== playerId)
+        .map((player) => player.displayName),
     }));
 }
 
@@ -170,17 +174,4 @@ function validateRound(
   }
 }
 
-function createSeededRandom(seed: string): () => number {
-  let state = 2166136261;
-  for (const character of seed) {
-    state = Math.imul(state ^ character.charCodeAt(0), 16777619);
-  }
 
-  return () => {
-    state += 0x6d2b79f5;
-    let value = state;
-    value = Math.imul(value ^ (value >>> 15), value | 1);
-    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
-    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
-  };
-}

@@ -28,8 +28,8 @@ export async function finalizeDueSessions(): Promise<number> {
   return finalizeDue();
 }
 
-export async function searchClubMembers(query: string) {
-  return searchClubMembersAction(query);
+export async function searchClubMembers(query: string, sessionId?: string) {
+  return searchClubMembersAction(query, sessionId);
 }
 
 export async function addFriendToList(friendId: string): Promise<void> {

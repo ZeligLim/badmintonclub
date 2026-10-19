@@ -185,8 +185,8 @@ isOneToOne: false
             }[]
                            },
 "find_club_members":
-{ Args: { "p_query": string }; Returns: {
-              "display_name": string,"is_selected": boolean,"player_level": string,"student_id": string,"user_id": string
+{ Args: { "p_query": string; "p_session_id"?: string }; Returns: {
+              "display_name": string,"is_selected": boolean,"is_signed_up": boolean,"player_level": string,"student_id": string,"user_id": string
             }[]
                            },
 "add_my_friend":
@@ -199,7 +199,7 @@ isOneToOne: false
                            },
 "get_session_friend_preferences":
 { Args: { "p_session_id": string }; Returns: {
-              "display_name": string,"is_selected": boolean,"player_level": string,"student_id": string,"user_id": string
+              "display_name": string,"is_selected": boolean,"is_signed_up": boolean,"player_level": string,"student_id": string,"user_id": string
             }[]
                            },
 "remove_my_friend":
