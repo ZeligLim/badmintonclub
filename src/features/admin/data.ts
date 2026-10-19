@@ -142,6 +142,11 @@ export async function loadAdminData(): Promise<AdminSession[]> {
 
   const userIds = [...new Set((signups ?? []).map((s) => s.user_id))];
 
+  const { data: friendPrefs } = await admin
+    .from("session_friend_preferences")
+    .select("session_id, user_id, friend_user_id")
+    .in("session_id", sessionIds);
+
   const profileMap = new Map<string, string>();
   if (userIds.length) {
     const { data: profiles, error: profilesErr } = await admin
@@ -159,6 +164,15 @@ export async function loadAdminData(): Promise<AdminSession[]> {
     const sessionSignups = (signups ?? []).filter(
       (s) => s.session_id === session.id,
     );
+
+    const sessionFriendMap = new Map<string, string[]>();
+    for (const pref of friendPrefs ?? []) {
+      if (pref.session_id === session.id) {
+        const list = sessionFriendMap.get(pref.user_id) ?? [];
+        list.push(pref.friend_user_id);
+        sessionFriendMap.set(pref.user_id, list);
+      }
+    }
 
     const players: AdminPlayer[] = sessionSignups.map((s) => ({
       userId: s.user_id,
@@ -184,6 +198,7 @@ export async function loadAdminData(): Promise<AdminSession[]> {
             id: player.userId,
             displayName: player.displayName,
             priority: player.slotNumber ?? 1,
+            friendIds: sessionFriendMap.get(player.userId) ?? [],
           })),
         ).map((game) => ({
           ...game,

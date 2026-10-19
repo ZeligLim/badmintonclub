@@ -173,6 +173,18 @@ async function createBookingConfirmationEmail(
     throw new Error("Could not load the confirmed session roster.");
   }
 
+  const { data: friendPrefs } = await supabase
+    .from("session_friend_preferences")
+    .select("user_id, friend_user_id")
+    .eq("session_id", sessionId);
+
+  const friendMap = new Map<string, string[]>();
+  for (const pref of friendPrefs ?? []) {
+    const list = friendMap.get(pref.user_id) ?? [];
+    list.push(pref.friend_user_id);
+    friendMap.set(pref.user_id, list);
+  }
+
   const sessionDetails = {
     id: sessionId,
     startsAt: session.starts_at,
@@ -185,6 +197,7 @@ async function createBookingConfirmationEmail(
       id: player.user_id,
       displayName: player.display_name,
       priority: player.slot_number,
+      friendIds: friendMap.get(player.user_id) ?? [],
     })),
     userId,
   );

@@ -94,6 +94,7 @@ export function SessionCard({
           id: player.id,
           displayName: player.displayName,
           priority: slot.number,
+          friendIds: player.id === currentPlayerId ? selectedFriendIds : [],
         })),
       );
   const playerGameSchedule =
@@ -453,6 +454,7 @@ function createDemoScheduleRoster(
       id: "demo-current-player",
       displayName: "You",
       priority: userSlot,
+      friendIds: selectedFriendIds,
     },
   ];
 
@@ -468,6 +470,7 @@ function createDemoScheduleRoster(
         id: candidate.userId,
         displayName: candidate.displayName,
         priority: userSlot,
+        friendIds: ["demo-current-player"],
       });
     }
   }
