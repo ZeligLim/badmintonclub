@@ -148,9 +148,11 @@ async function getFriendPreferences(
   supabase: Awaited<ReturnType<typeof createClient>>,
   sessions: DashboardSessionRow[],
 ): Promise<Map<string, FriendCandidate[]>> {
-  const openSessions = sessions.filter((session) => session.status === "open");
+  const activeSessions = sessions.filter(
+    (session) => session.status === "open" || session.status === "confirmed",
+  );
   const candidateRows = await Promise.all(
-    openSessions.map(async (session) => {
+    activeSessions.map(async (session) => {
       const { data, error } = await supabase.rpc("get_session_friend_preferences", {
         p_session_id: session.id,
       });

@@ -215,6 +215,15 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
         await cancelSignupForSession(session.id);
       } else if (session.status === "confirmed") {
         await joinConfirmedSessionFcfs(session.id);
+        if (friendIds.length > 0) {
+          try {
+            await saveSessionFriendPreferences(session.id, friendIds);
+          } catch (error: unknown) {
+            console.warn("Could not save friend preferences upon joining confirmed session.", {
+              errorType: error instanceof Error ? error.name : "unknown",
+            });
+          }
+        }
       } else {
         await signUpForSession(session.id, friendIds);
       }

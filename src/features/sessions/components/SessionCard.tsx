@@ -106,6 +106,7 @@ export function SessionCard({
     : [];
   const hasFcfsSpace =
     session.status === "confirmed" &&
+    !isPastCancellationDeadline &&
     signupState.registeredCount < session.capacity;
   const actionLabel = isWaitlisted
     ? "Leave waitlist"
@@ -122,6 +123,9 @@ export function SessionCard({
     (session.status === "confirmed" || session.status === "open");
   const canJoinSession =
     !isSignedUp &&
+    !isPastCancellationDeadline &&
+    !isSessionInProgress &&
+    !isSessionOver &&
     (session.status === "open" || hasFcfsSpace) &&
     (session.status !== "open" || signupWindowStatus !== "closed");
 
@@ -147,11 +151,18 @@ export function SessionCard({
             <p className="text-sm font-medium text-muted-foreground">
               {session.dayName}, {formatSessionDate(session.date)} ·{" "}
               {session.courtCount} courts
-              {session.dayName === "Friday" && (
+              {session.dayName === "Friday" ? (
                 <>
                   {" · "}
                   <span className="font-semibold text-emerald-700 dark:text-emerald-400">
                     €3 / person
+                  </span>
+                </>
+              ) : (
+                <>
+                  {" · "}
+                  <span className="font-semibold text-emerald-700 dark:text-emerald-400">
+                    Free
                   </span>
                 </>
               )}
@@ -218,11 +229,28 @@ export function SessionCard({
 
               <div className="mt-3 flex items-start gap-2 text-xs leading-5 text-muted-foreground">
                 <Clock3 aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
-                {hasFcfsSpace ? (
+                {isPastCancellationDeadline ? (
+                  <p>
+                    Timetable released ·{" "}
+                    <span className="font-medium text-foreground">session locked</span>{" "}
+                    (no further changes)
+                  </p>
+                ) : hasFcfsSpace ? (
                   <p>
                     Session confirmed · spaces still available on a{" "}
                     <span className="font-medium text-foreground">first-come, first-served</span>{" "}
-                    basis · <span className="font-semibold text-foreground">€3 per person</span>
+                    basis
+                    {session.dayName === "Friday" ? (
+                      <>
+                        {" · "}
+                        <span className="font-semibold text-foreground">€3 per person</span>
+                      </>
+                    ) : (
+                      <>
+                        {" · "}
+                        <span className="font-semibold text-emerald-700 dark:text-emerald-400">Free</span>
+                      </>
+                    )}
                   </p>
                 ) : session.dayName === "Friday" ? (
                   <p>
@@ -288,8 +316,12 @@ export function SessionCard({
           )}
 
           {isSignedIn &&
-            session.status === "open" &&
-            !isPlayed && (
+            !isPlayed &&
+            session.status !== "cancelled" &&
+            !isSessionInProgress &&
+            !isSessionOver &&
+            !isPastCancellationDeadline &&
+            (isSignedUp || canJoinSession) && (
               <SessionFriendPicker
                 friendCandidates={friendCandidates}
                 friendList={friendList}
