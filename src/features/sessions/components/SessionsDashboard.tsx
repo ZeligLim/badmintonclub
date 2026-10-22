@@ -12,7 +12,7 @@ import {
   removeFriendFromList,
   signUpForSession,
 } from "@/features/sessions";
-import { getUpcomingSchedule, londonDateTime } from "@/lib/sessions/schedule";
+import { londonDateTime } from "@/lib/sessions/schedule";
 import {
   createDemoDashboardData,
   DEFAULT_DEMO_SIGNUP_COUNTS,
@@ -136,16 +136,15 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
   }
 
   useEffect(() => {
-    if (isDemo || !sessionClockTime) {
+    if (isDemo || !sessionClockTime || !initialData.nextScheduleChangeAt) {
       return;
     }
 
-    const expectedDates = getUpcomingSchedule(sessionClockTime).sessions.map(
-      ({ date }) => date,
-    );
-    const hasScheduleChanged = expectedDates.some(
-      (date) => !sessions.some((session) => session.date === date),
-    );
+    // The server tells us when the club week rolls over to the next set of
+    // sessions, so the page refreshes itself at that moment.
+    const hasScheduleChanged =
+      sessionClockTime.getTime() >=
+      new Date(initialData.nextScheduleChangeAt).getTime();
 
     if (!hasScheduleChanged) {
       isScheduleRefreshPending.current = false;
@@ -157,7 +156,12 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
 
     isScheduleRefreshPending.current = true;
     router.refresh();
-  }, [isDemo, router, sessionClockTime, sessions]);
+  }, [
+    initialData.nextScheduleChangeAt,
+    isDemo,
+    router,
+    sessionClockTime,
+  ]);
 
   useEffect(() => {
     if (
@@ -232,7 +236,7 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
         !isCancelling &&
         !isDemo &&
         session.status === "open" &&
-        (session.dayName === "Friday" || initialData.user?.isCommittee);
+        (session.allocationMode === "fcfs" || initialData.user?.isCommittee);
 
       if (immediateConfirmSignup) {
         setSignupOverrides((currentOverrides) => {
@@ -355,7 +359,7 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
     const updatedSession = toggleDemoSignup(
       {
         ...storedSession,
-        registeredCount: demoSignupCounts[session.dayName],
+        registeredCount: demoSignupCounts[session.dayName] ?? 0,
       },
     );
     const hasSessionState = demoSessions.some(
@@ -385,7 +389,7 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
       return getDemoSignupState(
         session,
         storedState,
-        demoSignupCounts[session.dayName],
+        demoSignupCounts[session.dayName] ?? 0,
       );
     }
 

@@ -1,10 +1,4 @@
-import {
-  addMinutesToTime,
-  getSessionDayName,
-  getUpcomingSchedule,
-  londonDateTime,
-  type ClubSessionDay,
-} from "@/lib/sessions/schedule";
+import { addMinutesToTime } from "@/lib/sessions/schedule";
 import type {
   ClubSession,
   DashboardData,
@@ -14,6 +8,7 @@ import type {
 import { getCourtCount } from "./court-schedule";
 import type { AdminPlayer, AdminSession } from "../admin/data";
 import { buildDemoCourtSchedule } from "./demo-court-schedule";
+import { getDemoSchedule, type DemoSessionTemplate } from "./demo-schedule";
 
 const DEMO_FRIEND_CANDIDATES: FriendCandidate[] = [
   {
@@ -103,17 +98,16 @@ const WEDNESDAY_PLAYERS: AdminPlayer[] = [
 ];
 
 export function createDemoAdminSessions(now = new Date()): AdminSession[] {
-  const schedule = getUpcomingSchedule(now);
+  const schedule = getDemoSchedule(now);
 
-  return schedule.sessions.map(({ date }) => {
-    const dayName = getSessionDayName(date);
-    const isMonday = dayName === "Monday";
-    const isFriday = dayName === "Friday";
-    const capacity = isMonday || isFriday ? 16 : 40;
+  return schedule.sessions.map(({ date, template }) => {
+    const dayName = template.day;
+    const capacity = template.capacity;
     const courtCount = getCourtCount(capacity);
-    const durationMinutes = isFriday ? 180 : isMonday ? 60 : 120;
-    const startsAt = isFriday ? "15:00" : isMonday ? "18:00" : "19:30";
-    const players = isMonday || isFriday ? MONDAY_PLAYERS : WEDNESDAY_PLAYERS;
+    const durationMinutes = template.durationMinutes;
+    const startsAt = template.startsAt;
+    const players =
+      dayName === "Wednesday" ? WEDNESDAY_PLAYERS : MONDAY_PLAYERS;
     const selectedPlayers = players.filter(
       (p) => p.status === "selected" || p.status === "played",
     );
@@ -144,38 +138,40 @@ export function createDemoDashboardData(
   now = new Date(),
   signupCounts: DemoSignupCounts = DEFAULT_DEMO_SIGNUP_COUNTS,
 ): DashboardData {
-  const schedule = getUpcomingSchedule(now);
+  const schedule = getDemoSchedule(now);
 
   return {
     mode: "demo",
     user: null,
-    sessions: schedule.sessions.map(({ date, signupOpensAt }) => {
-      const dayName = getSessionDayName(date);
-      const registeredCount = signupCounts[dayName] ?? 0;
-      return createDemoSession(date, dayName, signupOpensAt, registeredCount);
-    }),
+    sessions: schedule.sessions.map(
+      ({ date, template, signupOpensAt, confirmationAt }) => {
+        const registeredCount = signupCounts[template.day] ?? 0;
+        return createDemoSession(
+          date,
+          template,
+          signupOpensAt,
+          confirmationAt,
+          registeredCount,
+        );
+      },
+    ),
+    nextScheduleChangeAt: null,
   };
 }
 
 function createDemoSession(
   date: string,
-  dayName: ClubSessionDay,
+  template: DemoSessionTemplate,
   signupOpensAt: string,
+  confirmationAt: string,
   registeredCount: number,
 ): ClubSession {
-  const confirmationDate = new Date(`${date}T12:00:00Z`);
-  confirmationDate.setUTCDate(confirmationDate.getUTCDate() - 1);
-
-  const isMonday = dayName === "Monday";
-  const isFriday = dayName === "Friday";
-  const capacity = isMonday || isFriday ? 16 : 40;
+  const dayName = template.day;
+  const capacity = template.capacity;
   const playersPerSlot = 4;
   const slotCount = capacity / playersPerSlot;
-  const durationMinutes = isFriday ? 180 : isMonday ? 60 : 120;
-  const startsAt = isFriday ? "15:00" : isMonday ? "18:00" : "19:30";
-  const confirmationAt = isFriday
-    ? londonDateTime(new Date(`${date}T14:30:00Z`), 14, 30)
-    : londonDateTime(confirmationDate, 0, 0);
+  const durationMinutes = template.durationMinutes;
+  const startsAt = template.startsAt;
 
   return {
     id: `demo-${dayName.toLowerCase()}-${date}`,
@@ -190,6 +186,8 @@ function createDemoSession(
     signupOpensAt,
     confirmationAt,
     status: "open",
+    feeCents: template.feeCents,
+    allocationMode: template.allocationMode,
     currentUserStatus: null,
     currentUserSlot: null,
     friendCandidates: DEMO_FRIEND_CANDIDATES,

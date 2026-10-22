@@ -125,20 +125,38 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"sessions": {
+                },"session_templates": {
                   Row: {
-                    "capacity": number,"confirmation_at": string,"created_at": string,"duration_minutes": number,"event_date": string,"id": string,"signup_opens_at": string,"starts_at": string,"status": string
+                    "allocation_mode": string,"capacity": number,"committee_auto_signup": boolean,"confirmation_at": string,"confirmation_lead_days": number,"created_at": string,"duration_minutes": number,"fee_cents": number,"id": string,"is_active": boolean,"name": string,"signup_opens_at": string,"signup_opens_lead_days": number,"starts_at": string,"updated_at": string,"valid_from": string | null,"valid_until": string | null,"weekday": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "capacity"?: number,"confirmation_at": string,"created_at"?: string,"duration_minutes"?: number,"event_date": string,"id"?: string,"signup_opens_at": string,"starts_at"?: string,"status"?: string
+                    "allocation_mode"?: string,"capacity": number,"committee_auto_signup"?: boolean,"confirmation_at"?: string,"confirmation_lead_days"?: number,"created_at"?: string,"duration_minutes": number,"fee_cents"?: number,"id"?: string,"is_active"?: boolean,"name": string,"signup_opens_at"?: string,"signup_opens_lead_days"?: number,"starts_at": string,"updated_at"?: string,"valid_from"?: string | null,"valid_until"?: string | null,"weekday": number
                   }
                   Update: {
-                    "capacity"?: number,"confirmation_at"?: string,"created_at"?: string,"duration_minutes"?: number,"event_date"?: string,"id"?: string,"signup_opens_at"?: string,"starts_at"?: string,"status"?: string
+                    "allocation_mode"?: string,"capacity"?: number,"committee_auto_signup"?: boolean,"confirmation_at"?: string,"confirmation_lead_days"?: number,"created_at"?: string,"duration_minutes"?: number,"fee_cents"?: number,"id"?: string,"is_active"?: boolean,"name"?: string,"signup_opens_at"?: string,"signup_opens_lead_days"?: number,"starts_at"?: string,"updated_at"?: string,"valid_from"?: string | null,"valid_until"?: string | null,"weekday"?: number
                   }
                   Relationships: [
 
                   ]
+                },"sessions": {
+                  Row: {
+                    "allocation_mode": string,"capacity": number,"committee_auto_signup": boolean,"confirmation_at": string,"created_at": string,"duration_minutes": number,"event_date": string,"fee_cents": number,"id": string,"signup_opens_at": string,"starts_at": string,"status": string,"template_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "allocation_mode"?: string,"capacity"?: number,"committee_auto_signup"?: boolean,"confirmation_at": string,"created_at"?: string,"duration_minutes"?: number,"event_date": string,"fee_cents"?: number,"id"?: string,"signup_opens_at": string,"starts_at"?: string,"status"?: string,"template_id"?: string | null
+                  }
+                  Update: {
+                    "allocation_mode"?: string,"capacity"?: number,"committee_auto_signup"?: boolean,"confirmation_at"?: string,"created_at"?: string,"duration_minutes"?: number,"event_date"?: string,"fee_cents"?: number,"id"?: string,"signup_opens_at"?: string,"starts_at"?: string,"status"?: string,"template_id"?: string | null
+                  }
+                  Relationships: [{
+      foreignKeyName: "sessions_template_id_fkey"
+      columns: ["template_id"]
+isOneToOne: false
+      referencedRelation: "session_templates"
+      referencedColumns: ["id"]
+    }]
                 }
           }
           Views: {
@@ -149,6 +167,39 @@ isOneToOne: false
 { Args: Record<PropertyKey, never>; Returns: {
               "can_choose_professional": boolean,"display_name": string,"is_committee": boolean,"player_level": string,"user_id": string
             }[]
+                           },
+            "admin_list_session_templates":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "allocation_mode": string,"capacity": number,"committee_auto_signup": boolean,"confirmation_at": string,"confirmation_lead_days": number,"created_at": string,"duration_minutes": number,"fee_cents": number,"id": string,"is_active": boolean,"name": string,"signup_opens_at": string,"signup_opens_lead_days": number,"starts_at": string,"updated_at": string,"valid_from": string | null,"valid_until": string | null,"weekday": number
+            }[]
+                           },
+            "admin_publish_scheduled_sessions":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "created_count": number,"removed_count": number,"updated_count": number
+            }[]
+                           },
+            "admin_set_session_template_active":
+{ Args: { "p_is_active": boolean,"p_template_id": string }; Returns: undefined
+                                       },
+            "admin_upsert_session_template":
+{ Args: {
+              p_allocation_mode: string,
+              p_capacity: number,
+              p_committee_auto_signup: boolean,
+              p_confirmation_at: string,
+              p_confirmation_lead_days: number,
+              p_duration_minutes: number,
+              p_fee_cents: number,
+              p_is_active: boolean,
+              p_name: string,
+              p_signup_opens_at: string,
+              p_signup_opens_lead_days: number,
+              p_starts_at: string,
+              p_template_id: string | null,
+              p_valid_from: string | null,
+              p_valid_until: string | null,
+              p_weekday: number
+            }; Returns: string
                            },
             "admin_set_session_happening":
             { Args: { "p_happening": boolean,"p_session_id": string }; Returns: undefined
@@ -171,12 +222,20 @@ isOneToOne: false
 "ensure_next_week_sessions":
 { Args: Record<PropertyKey, never>; Returns: undefined
                            },
+"ensure_scheduled_sessions":
+{ Args: { "p_weeks_ahead"?: number }; Returns: number
+                           },
 "finalize_due_sessions":
 { Args: Record<PropertyKey, never>; Returns: number
                            },
 "get_dashboard_sessions":
 { Args: { "p_from_date": string,"p_through_date": string }; Returns: {
-              "capacity": number,"confirmation_at": string,"current_user_slot": number,"current_user_status": string,"day_name": string,"duration_minutes": number,"event_date": string,"id": string,"registered_count": number,"signup_opens_at": string,"starts_at": string,"status": string
+              "allocation_mode": string,"capacity": number,"confirmation_at": string,"current_user_slot": number,"current_user_status": string,"day_name": string,"duration_minutes": number,"event_date": string,"fee_cents": number,"id": string,"registered_count": number,"signup_opens_at": string,"starts_at": string,"status": string
+            }[]
+                           },
+"get_dashboard_window":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "from_date": string,"next_change_at": string | null,"through_date": string
             }[]
                            },
 "find_club_member_by_student_id":

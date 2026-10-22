@@ -2,7 +2,7 @@ import "server-only";
 
 import {
   addMinutesToTime,
-  getUpcomingSchedule,
+  CLUB_SESSION_DAYS,
   type ClubSessionDay,
 } from "@/lib/sessions/schedule";
 import { hasSupabaseConfig } from "@/lib/supabase/env";
@@ -12,6 +12,7 @@ import type {
   ClubSession,
   DashboardData,
   FriendCandidate,
+  SessionAllocationMode,
   SessionSignupStatus,
   SessionStatus,
 } from "../types";
@@ -48,15 +49,20 @@ export async function loadDashboardData(): Promise<DashboardData> {
     throw new Error(`Could not prepare upcoming sessions: ${ensureError.message}`);
   }
 
-  const schedule = getUpcomingSchedule();
-  const fromDate =
-    schedule.fromDate <= schedule.sessions[0].date
-      ? schedule.fromDate
-      : schedule.sessions[0].date;
-  const lastScheduledDate =
-    schedule.sessions[schedule.sessions.length - 1].date;
-  const throughDate =
-    lastScheduledDate < fromDate ? fromDate : lastScheduledDate;
+  // The window comes from the session templates, so the club week always
+  // matches the sessions that are actually published.
+  const { data: windowRows, error: windowError } = await supabase.rpc(
+    "get_dashboard_window",
+  );
+  if (windowError) {
+    throw new Error(`Could not load the club schedule window: ${windowError.message}`);
+  }
+  const window = windowRows?.[0];
+  if (!window) {
+    throw new Error("The club schedule window is not available.");
+  }
+  const fromDate = window.from_date;
+  const throughDate = window.through_date;
 
   const { data: sessionRows, error: sessionsError } = await supabase.rpc(
     "get_dashboard_sessions",
@@ -102,6 +108,7 @@ export async function loadDashboardData(): Promise<DashboardData> {
     sessions: sessionRows.map((row) =>
       mapSession(row, rosterRows, friendCandidates.get(row.id) ?? []),
     ),
+    nextScheduleChangeAt: window.next_change_at,
   };
 }
 
@@ -239,6 +246,8 @@ function mapSession(
     signupOpensAt: row.signup_opens_at,
     confirmationAt: row.confirmation_at,
     status,
+    feeCents: row.fee_cents,
+    allocationMode: getAllocationMode(row.allocation_mode),
     currentUserStatus: getSignupStatus(row.current_user_status),
     currentUserSlot: row.current_user_slot,
     friendCandidates,
@@ -270,11 +279,19 @@ function parsePlayerLevel(playerLevel: string): FriendCandidate["playerLevel"] {
 }
 
 function getDayName(value: string): ClubSessionDay {
-  if (value === "Monday" || value === "Wednesday" || value === "Friday") {
-    return value;
+  if (CLUB_SESSION_DAYS.includes(value as ClubSessionDay)) {
+    return value as ClubSessionDay;
   }
 
   throw new Error("The session schedule returned an unsupported weekday.");
+}
+
+function getAllocationMode(value: string): SessionAllocationMode {
+  if (value === "lottery" || value === "fcfs") {
+    return value;
+  }
+
+  throw new Error("The session schedule returned an unsupported allocation mode.");
 }
 
 function getSessionStatus(value: string): SessionStatus {

@@ -10,6 +10,12 @@ export type SessionSignupStatus =
 
 export type SessionStatus = "open" | "confirmed" | "closed" | "cancelled";
 
+/**
+ * How the places in a session are handed out. "lottery" runs the fairness draw
+ * when sign-ups close, "fcfs" gives each place to the first player who asked.
+ */
+export type SessionAllocationMode = "lottery" | "fcfs";
+
 export type { PlayerLevel } from "@/types/player";
 
 export type FriendCandidate = {
@@ -45,17 +51,16 @@ export type ClubSession = {
   signupOpensAt: string;
   confirmationAt: string;
   status: SessionStatus;
+  /** Fee charged per player, in cents. */
+  feeCents: number;
+  allocationMode: SessionAllocationMode;
   currentUserStatus: Exclude<SessionSignupStatus, "cancelled"> | null;
   currentUserSlot: number | null;
   friendCandidates: FriendCandidate[];
   timeSlots: SessionTimeSlot[];
 };
 
-export type DemoSignupCounts = {
-  Monday: number;
-  Wednesday: number;
-  Friday: number;
-};
+export type DemoSignupCounts = Partial<Record<ClubSessionDay, number>>;
 
 export type DashboardData = {
   mode: "demo" | "live";
@@ -70,4 +75,9 @@ export type DashboardData = {
     friendList: FriendCandidate[];
   } | null;
   sessions: ClubSession[];
+  /**
+   * When the club week rolls over to the next set of sessions. The dashboard
+   * refreshes itself once this moment has passed.
+   */
+  nextScheduleChangeAt: string | null;
 };

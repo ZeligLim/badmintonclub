@@ -111,6 +111,8 @@ export function SessionCard({
     session.status === "confirmed" &&
     !isPastCancellationDeadline &&
     signupState.registeredCount < session.capacity;
+  const isFirstComeFirstServed = session.allocationMode === "fcfs";
+  const feeLabel = formatFee(session.feeCents);
   const actionLabel = isWaitlisted
     ? "Leave waitlist"
     : isSignedUp
@@ -154,11 +156,11 @@ export function SessionCard({
             <p className="text-sm font-medium text-muted-foreground">
               {session.dayName}, {formatSessionDate(session.date)} ·{" "}
               {session.courtCount} courts
-              {session.dayName === "Friday" ? (
+              {session.feeCents > 0 ? (
                 <>
                   {" · "}
                   <span className="font-semibold text-emerald-700 dark:text-emerald-400">
-                    €3 / person
+                    {feeLabel} / person
                   </span>
                 </>
               ) : (
@@ -172,14 +174,14 @@ export function SessionCard({
             </p>
           </div>
 
-          {session.dayName === "Friday" && session.status !== "cancelled" && (
+          {session.feeCents > 0 && session.status !== "cancelled" && (
             <div className="mt-3 flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/70 px-3.5 py-2 text-xs text-emerald-950 dark:border-emerald-800/40 dark:bg-emerald-950/20 dark:text-emerald-200">
               <span className="flex items-center gap-2">
                 <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-200 font-bold text-emerald-900 dark:bg-emerald-800 dark:text-emerald-100">
                   €
                 </span>
                 <span>
-                  Need to pay <strong>€3 per person</strong> to play
+                  Need to pay <strong>{feeLabel} per person</strong> to play
                 </span>
               </span>
               <span className="text-[0.7rem] font-medium text-emerald-700 dark:text-emerald-300">
@@ -207,7 +209,7 @@ export function SessionCard({
                   <p className="text-sm font-medium tabular-nums">
                     {signupState.registeredCount}/{session.capacity}{" "}
                     <span className="font-normal text-muted-foreground">
-                      players {isConfirmed || session.dayName === "Friday" ? "confirmed" : "signed up"}
+                      players {isConfirmed || isFirstComeFirstServed ? "confirmed" : "signed up"}
                     </span>
                   </p>
                 </div>
@@ -243,10 +245,10 @@ export function SessionCard({
                     Session confirmed · spaces still available on a{" "}
                     <span className="font-medium text-foreground">first-come, first-served</span>{" "}
                     basis
-                    {session.dayName === "Friday" ? (
+                    {session.feeCents > 0 ? (
                       <>
                         {" · "}
-                        <span className="font-semibold text-foreground">€3 per person</span>
+                        <span className="font-semibold text-foreground">{feeLabel} per person</span>
                       </>
                     ) : (
                       <>
@@ -255,9 +257,13 @@ export function SessionCard({
                       </>
                     )}
                   </p>
-                ) : session.dayName === "Friday" ? (
+                ) : isFirstComeFirstServed ? (
                   <p>
-                    First-come, first-served · <span className="font-semibold text-foreground">€3 per person</span> ·{" "}
+                    First-come, first-served ·{" "}
+                    <span className="font-semibold text-foreground">
+                      {session.feeCents > 0 ? `${feeLabel} per person` : "Free"}
+                    </span>{" "}
+                    ·{" "}
                     {signupWindowStatus === "not-open" ? (
                       <>
                         sign-ups open{" "}
@@ -534,4 +540,12 @@ function formatSessionTime(value: string) {
 function formatDuration(durationMinutes: number) {
   const hours = durationMinutes / 60;
   return `${hours} ${hours === 1 ? "hour" : "hours"}`;
+}
+
+function formatFee(feeCents: number) {
+  if (feeCents % 100 === 0) {
+    return `€${feeCents / 100}`;
+  }
+
+  return `€${(feeCents / 100).toFixed(2)}`;
 }

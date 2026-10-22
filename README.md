@@ -1,12 +1,12 @@
 # Rally Club
 
-A weekly badminton signup board for Monday and Wednesday evening sessions.
-Members request a place from Thursday. At midnight the day before each session,
-the club confirms players in order of who has gone longest without playing; members
-who have never checked in are first. Selected players are grouped into
-four-player court slots across the session. Monday has 2 courts and 16 places;
-Wednesday has 4 courts and 32 places. Membership and sign-in are limited to
-`@atu.ie` email addresses.
+A weekly badminton signup board. The club's recurring sessions are described by
+session templates, so the committee can add, change or pause a weekly session
+without editing the database by hand. Members request a place from the sign-up
+window the template defines. At the closing deadline the club confirms players
+in order of who has gone longest without playing; members who have never checked
+in are first. Selected players are grouped into four-player court slots across
+the session. Membership and sign-in are limited to `@atu.ie` email addresses.
 
 ## Local setup
 
@@ -38,13 +38,23 @@ project's Auth settings.
 ## Session rules
 
 - Session dates and signup deadlines use the `Europe/London` timezone.
-- Monday sessions run from 18:00 to 19:00 (6–7 pm); Wednesday sessions run
-  from 20:00 to 22:00 (8–10 pm).
-- The schedule shows the current Monday and Wednesday sessions through
-  Wednesday, then switches to the following week's sessions on Thursday.
-- Signup requests open Thursday at 00:00 and close at 00:00 the day before the
-  event (Europe/London time). Both the signup UI and database enforce these
-  time windows.
+- The club's recurring sessions come from session templates rather than a
+  hardcoded weekday list. A template sets the weekday, start time, length,
+  capacity, fee, how places are allocated and when sign-ups open and close.
+- The templates the club ships with are:
+  - Monday evening — 18:00 for 1 hour, 16 places, free, allocated by the
+    fairness draw. Sign-ups open 4 days before at 00:00 and close 1 day before
+    at 00:00.
+  - Wednesday evening — 19:30 for 2 hours, 40 places, free, allocated by the
+    fairness draw. Sign-ups open 6 days before at 00:00 and close 1 day before
+    at 00:00.
+  - Friday afternoon — 15:00 for 3 hours, 16 places, €3 per player, allocated
+    first come, first served, and without the committee automatic sign-up.
+    Sign-ups open 6 days before at 00:00 and close on the day at 14:30.
+- The schedule shows the current club week through Wednesday, then switches to
+  the following week's sessions when the next sign-up window opens, which the
+  templates decide.
+- Both the signup UI and database enforce the sign-up windows.
 - Members can cancel their own signup, including a confirmed place, until the
   session starts.
 - The browser clock checks session periods every 60 seconds and uses the
@@ -60,6 +70,9 @@ project's Auth settings.
   considered first, then friend groups are ranked using the most recently
   played eligible group member. Awarding a place updates play history to that
   session's scheduled start; overflow is waitlisted.
+- First-come-first-served sessions skip the draw: their places are handed out
+  in signup order, and a member who signs up for one is given a court straight
+  away instead of waiting for the deadline.
 - Beginner and Intermediate are member-selectable matching preferences.
   Professional is invite-only and can only be assigned by a club administrator.
   Levels never prevent a player from being selected; complete courts prefer
@@ -68,15 +81,46 @@ project's Auth settings.
   Friend selection does not bypass committee priority or longest-since-last-play
   fairness. Friends who do not make an eligible request for that session are
   ignored when matching.
-- Monday sessions have 2 courts and a 16-player capacity. Wednesday sessions
-  have 4 courts and a 32-player capacity.
+- Each session holds as many players as its template says, in multiples of four
+  so the four-player court slots divide evenly.
 - In `/dev`, the Testing controls set total sign-ups for each weekday from 0 to
   64, including over-capacity counts for previewing waitlist states.
 - A selected member can check in after the session to record attendance.
 
-Session capacities are fixed by weekday in the database: 16 for Monday and 32
-for Wednesday. The four-player allocation groups run from 1–4 on Monday and
-1–8 on Wednesday.
+## Session templates
+
+The club's recurring sessions are described by rows in
+`public.session_templates`. A template holds:
+
+- a name and the ISO weekday it runs on (1 = Monday);
+- the start time and the length in minutes (30–360);
+- the capacity in players (4–64, in multiples of four);
+- the fee per player in cents;
+- how places are allocated: `lottery` for the fairness draw, `fcfs` for first
+  come, first served;
+- whether committee members are signed up automatically;
+- the sign-up window, given as a number of days before the session and a time
+  of day for opening and closing;
+- whether the template is active, and the optional dates it runs from and
+  until.
+
+Sessions are materialised from the templates by
+`public.ensure_scheduled_sessions()`, which the dashboard calls so that the
+current and next club week are always covered. Every session stores a copy of
+the template values it was created from, together with a reference to its
+template. That means:
+
+- editing a template only affects the sessions created after the edit;
+- a session whose sign-ups have already opened, or that already has bookings,
+  is never changed by a template edit;
+- pausing a template removes the sessions that have not been published yet and
+  leaves published sessions and their bookings alone.
+
+`/admin` has a **Recurring session templates** panel, where a club
+administrator can add, edit and pause templates and press **Publish sessions**
+to bring the unpublished sessions in line with the templates. The panel reports
+how many sessions were created, updated and removed. The database checks every
+change and only lets club administrators manage templates.
 
 ## Database and deployment
 
@@ -105,8 +149,9 @@ where id = '<verified-atu-user-id>'
   );
 ```
 
-Subsequent administrators can manage player levels and committee status in
-`/admin`; the database verifies administrator access on every request.
+Subsequent administrators can manage player levels, committee status and the
+recurring session templates in `/admin`; the database verifies administrator
+access on every request.
 
 For a hosted setup, create a Supabase project and a Vercel project, copy the
 values from `.env.example` into the Vercel environment settings, then link and

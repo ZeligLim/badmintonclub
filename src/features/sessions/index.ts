@@ -30,4 +30,5 @@ export type {
   DemoSignupCounts,
   FriendCandidate,
   PlayerLevel,
+  SessionAllocationMode,
 } from "./types";

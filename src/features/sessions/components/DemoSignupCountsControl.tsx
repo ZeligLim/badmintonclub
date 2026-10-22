@@ -1,4 +1,5 @@
 import type { DemoSignupCounts } from "@/features/sessions";
+import { DEMO_SESSION_TEMPLATES } from "../demo-schedule";
 
 type DemoSignupCountsControlProps = {
   value: DemoSignupCounts;
@@ -21,29 +22,35 @@ export function DemoSignupCountsControl({
         </p>
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {(["Monday", "Wednesday", "Friday"] as const).map((dayName) => (
-          <label
-            className="flex items-center gap-2 text-sm"
-            htmlFor={`demo-signups-${dayName.toLowerCase()}`}
-            key={dayName}
-          >
-            <span>{dayName}</span>
-            <input
-              className="w-20 rounded-md bg-background px-2 py-2 text-sm tabular-nums text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              id={`demo-signups-${dayName.toLowerCase()}`}
-              max={64}
-              min={0}
-              onChange={(event) => {
-                const count = event.currentTarget.valueAsNumber;
-                if (Number.isFinite(count)) {
-                  onChange(dayName, Math.min(Math.max(Math.trunc(count), 0), 64));
-                }
-              }}
-              type="number"
-              value={value[dayName]}
-            />
-          </label>
-        ))}
+        {DEMO_SESSION_TEMPLATES.map((template) => {
+          const dayName = template.day;
+          return (
+            <label
+              className="flex items-center gap-2 text-sm"
+              htmlFor={`demo-signups-${dayName.toLowerCase()}`}
+              key={dayName}
+            >
+              <span>{dayName}</span>
+              <input
+                className="w-20 rounded-md bg-background px-2 py-2 text-sm tabular-nums text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                id={`demo-signups-${dayName.toLowerCase()}`}
+                max={64}
+                min={0}
+                onChange={(event) => {
+                  const count = event.currentTarget.valueAsNumber;
+                  if (Number.isFinite(count)) {
+                    onChange(
+                      dayName,
+                      Math.min(Math.max(Math.trunc(count), 0), 64),
+                    );
+                  }
+                }}
+                type="number"
+                value={value[dayName] ?? 0}
+              />
+            </label>
+          );
+        })}
       </div>
     </section>
   );

@@ -8,7 +8,9 @@ import {
   loadAdminAccountCount,
   loadAdminData,
   loadClubPlayers,
+  loadSessionTemplates,
   requireAdminUser,
+  SessionTemplateManager,
 } from "@/features/admin";
 
 export const instant = false;
@@ -17,10 +19,11 @@ export default async function AdminPage() {
   const user = await requireAdminUser();
   if (!user) redirect("/sign-in");
 
-  const [sessions, players, accountCount] = await Promise.all([
+  const [sessions, players, accountCount, templates] = await Promise.all([
     loadAdminData(),
     loadClubPlayers(),
     loadAdminAccountCount(),
+    loadSessionTemplates(),
   ]);
 
   return (
@@ -52,6 +55,10 @@ export default async function AdminPage() {
             ))}
           </div>
         )}
+
+        <div className="mt-16">
+          <SessionTemplateManager templates={templates} />
+        </div>
 
         <div className="mt-16">
           <ClubPlayerAccessTable players={players} />

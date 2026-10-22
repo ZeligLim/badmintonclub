@@ -3,7 +3,11 @@ import "server-only";
 import { connection } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { allocateCourtSchedule, getCourtCount } from "@/features/sessions";
+import {
+  allocateCourtSchedule,
+  getCourtCount,
+  type SessionAllocationMode,
+} from "@/features/sessions";
 import { getSessionDayName } from "@/lib/sessions/schedule";
 import type { PlayerLevel } from "@/types/player";
 
@@ -41,6 +45,26 @@ export type AdminClubPlayer = {
   playerLevel: PlayerLevel;
   isCommittee: boolean;
   canChooseProfessional: boolean;
+};
+
+export type AdminSessionTemplate = {
+  id: string;
+  name: string;
+  /** ISO weekday, 1 = Monday ... 7 = Sunday. */
+  weekday: number;
+  startsAt: string;
+  durationMinutes: number;
+  capacity: number;
+  feeCents: number;
+  allocationMode: SessionAllocationMode;
+  committeeAutoSignup: boolean;
+  signupOpensLeadDays: number;
+  signupOpensAt: string;
+  confirmationLeadDays: number;
+  confirmationAt: string;
+  isActive: boolean;
+  validFrom: string | null;
+  validUntil: string | null;
 };
 
 export async function requireAdminUser() {
@@ -92,6 +116,37 @@ export async function loadClubPlayers(): Promise<AdminClubPlayer[]> {
     playerLevel: parsePlayerLevel(player.player_level),
     isCommittee: player.is_committee,
     canChooseProfessional: player.can_choose_professional,
+  }));
+}
+
+export async function loadSessionTemplates(): Promise<AdminSessionTemplate[]> {
+  if (!(await requireAdminUser())) {
+    throw new Error("Only a club administrator can manage session templates.");
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_list_session_templates");
+  if (error) {
+    throw new Error(`Could not load session templates: ${error.message}`);
+  }
+
+  return data.map((template) => ({
+    id: template.id,
+    name: template.name,
+    weekday: template.weekday,
+    startsAt: formatTime(template.starts_at),
+    durationMinutes: template.duration_minutes,
+    capacity: template.capacity,
+    feeCents: template.fee_cents,
+    allocationMode: parseAllocationMode(template.allocation_mode),
+    committeeAutoSignup: template.committee_auto_signup,
+    signupOpensLeadDays: template.signup_opens_lead_days,
+    signupOpensAt: formatTime(template.signup_opens_at),
+    confirmationLeadDays: template.confirmation_lead_days,
+    confirmationAt: formatTime(template.confirmation_at),
+    isActive: template.is_active,
+    validFrom: template.valid_from,
+    validUntil: template.valid_until,
   }));
 }
 
@@ -254,4 +309,16 @@ function parsePlayerLevel(playerLevel: string): PlayerLevel {
   }
 
   throw new Error("A club member has an unsupported player level.");
+}
+
+function parseAllocationMode(allocationMode: string): SessionAllocationMode {
+  if (allocationMode === "lottery" || allocationMode === "fcfs") {
+    return allocationMode;
+  }
+
+  throw new Error("A session template has an unsupported allocation mode.");
+}
+
+function formatTime(value: string): string {
+  return value.slice(0, 5);
 }
