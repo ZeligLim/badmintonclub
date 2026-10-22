@@ -4,11 +4,19 @@ import type { ClubSession } from "./types";
 const GAME_DURATION_MINUTES = 15;
 const PLAYERS_PER_COURT = 4;
 
+export type PlayerLevel = "BEGINNER" | "INTERMEDIATE" | "ADVANCED";
+
 export type CourtRosterPlayer = {
   id: string;
   displayName: string;
+  /**
+   * Lower values mean higher committee priority, matching the previous
+   * implementation's priority ordering.
+   */
   priority?: number;
+  /** One-way outgoing friendship requests. Mutual requests are not required. */
   friendIds?: string[];
+  level?: PlayerLevel | null;
 };
 
 export type AllocatedCourtGame = {
@@ -34,6 +42,9 @@ export type PlayerGame = {
 type InternalPlayer = CourtRosterPlayer & {
   rosterIndex: number;
   normalizedFriendIds: string[];
+  incomingFriendCount: number;
+  /** Stable random tie-break value for this schedule generation. */
+  randomRank: number;
 };
 
 export type ScheduleTrackingState = {
@@ -47,35 +58,16 @@ export type ScheduleTrackingState = {
   doublesOpponents: Map<string, Map<string, number>>;
 };
 
-// Seeded PRNG (Mulberry32) for deterministic Fisher-Yates shuffles
-function seededRandom(seed: number): () => number {
-  let s = seed >>> 0;
-  return () => {
-    s = (s + 0x6d2b79f5) >>> 0;
-    let t = Math.imul(s ^ (s >>> 15), 1 | s);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function seededShuffle<T>(arr: T[], seed: number): T[] {
-  const result = [...arr];
-  const rng = seededRandom(seed);
+function shuffle<T>(items: T[]): T[] {
+  const result = [...items];
   for (let i = result.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    const temp = result[i]!;
-    result[i] = result[j]!;
-    result[j] = temp;
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j]!, result[i]!];
   }
   return result;
 }
 
-// Stage 1: Deterministic selection priority comparator
-// Primary: gamesPlayed (asc) - hard fairness invariant
-// Secondary: consecutiveRests (desc) - rest priority
-// Tertiary: totalRests (desc) - overall rest balance
-// Quaternary: rosterIndex (asc) - deterministic tie-break
-function compareSelectionPriority(
+function compareGameFairness(
   a: InternalPlayer,
   b: InternalPlayer,
   state: ScheduleTrackingState,
@@ -84,209 +76,306 @@ function compareSelectionPriority(
   const gamesB = state.gamesPlayed.get(b.id) ?? 0;
   if (gamesA !== gamesB) return gamesA - gamesB;
 
-  const restA = state.consecutiveRests.get(a.id) ?? 0;
-  const restB = state.consecutiveRests.get(b.id) ?? 0;
-  if (restA !== restB) return restB - restA;
+  const restsA = state.consecutiveRests.get(a.id) ?? 0;
+  const restsB = state.consecutiveRests.get(b.id) ?? 0;
+  if (restsA !== restsB) return restsB - restsA;
 
-  const totRestA = state.totalRests.get(a.id) ?? 0;
-  const totRestB = state.totalRests.get(b.id) ?? 0;
-  if (totRestA !== totRestB) return totRestB - totRestA;
+  const totalRestsA = state.totalRests.get(a.id) ?? 0;
+  const totalRestsB = state.totalRests.get(b.id) ?? 0;
+  if (totalRestsA !== totalRestsB) return totalRestsB - totalRestsA;
 
   return a.rosterIndex - b.rosterIndex;
 }
 
-// Partition evaluation: tuple of [negSatisfiedEdges, coPresence, physicalCourtRepeats]
-type PartitionScore = [number, number, number];
-
-function comparePartitionScores(a: PartitionScore, b: PartitionScore): number {
-  if (a[0] !== b[0]) return a[0] - b[0]; // more friends satisfied (lower negative number)
-  if (a[1] !== b[1]) return a[1] - b[1]; // fewer co-presence repeats
-  return a[2] - b[2]; // fewer physical court repeats
+/**
+ * Anchor ranking:
+ * 1. Committee priority (lower numeric priority first).
+ * 2. More incoming friend requests.
+ * 3. More outgoing friend requests.
+ * 4. Random tie-break assigned once per schedule generation.
+ */
+function compareAnchorPriority(a: InternalPlayer, b: InternalPlayer): number {
+  return (
+    (a.priority ?? 0) - (b.priority ?? 0) ||
+    b.incomingFriendCount - a.incomingFriendCount ||
+    b.normalizedFriendIds.length - a.normalizedFriendIds.length ||
+    a.randomRank - b.randomRank
+  );
 }
 
-function evaluatePartition(
-  partition: InternalPlayer[][],
-  friendMap: Map<string, Set<string>>,
-  state: ScheduleTrackingState,
-): PartitionScore {
-  let negFriends = 0;
-  let coPresence = 0;
-  let courtRepeats = 0;
+function toRosterPlayer(player: InternalPlayer): CourtRosterPlayer {
+  return {
+    id: player.id,
+    displayName: player.displayName,
+    priority: player.priority,
+    friendIds: player.friendIds,
+    level: player.level,
+  };
+}
 
-  for (let c = 0; c < partition.length; c++) {
-    const courtGroup = partition[c]!;
-    const courtNumber = c + 1;
+type AnchorCycle = {
+  eligibleAnchorIds: Set<string>;
+  satisfiedAnchorIds: Set<string>;
+};
 
-    for (let i = 0; i < courtGroup.length; i++) {
-      const u = courtGroup[i]!;
-      courtRepeats += state.physicalCourtAssignments.get(u.id)?.get(courtNumber) ?? 0;
-      const uFriends = friendMap.get(u.id);
-
-      for (let j = 0; j < courtGroup.length; j++) {
-        if (i === j) continue;
-        const v = courtGroup[j]!;
-        if (uFriends?.has(v.id)) {
-          negFriends -= 1;
-        }
-        if (i < j) {
-          coPresence += state.courtCoPresence.get(u.id)?.get(v.id) ?? 0;
-        }
-      }
-    }
+/**
+ * Starts a new anchor cycle only after every eligible anchor has been
+ * explicitly selected as an anchor in the previous cycle.
+ */
+function resetAnchorCycleIfComplete(cycle: AnchorCycle): void {
+  if (
+    cycle.eligibleAnchorIds.size > 0 &&
+    [...cycle.eligibleAnchorIds].every((id) => cycle.satisfiedAnchorIds.has(id))
+  ) {
+    cycle.satisfiedAnchorIds.clear();
   }
-
-  return [negFriends, coPresence, courtRepeats];
 }
 
-function getPartitionCanonicalKey(partition: InternalPlayer[][]): string {
-  return partition
-    .map((court) =>
-      court
-        .map((p) => p.id)
-        .sort()
-        .join(","),
+function hasAvailableFriend(
+  player: InternalPlayer,
+  availableIds: Set<string>,
+  friendMap: Map<string, Set<string>>,
+): boolean {
+  return [...(friendMap.get(player.id) ?? [])].some((id) => availableIds.has(id));
+}
+
+/**
+ * Select the highest-ranked available unsatisfied anchor.
+ * If every eligible anchor has been satisfied, a new cycle begins.
+ *
+ * If unsatisfied anchors exist but are resting / already allocated in this
+ * round, the cycle is not reset; the caller can use a fairness fallback.
+ */
+function getNextAnchor(
+  availablePlayers: InternalPlayer[],
+  cycle: AnchorCycle,
+): InternalPlayer | undefined {
+  resetAnchorCycleIfComplete(cycle);
+
+  return availablePlayers
+    .filter(
+      (player) =>
+        cycle.eligibleAnchorIds.has(player.id) &&
+        !cycle.satisfiedAnchorIds.has(player.id),
     )
-    .sort()
-    .join("|");
+    .sort(compareAnchorPriority)[0];
 }
 
-// Exact exhaustive search for small sessions (C <= 2, active <= 8)
-function exhaustivePartition(
-  players: InternalPlayer[],
-  courtCount: number,
+function getAvailableFriends(
+  anchor: InternalPlayer,
+  availableIds: Set<string>,
   friendMap: Map<string, Set<string>>,
-  state: ScheduleTrackingState,
-): InternalPlayer[][] {
-  if (courtCount === 1) {
-    return [players];
-  }
-
-  // Generate all C(players.length, 4) combinations for Court 1
-  function combinations(arr: InternalPlayer[], k: number): InternalPlayer[][] {
-    if (k === 0) return [[]];
-    if (arr.length === 0) return [];
-    const head = arr[0]!;
-    const tail = arr.slice(1);
-    const withHead = combinations(tail, k - 1).map((c) => [head, ...c]);
-    const withoutHead = combinations(tail, k);
-    return [...withHead, ...withoutHead];
-  }
-
-  const allCourt1 = combinations(players, PLAYERS_PER_COURT);
-  let bestPartition: InternalPlayer[][] | null = null;
-  let bestScore: PartitionScore = [Infinity, Infinity, Infinity];
-  let bestKey = "";
-
-  const seenKeys = new Set<string>();
-
-  for (const c1 of allCourt1) {
-    const c1Set = new Set(c1.map((p) => p.id));
-    const c2 = players.filter((p) => !c1Set.has(p.id));
-
-    // Normalize canonical key to eliminate court symmetry
-    const partition = [c1, c2];
-    const key = getPartitionCanonicalKey(partition);
-    if (seenKeys.has(key)) continue;
-    seenKeys.add(key);
-
-    const score = evaluatePartition(partition, friendMap, state);
-    const cmp = comparePartitionScores(score, bestScore);
-    if (cmp < 0 || (cmp === 0 && (bestKey === "" || key.localeCompare(bestKey) < 0))) {
-      bestScore = score;
-      bestPartition = partition;
-      bestKey = key;
-    }
-  }
-
-  return bestPartition ?? [players.slice(0, 4), players.slice(4, 8)];
+  byId: Map<string, InternalPlayer>,
+): InternalPlayer[] {
+  return [...(friendMap.get(anchor.id) ?? [])]
+    .filter((id) => availableIds.has(id))
+    .map((id) => byId.get(id))
+    .filter((player): player is InternalPlayer => player !== undefined);
 }
 
-// Multi-start 2-opt local search with full cross-court evaluation for C > 2
-function multiStart2OptPartition(
-  players: InternalPlayer[],
-  courtCount: number,
-  friendMap: Map<string, Set<string>>,
-  state: ScheduleTrackingState,
-): InternalPlayer[][] {
-  let bestPartition: InternalPlayer[][] | null = null;
-  let bestScore: PartitionScore = [Infinity, Infinity, Infinity];
-  let bestKey = "";
+/**
+ * Build one court using anchor-led friendship allocation.
+ *
+ * Nested-anchor behaviour:
+ * - Start with a primary anchor.
+ * - When one of their friends is also an unsatisfied anchor, promote that
+ *   friend to a nested anchor and follow their friend list before filling
+ *   with unrelated players.
+ * - Continue recursively, allowing chains such as A -> B -> C -> D.
+ * - After following a chain, use remaining preferences from anchors already
+ *   in the group, then try another available anchor + their friend (a second
+ *   two-person pair), and finally use fairness-ordered fallback players.
+ *
+ * An anchor is satisfied only when explicitly promoted/selected as an anchor.
+ * Merely being selected as somebody else's friend does not satisfy them.
+ */
+function buildCourtGroup(args: {
+  activePlayers: InternalPlayer[];
+  availableIds: Set<string>;
+  cycle: AnchorCycle;
+  friendMap: Map<string, Set<string>>;
+  byId: Map<string, InternalPlayer>;
+  state: ScheduleTrackingState;
+}): InternalPlayer[] {
+  const { activePlayers, availableIds, cycle, friendMap, byId, state } = args;
+  const group: InternalPlayer[] = [];
+  const anchorsUsed: InternalPlayer[] = [];
 
-  const NUM_RESTARTS = 5;
+  const addPlayer = (player: InternalPlayer): boolean => {
+    if (group.length >= PLAYERS_PER_COURT || !availableIds.has(player.id)) return false;
+    group.push(player);
+    availableIds.delete(player.id);
+    return true;
+  };
 
-  for (let restart = 0; restart < NUM_RESTARTS; restart++) {
-    let initialPermutation: InternalPlayer[];
-
-    if (restart === 0) {
-      // Restart 0: Friend-degree descending sort, tie-broken by rosterIndex
-      initialPermutation = [...players].sort((a, b) => {
-        const degA = a.normalizedFriendIds.filter((fid) => players.some((p) => p.id === fid)).length;
-        const degB = b.normalizedFriendIds.filter((fid) => players.some((p) => p.id === fid)).length;
-        if (degA !== degB) return degB - degA;
-        return a.rosterIndex - b.rosterIndex;
-      });
-    } else {
-      // Restarts 1..4: Seeded deterministic Fisher-Yates shuffle
-      initialPermutation = seededShuffle(players, restart * 1000 + 42);
+  const promoteAnchor = (player: InternalPlayer): void => {
+    if (!cycle.eligibleAnchorIds.has(player.id)) return;
+    if (cycle.satisfiedAnchorIds.has(player.id)) return;
+    cycle.satisfiedAnchorIds.add(player.id);
+    if (!anchorsUsed.some((anchor) => anchor.id === player.id)) {
+      anchorsUsed.push(player);
     }
+  };
 
-    // Chunk into court groups of 4
-    const currentPartition: InternalPlayer[][] = [];
-    for (let c = 0; c < courtCount; c++) {
-      currentPartition.push(initialPermutation.slice(c * 4, c * 4 + 4));
+  /**
+   * Follow one friendship branch deeply before returning to fill sibling
+   * preferences. This makes nested chains take precedence over unrelated
+   * direct friends when the court has limited spaces.
+   */
+  const followNestedPreferences = (anchor: InternalPlayer): void => {
+    if (group.length >= PLAYERS_PER_COURT) return;
+
+    const candidates = shuffle(
+      getAvailableFriends(anchor, availableIds, friendMap, byId),
+    );
+
+    // Prefer a friend who can act as another unsatisfied anchor and has at
+    // least one available friend of their own. This enables A -> B -> C -> D.
+    const nestedAnchors = candidates
+      .filter(
+        (candidate) =>
+          cycle.eligibleAnchorIds.has(candidate.id) &&
+          !cycle.satisfiedAnchorIds.has(candidate.id) &&
+          hasAvailableFriend(candidate, availableIds, friendMap),
+      )
+      .sort(compareAnchorPriority);
+
+    const ordinaryFriends = candidates.filter(
+      (candidate) => !nestedAnchors.some((nested) => nested.id === candidate.id),
+    );
+
+    const next = nestedAnchors[0] ?? ordinaryFriends[0];
+    if (!next || !addPlayer(next)) return;
+
+    if (
+      cycle.eligibleAnchorIds.has(next.id) &&
+      !cycle.satisfiedAnchorIds.has(next.id) &&
+      hasAvailableFriend(next, availableIds, friendMap)
+    ) {
+      promoteAnchor(next);
+      followNestedPreferences(next);
     }
+  };
 
-    let currentScore = evaluatePartition(currentPartition, friendMap, state);
-    let improved = true;
-    let iteration = 0;
+  // Primary anchor selection. If no unsatisfied anchor is currently
+  // available, use the fairest remaining active player as a fallback.
+  let primaryAnchor = getNextAnchor(
+    activePlayers.filter((player) => availableIds.has(player.id)),
+    cycle,
+  );
 
-    // Evaluate all cross-court 2-player swaps until local minimum
-    while (improved && iteration < 30) {
-      improved = false;
-      iteration += 1;
+  if (!primaryAnchor) {
+    primaryAnchor = activePlayers
+      .filter((player) => availableIds.has(player.id))
+      .sort((a, b) => compareGameFairness(a, b, state))[0];
+  }
 
-      for (let c1 = 0; c1 < courtCount; c1++) {
-        for (let c2 = c1 + 1; c2 < courtCount; c2++) {
-          const group1 = currentPartition[c1]!;
-          const group2 = currentPartition[c2]!;
+  if (!primaryAnchor) return group;
 
-          for (let i = 0; i < group1.length; i++) {
-            for (let j = 0; j < group2.length; j++) {
-              // Swap player group1[i] and group2[j]
-              const temp = group1[i]!;
-              group1[i] = group2[j]!;
-              group2[j] = temp;
+  addPlayer(primaryAnchor);
+  if (cycle.eligibleAnchorIds.has(primaryAnchor.id)) {
+    // Being explicitly chosen as the primary anchor satisfies this anchor
+    // opportunity even if all of their requested friends are unavailable.
+    promoteAnchor(primaryAnchor);
+  }
 
-              const candidateScore = evaluatePartition(currentPartition, friendMap, state);
+  // First follow a nested chain from the primary anchor.
+  if (cycle.eligibleAnchorIds.has(primaryAnchor.id)) {
+    followNestedPreferences(primaryAnchor);
+  }
 
-              // Accept swap if and only if the complete lexicographical objective strictly improves
-              if (comparePartitionScores(candidateScore, currentScore) < 0) {
-                currentScore = candidateScore;
-                improved = true;
-              } else {
-                // Revert swap
-                group2[j] = group1[i]!;
-                group1[i] = temp;
-              }
-            }
-          }
-        }
+  // Fill remaining spaces using preferences from every anchor already used.
+  // Iterate because a newly selected friend may itself be an anchor.
+  let changed = true;
+  while (group.length < PLAYERS_PER_COURT && changed) {
+    changed = false;
+
+    for (let index = 0; index < anchorsUsed.length; index++) {
+      const owner = anchorsUsed[index]!;
+      const candidates = shuffle(
+        getAvailableFriends(owner, availableIds, friendMap, byId),
+      );
+
+      const nested = candidates
+        .filter(
+          (candidate) =>
+            cycle.eligibleAnchorIds.has(candidate.id) &&
+            !cycle.satisfiedAnchorIds.has(candidate.id) &&
+            hasAvailableFriend(candidate, availableIds, friendMap),
+        )
+        .sort(compareAnchorPriority);
+
+      const next = nested[0] ?? candidates[0];
+      if (!next || !addPlayer(next)) continue;
+
+      changed = true;
+      if (
+        cycle.eligibleAnchorIds.has(next.id) &&
+        !cycle.satisfiedAnchorIds.has(next.id) &&
+        hasAvailableFriend(next, availableIds, friendMap)
+      ) {
+        promoteAnchor(next);
+        followNestedPreferences(next);
       }
-    }
 
-    const currentKey = getPartitionCanonicalKey(currentPartition);
-    const cmp = comparePartitionScores(currentScore, bestScore);
-    if (cmp < 0 || (cmp === 0 && (bestKey === "" || currentKey.localeCompare(bestKey) < 0))) {
-      bestScore = currentScore;
-      bestPartition = currentPartition.map((court) => [...court]);
-      bestKey = currentKey;
+      if (group.length >= PLAYERS_PER_COURT) break;
     }
   }
 
-  return bestPartition!;
+  // If there is room, try to combine another two-person preference pair.
+  // This is the A->B plus C->D case; requests may be one-way.
+  while (group.length <= PLAYERS_PER_COURT - 2) {
+    const remaining = activePlayers.filter((player) => availableIds.has(player.id));
+    const secondAnchor = getNextAnchor(remaining, cycle);
+    if (!secondAnchor) break;
+
+    const secondPairFriends = shuffle(
+      getAvailableFriends(secondAnchor, availableIds, friendMap, byId),
+    );
+    if (secondPairFriends.length === 0) {
+      // Do not mark this player satisfied: their own preference could not
+      // be used to form a pair. They remain eligible in a later round.
+      // Avoid repeatedly selecting this same anchor in this court.
+      const alternatives = remaining
+        .filter((player) => player.id !== secondAnchor.id)
+        .sort(compareAnchorPriority);
+      const alternative = alternatives.find((player) =>
+        hasAvailableFriend(player, availableIds, friendMap),
+      );
+      if (!alternative) break;
+
+      addPlayer(alternative);
+      promoteAnchor(alternative);
+      const friend = shuffle(
+        getAvailableFriends(alternative, availableIds, friendMap, byId),
+      )[0];
+      if (friend) addPlayer(friend);
+      break;
+    }
+
+    addPlayer(secondAnchor);
+    promoteAnchor(secondAnchor);
+    addPlayer(secondPairFriends[0]!);
+
+    // The second anchor's preference has now contributed to this team.
+    if (group.length < PLAYERS_PER_COURT) {
+      followNestedPreferences(secondAnchor);
+    }
+  }
+
+  // Final fallback: fill remaining places with the fairest available players.
+  const fallbackPlayers = activePlayers
+    .filter((player) => availableIds.has(player.id))
+    .sort((a, b) => compareGameFairness(a, b, state));
+
+  for (const player of fallbackPlayers) {
+    if (group.length >= PLAYERS_PER_COURT) break;
+    addPlayer(player);
+  }
+
+  return group;
 }
 
-// Stage 3: Optimize doubles 2v2 pairing within an assigned 4-player court
 type DoublesPairing = {
   teamA: [CourtRosterPlayer, CourtRosterPlayer];
   teamB: [CourtRosterPlayer, CourtRosterPlayer];
@@ -296,7 +385,6 @@ function optimizeDoublesMatchup(
   courtPlayers: InternalPlayer[],
   state: ScheduleTrackingState,
 ): DoublesPairing {
-  // Sort players alphabetically by ID for deterministic pairing evaluation
   const sorted = [...courtPlayers].sort((a, b) => a.id.localeCompare(b.id));
   const [p0, p1, p2, p3] = sorted;
 
@@ -304,15 +392,16 @@ function optimizeDoublesMatchup(
     throw new Error("Doubles pairing requires exactly 4 players.");
   }
 
-  const options: Array<{ team1: [InternalPlayer, InternalPlayer]; team2: [InternalPlayer, InternalPlayer] }> = [
-    { team1: [p0, p1], team2: [p2, p3] },
-    { team1: [p0, p2], team2: [p1, p3] },
-    { team1: [p0, p3], team2: [p1, p2] },
-  ];
+  const options: Array<{
+    team1: [InternalPlayer, InternalPlayer];
+    team2: [InternalPlayer, InternalPlayer];
+  }> = [
+      { team1: [p0, p1], team2: [p2, p3] },
+      { team1: [p0, p2], team2: [p1, p3] },
+      { team1: [p0, p3], team2: [p1, p2] },
+    ];
 
-  type MatchupScore = [number, number];
-
-  function evaluateMatchup(option: (typeof options)[number]): MatchupScore {
+  const score = (option: (typeof options)[number]): [number, number] => {
     const [a, b] = option.team1;
     const [c, d] = option.team2;
 
@@ -327,94 +416,42 @@ function optimizeDoublesMatchup(
       (state.doublesOpponents.get(b.id)?.get(d.id) ?? 0);
 
     return [partnerRepeats, opponentRepeats];
-  }
+  };
 
-  function compareMatchups(a: MatchupScore, b: MatchupScore): number {
-    if (a[0] !== b[0]) return a[0] - b[0]; // fewer partnership repeats
-    return a[1] - b[1]; // fewer opponent repeats
-  }
+  const compareScores = (a: [number, number], b: [number, number]) =>
+    a[0] - b[0] || a[1] - b[1];
 
-  let bestOption = options[0]!;
-  let bestScore = evaluateMatchup(options[0]!);
+  let best = options[0]!;
+  let bestScore = score(best);
 
-  for (let i = 1; i < options.length; i++) {
-    const option = options[i]!;
-    const score = evaluateMatchup(option);
-    if (compareMatchups(score, bestScore) < 0) {
-      bestScore = score;
-      bestOption = option;
+  for (const option of options.slice(1)) {
+    const optionScore = score(option);
+    if (compareScores(optionScore, bestScore) < 0) {
+      best = option;
+      bestScore = optionScore;
     }
   }
 
-  // Canonicalize team ordering:
-  // Sort players within each team alphabetically
-  const team1Sorted = [...bestOption.team1].sort((a, b) => a.id.localeCompare(b.id)) as [InternalPlayer, InternalPlayer];
-  const team2Sorted = [...bestOption.team2].sort((a, b) => a.id.localeCompare(b.id)) as [InternalPlayer, InternalPlayer];
+  const team1 = [...best.team1].sort((a, b) => a.id.localeCompare(b.id));
+  const team2 = [...best.team2].sort((a, b) => a.id.localeCompare(b.id));
 
-  // Team with alphabetically smaller first player is teamA
-  let teamA: [CourtRosterPlayer, CourtRosterPlayer];
-  let teamB: [CourtRosterPlayer, CourtRosterPlayer];
-  if (team1Sorted[0].id.localeCompare(team2Sorted[0].id) < 0) {
-    teamA = [
-      {
-        id: team1Sorted[0].id,
-        displayName: team1Sorted[0].displayName,
-        priority: team1Sorted[0].priority,
-        friendIds: team1Sorted[0].friendIds,
-      },
-      {
-        id: team1Sorted[1].id,
-        displayName: team1Sorted[1].displayName,
-        priority: team1Sorted[1].priority,
-        friendIds: team1Sorted[1].friendIds,
-      },
-    ];
-    teamB = [
-      {
-        id: team2Sorted[0].id,
-        displayName: team2Sorted[0].displayName,
-        priority: team2Sorted[0].priority,
-        friendIds: team2Sorted[0].friendIds,
-      },
-      {
-        id: team2Sorted[1].id,
-        displayName: team2Sorted[1].displayName,
-        priority: team2Sorted[1].priority,
-        friendIds: team2Sorted[1].friendIds,
-      },
-    ];
-  } else {
-    teamA = [
-      {
-        id: team2Sorted[0].id,
-        displayName: team2Sorted[0].displayName,
-        priority: team2Sorted[0].priority,
-        friendIds: team2Sorted[0].friendIds,
-      },
-      {
-        id: team2Sorted[1].id,
-        displayName: team2Sorted[1].displayName,
-        priority: team2Sorted[1].priority,
-        friendIds: team2Sorted[1].friendIds,
-      },
-    ];
-    teamB = [
-      {
-        id: team1Sorted[0].id,
-        displayName: team1Sorted[0].displayName,
-        priority: team1Sorted[0].priority,
-        friendIds: team1Sorted[0].friendIds,
-      },
-      {
-        id: team1Sorted[1].id,
-        displayName: team1Sorted[1].displayName,
-        priority: team1Sorted[1].priority,
-        friendIds: team1Sorted[1].friendIds,
-      },
-    ];
-  }
+  const firstTeamComesFirst = team1[0]!.id.localeCompare(team2[0]!.id) < 0;
+  const first = firstTeamComesFirst ? team1 : team2;
+  const second = firstTeamComesFirst ? team2 : team1;
 
-  return { teamA, teamB };
+  return {
+    teamA: [toRosterPlayer(first[0]!), toRosterPlayer(first[1]!)],
+    teamB: [toRosterPlayer(second[0]!), toRosterPlayer(second[1]!)],
+  };
+}
+
+function incrementPairCount(
+  map: Map<string, Map<string, number>>,
+  firstId: string,
+  secondId: string,
+): void {
+  const inner = map.get(firstId)!;
+  inner.set(secondId, (inner.get(secondId) ?? 0) + 1);
 }
 
 export function allocateCourtSchedule(
@@ -436,82 +473,144 @@ export function allocateCourtSchedule(
     throw new Error("Court allocation roster contains duplicate player IDs.");
   }
 
-  // Input normalization for 100% deterministic processing
-  const orderedRoster: InternalPlayer[] = [...roster]
-    .map((player) => ({
-      ...player,
-      priority: player.priority ?? 0,
-      normalizedFriendIds: [...(player.friendIds ?? [])].sort(),
-    }))
-    .sort(
-      (a, b) =>
-        a.priority - b.priority ||
-        a.id.localeCompare(b.id),
-    )
+  const rosterIds = new Set(roster.map((player) => player.id));
+  const incomingCounts = new Map<string, number>(roster.map((player) => [player.id, 0]));
+
+  for (const player of roster) {
+    for (const friendId of new Set(player.friendIds ?? [])) {
+      if (friendId !== player.id && rosterIds.has(friendId)) {
+        incomingCounts.set(friendId, (incomingCounts.get(friendId) ?? 0) + 1);
+      }
+    }
+  }
+
+  // Normalize outgoing requests. Keep requests for absent friends when
+  // determining anchor eligibility/ranking; friend selection itself is
+  // restricted to confirmed players in the current session. Self-requests
+  // and duplicate IDs are ignored.
+  const orderedRoster: InternalPlayer[] = roster
     .map((player, index) => ({
       ...player,
+      priority: player.priority ?? 0,
+      friendIds: [...(player.friendIds ?? [])],
+      normalizedFriendIds: [
+        ...new Set(player.friendIds ?? []),
+      ].filter((id) => id !== player.id),
+      incomingFriendCount: incomingCounts.get(player.id) ?? 0,
       rosterIndex: index,
-    }));
+      randomRank: Math.random(),
+    }))
+    .sort((a, b) => a.rosterIndex - b.rosterIndex);
 
-  const roundCount = Math.ceil(
-    session.durationMinutes / GAME_DURATION_MINUTES,
+  const byId = new Map(orderedRoster.map((player) => [player.id, player]));
+  const friendMap = new Map(
+    orderedRoster.map((player) => [
+      player.id,
+      new Set(player.normalizedFriendIds),
+    ]),
   );
 
-  // Doubles court capacity rule:
-  // Each doubles court must have exactly 4 players.
-  // Active courts cannot exceed available players divided by 4.
-  // If roster size < 4 (tiny roster), allow 1 partial court with all players.
+  // Eligible means the player has at least one outgoing request. A requested
+  // friend who is absent from this session cannot be selected, but their
+  // request still makes the requester eligible for an anchor opportunity.
+  const eligibleAnchorIds = new Set(
+    orderedRoster
+      .filter((player) => player.normalizedFriendIds.length > 0)
+      .map((player) => player.id),
+  );
+
+  const cycle: AnchorCycle = {
+    eligibleAnchorIds,
+    satisfiedAnchorIds: new Set<string>(),
+  };
+
+  const roundCount = Math.ceil(session.durationMinutes / GAME_DURATION_MINUTES);
   const activeCourtCount =
     orderedRoster.length < PLAYERS_PER_COURT
       ? 1
-      : Math.min(session.courtCount, Math.floor(orderedRoster.length / PLAYERS_PER_COURT));
-  const playersPerCourt = orderedRoster.length < PLAYERS_PER_COURT ? orderedRoster.length : PLAYERS_PER_COURT;
+      : Math.min(
+        session.courtCount,
+        Math.floor(orderedRoster.length / PLAYERS_PER_COURT),
+      );
+  const playersPerCourt =
+    orderedRoster.length < PLAYERS_PER_COURT
+      ? orderedRoster.length
+      : PLAYERS_PER_COURT;
   const activeSpotsPerRound = activeCourtCount * playersPerCourt;
 
-  // Initialize tracking state
   const state: ScheduleTrackingState = {
-    gamesPlayed: new Map(orderedRoster.map((p) => [p.id, 0])),
-    consecutiveRests: new Map(orderedRoster.map((p) => [p.id, 0])),
-    totalRests: new Map(orderedRoster.map((p) => [p.id, 0])),
-    lastPlayedRound: new Map(orderedRoster.map((p) => [p.id, -1])),
-    physicalCourtAssignments: new Map(orderedRoster.map((p) => [p.id, new Map()])),
-    courtCoPresence: new Map(orderedRoster.map((p) => [p.id, new Map()])),
-    doublesPartnerships: new Map(orderedRoster.map((p) => [p.id, new Map()])),
-    doublesOpponents: new Map(orderedRoster.map((p) => [p.id, new Map()])),
+    gamesPlayed: new Map(orderedRoster.map((player) => [player.id, 0])),
+    consecutiveRests: new Map(orderedRoster.map((player) => [player.id, 0])),
+    totalRests: new Map(orderedRoster.map((player) => [player.id, 0])),
+    lastPlayedRound: new Map(orderedRoster.map((player) => [player.id, -1])),
+    physicalCourtAssignments: new Map(
+      orderedRoster.map((player) => [player.id, new Map<number, number>()]),
+    ),
+    courtCoPresence: new Map(
+      orderedRoster.map((player) => [player.id, new Map<string, number>()]),
+    ),
+    doublesPartnerships: new Map(
+      orderedRoster.map((player) => [player.id, new Map<string, number>()]),
+    ),
+    doublesOpponents: new Map(
+      orderedRoster.map((player) => [player.id, new Map<string, number>()]),
+    ),
   };
-
-  const friendMap = new Map<string, Set<string>>(
-    orderedRoster.map((p) => [p.id, new Set(p.normalizedFriendIds)]),
-  );
 
   const schedule: AllocatedCourtGame[] = [];
 
   for (let roundIndex = 0; roundIndex < roundCount; roundIndex++) {
-    // Stage 1: Priority-based selection
-    const sortedCandidates = [...orderedRoster].sort((a, b) =>
-      compareSelectionPriority(a, b, state),
-    );
-    const activePlayers = sortedCandidates.slice(0, activeSpotsPerRound);
-    const activeSet = new Set(activePlayers.map((p) => p.id));
+    // HARD FAIRNESS RULE:
+    // Select players with the fewest games first. Among equal game counts,
+    // prefer the longest consecutive rest, then the greatest total rest.
+    const activePlayers = [...orderedRoster]
+      .sort((a, b) => compareGameFairness(a, b, state))
+      .slice(0, activeSpotsPerRound);
 
-    // Update rest and play tracking
+    const activeSet = new Set(activePlayers.map((player) => player.id));
+
     for (const player of orderedRoster) {
       if (activeSet.has(player.id)) {
-        state.gamesPlayed.set(player.id, (state.gamesPlayed.get(player.id) ?? 0) + 1);
+        state.gamesPlayed.set(
+          player.id,
+          (state.gamesPlayed.get(player.id) ?? 0) + 1,
+        );
         state.consecutiveRests.set(player.id, 0);
         state.lastPlayedRound.set(player.id, roundIndex);
       } else {
-        state.consecutiveRests.set(player.id, (state.consecutiveRests.get(player.id) ?? 0) + 1);
-        state.totalRests.set(player.id, (state.totalRests.get(player.id) ?? 0) + 1);
+        state.consecutiveRests.set(
+          player.id,
+          (state.consecutiveRests.get(player.id) ?? 0) + 1,
+        );
+        state.totalRests.set(
+          player.id,
+          (state.totalRests.get(player.id) ?? 0) + 1,
+        );
       }
     }
 
-    // Stage 2: Court Partitioning
-    let courtPartitions: InternalPlayer[][];
-    if (activeCourtCount <= 2) {
-      courtPartitions = exhaustivePartition(activePlayers, activeCourtCount, friendMap, state);
-    } else {
-      courtPartitions = multiStart2OptPartition(activePlayers, activeCourtCount, friendMap, state);
+    // Friendship-led team construction, while keeping each active player
+    // available for no more than one court in this round.
+    const availableIds = new Set(activePlayers.map((player) => player.id));
+    const courtGroups: InternalPlayer[][] = [];
+
+    for (let courtIndex = 0; courtIndex < activeCourtCount; courtIndex++) {
+      const group = buildCourtGroup({
+        activePlayers,
+        availableIds,
+        cycle,
+        friendMap,
+        byId,
+        state,
+      });
+
+      if (group.length !== playersPerCourt) {
+        throw new Error(
+          `Court ${courtIndex + 1} in round ${roundIndex + 1} has ${group.length} players; expected ${playersPerCourt}.`,
+        );
+      }
+
+      courtGroups.push(group);
     }
 
     const startOffset = roundIndex * GAME_DURATION_MINUTES;
@@ -521,42 +620,39 @@ export function allocateCourtSchedule(
       Math.min(startOffset + GAME_DURATION_MINUTES, session.durationMinutes),
     );
 
-    // Stage 3: Doubles Matchup within Court
-    for (let c = 0; c < courtPartitions.length; c++) {
-      const courtNumber = c + 1;
-      const courtGroup = courtPartitions[c]!;
+    for (let courtIndex = 0; courtIndex < courtGroups.length; courtIndex++) {
+      const courtNumber = courtIndex + 1;
+      const courtGroup = courtGroups[courtIndex]!;
 
-      // Update physical court assignments and court co-presence
       for (let i = 0; i < courtGroup.length; i++) {
-        const u = courtGroup[i]!;
-        const courtMap = state.physicalCourtAssignments.get(u.id)!;
-        courtMap.set(courtNumber, (courtMap.get(courtNumber) ?? 0) + 1);
+        const player = courtGroup[i]!;
+        const courtAssignments = state.physicalCourtAssignments.get(player.id)!;
+        courtAssignments.set(
+          courtNumber,
+          (courtAssignments.get(courtNumber) ?? 0) + 1,
+        );
 
         for (let j = i + 1; j < courtGroup.length; j++) {
-          const v = courtGroup[j]!;
-          const coPMapU = state.courtCoPresence.get(u.id)!;
-          coPMapU.set(v.id, (coPMapU.get(v.id) ?? 0) + 1);
-          const coPMapV = state.courtCoPresence.get(v.id)!;
-          coPMapV.set(u.id, (coPMapV.get(u.id) ?? 0) + 1);
+          const other = courtGroup[j]!;
+          incrementPairCount(state.courtCoPresence, player.id, other.id);
+          incrementPairCount(state.courtCoPresence, other.id, player.id);
         }
       }
 
       if (courtGroup.length === PLAYERS_PER_COURT) {
         const { teamA, teamB } = optimizeDoublesMatchup(courtGroup, state);
-
-        // Update partnerships
         const [a1, a2] = teamA;
         const [b1, b2] = teamB;
-        state.doublesPartnerships.get(a1.id)!.set(a2.id, (state.doublesPartnerships.get(a1.id)!.get(a2.id) ?? 0) + 1);
-        state.doublesPartnerships.get(a2.id)!.set(a1.id, (state.doublesPartnerships.get(a2.id)!.get(a1.id) ?? 0) + 1);
-        state.doublesPartnerships.get(b1.id)!.set(b2.id, (state.doublesPartnerships.get(b1.id)!.get(b2.id) ?? 0) + 1);
-        state.doublesPartnerships.get(b2.id)!.set(b1.id, (state.doublesPartnerships.get(b2.id)!.get(b1.id) ?? 0) + 1);
 
-        // Update opponents
+        incrementPairCount(state.doublesPartnerships, a1.id, a2.id);
+        incrementPairCount(state.doublesPartnerships, a2.id, a1.id);
+        incrementPairCount(state.doublesPartnerships, b1.id, b2.id);
+        incrementPairCount(state.doublesPartnerships, b2.id, b1.id);
+
         for (const playerA of teamA) {
           for (const playerB of teamB) {
-            state.doublesOpponents.get(playerA.id)!.set(playerB.id, (state.doublesOpponents.get(playerA.id)!.get(playerB.id) ?? 0) + 1);
-            state.doublesOpponents.get(playerB.id)!.set(playerA.id, (state.doublesOpponents.get(playerB.id)!.get(playerA.id) ?? 0) + 1);
+            incrementPairCount(state.doublesOpponents, playerA.id, playerB.id);
+            incrementPairCount(state.doublesOpponents, playerB.id, playerA.id);
           }
         }
 
@@ -566,22 +662,21 @@ export function allocateCourtSchedule(
           endAt,
           teamA,
           teamB,
-          players: [teamA[0], teamA[1], teamB[0], teamB[1]],
+          players: [...teamA, ...teamB],
         });
       } else {
-        // Small roster partial court (< 4 players)
+        // A partial court is only possible when the entire roster has < 4.
         schedule.push({
           courtNumber,
           startAt,
           endAt,
-          players: courtGroup.map((p) => ({ id: p.id, displayName: p.displayName, priority: p.priority })),
+          players: courtGroup.map(toRosterPlayer),
         });
       }
     }
   }
 
-  validateRound(schedule, activeCourtCount * roundCount, orderedRoster.length);
-
+  validateSchedule(schedule, activeCourtCount * roundCount, orderedRoster.length);
   return schedule;
 }
 
@@ -602,19 +697,28 @@ export function createPlayerGameSchedule(
     }));
 }
 
-function validateRound(
+function validateSchedule(
   games: AllocatedCourtGame[],
   expectedGameCount: number,
   rosterSize: number,
 ): void {
   if (games.length !== expectedGameCount) {
-    throw new Error(`Court allocation produced ${games.length} games; expected ${expectedGameCount}.`);
+    throw new Error(
+      `Court allocation produced ${games.length} games; expected ${expectedGameCount}.`,
+    );
   }
+
   const expectedPerGame = Math.min(PLAYERS_PER_COURT, rosterSize);
   for (const game of games) {
     if (game.players.length !== expectedPerGame) {
       throw new Error(
         `Court ${game.courtNumber} at ${game.startAt} has ${game.players.length} players; expected ${expectedPerGame}.`,
+      );
+    }
+
+    if (new Set(game.players.map((player) => player.id)).size !== game.players.length) {
+      throw new Error(
+        `Court ${game.courtNumber} at ${game.startAt} contains a duplicate player.`,
       );
     }
   }

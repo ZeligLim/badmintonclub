@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   allocateCourtSchedule,
   createPlayerGameSchedule,
+  type AllocatedCourtGame,
   type CourtRosterPlayer,
 } from "./court-schedule";
 import { runProductionBenchmark } from "./court-schedule.bench";
@@ -26,6 +27,25 @@ function makeRoster(
   return roster;
 }
 
+/**
+ * Builds a roster from an explicit list so that scenarios can name the
+ * players they care about.
+ */
+function makeNamedRoster(
+  players: Array<{
+    id: string;
+    friendIds?: string[];
+    priority?: number;
+  }>,
+): CourtRosterPlayer[] {
+  return players.map((player) => ({
+    id: player.id,
+    displayName: player.id,
+    priority: player.priority ?? 1,
+    friendIds: player.friendIds ?? [],
+  }));
+}
+
 function countGamesPerPlayer(
   schedule: ReturnType<typeof allocateCourtSchedule>,
   roster: CourtRosterPlayer[],
@@ -37,6 +57,42 @@ function countGamesPerPlayer(
     }
   }
   return counts;
+}
+
+function courtOf(
+  schedule: AllocatedCourtGame[],
+  playerId: string,
+): AllocatedCourtGame | undefined {
+  return schedule.find((game) => game.players.some((p) => p.id === playerId));
+}
+
+function courtPlayerIds(game: AllocatedCourtGame | undefined): string[] {
+  return (game?.players ?? []).map((player) => player.id).sort();
+}
+
+/**
+ * Counts the directed friend requests that end up on the same court.
+ */
+function countSatisfiedEdges(schedule: AllocatedCourtGame[]): number {
+  let satisfied = 0;
+  for (const game of schedule) {
+    const playerIds = new Set(game.players.map((p) => p.id));
+    for (const player of game.players) {
+      for (const friendId of player.friendIds ?? []) {
+        if (playerIds.has(friendId)) {
+          satisfied += 1;
+        }
+      }
+    }
+  }
+  return satisfied;
+}
+
+/**
+ * The rounds of a schedule, in the order they are played.
+ */
+function roundsOf(schedule: AllocatedCourtGame[]): string[] {
+  return [...new Set(schedule.map((game) => game.startAt))].sort();
 }
 
 describe("Court Scheduling Algorithm", () => {
@@ -105,8 +161,7 @@ describe("Court Scheduling Algorithm", () => {
     const roster = makeRoster(12);
     const schedule = allocateCourtSchedule(monday60min, roster);
 
-    const roundTimes = [...new Set(schedule.map((g) => g.startAt))];
-    for (const startAt of roundTimes) {
+    for (const startAt of roundsOf(schedule)) {
       const roundGames = schedule.filter((g) => g.startAt === startAt);
       const playerIdsInRound = roundGames.flatMap((g) => g.players.map((p) => p.id));
       const uniquePlayerIds = new Set(playerIdsInRound);
@@ -121,7 +176,7 @@ describe("Court Scheduling Algorithm", () => {
     const roster = makeRoster(10);
     const schedule = allocateCourtSchedule(monday60min, roster);
 
-    const rounds = [...new Set(schedule.map((g) => g.startAt))];
+    const rounds = roundsOf(schedule);
     const gamesPlayedSoFar = new Map<string, number>(roster.map((p) => [p.id, 0]));
 
     for (let r = 0; r < rounds.length; r++) {
@@ -162,7 +217,7 @@ describe("Court Scheduling Algorithm", () => {
     const roster = makeRoster(10);
     const schedule = allocateCourtSchedule(monday60min, roster);
 
-    const rounds = [...new Set(schedule.map((g) => g.startAt))];
+    const rounds = roundsOf(schedule);
     for (const player of roster) {
       const roundsPlayed = rounds.map((startAt) =>
         schedule.some((g) => g.startAt === startAt && g.players.some((p) => p.id === player.id)),
@@ -220,21 +275,8 @@ describe("Court Scheduling Algorithm", () => {
       roster,
     );
 
-    // Count satisfied directed edges on Court 1 and Court 2
-    let totalSatisfied = 0;
-    for (const game of schedule) {
-      const playerIds = new Set(game.players.map((p) => p.id));
-      for (const player of game.players) {
-        for (const fid of player.friendIds ?? []) {
-          if (playerIds.has(fid)) {
-            totalSatisfied += 1;
-          }
-        }
-      }
-    }
-
     // The mathematical maximum for this scenario is 6 satisfied edges
-    expect(totalSatisfied).toBe(6);
+    expect(countSatisfiedEdges(schedule)).toBe(6);
   });
 
   // T8: Isolated Friend Pair (Best-Effort Priority)
@@ -249,9 +291,9 @@ describe("Court Scheduling Algorithm", () => {
       roster,
     );
 
-    const game1 = schedule.find((g) => g.players.some((p) => p.id === "player-1"));
-    expect(game1).toBeDefined();
-    expect(game1?.players.some((p) => p.id === "player-2")).toBe(true);
+    const game = courtOf(schedule, "player-1");
+    expect(game).toBeDefined();
+    expect(game?.players.some((p) => p.id === "player-2")).toBe(true);
   });
 
   // T9: Full Friend Group of 4 (Best-Effort Priority)
@@ -269,9 +311,9 @@ describe("Court Scheduling Algorithm", () => {
     );
 
     // All 4 should occupy the exact same court
-    const court = schedule.find((g) => g.players.some((p) => p.id === "player-1"));
-    expect(court).toBeDefined();
-    const courtPlayerIds = new Set(court?.players.map((p) => p.id));
+    const courtPlayerIds = new Set(
+      courtOf(schedule, "player-1")?.players.map((p) => p.id),
+    );
     expect(courtPlayerIds.has("player-1")).toBe(true);
     expect(courtPlayerIds.has("player-2")).toBe(true);
     expect(courtPlayerIds.has("player-3")).toBe(true);
@@ -309,19 +351,309 @@ describe("Court Scheduling Algorithm", () => {
     expect(partnerPairsSeen.size).toBe(6); // 2 pairs per round x 3 unique rounds = 6 distinct team entries
   });
 
-  // T11: Deterministic Reproducibility (Hard Guarantee)
-  it("T11: produces 100% identical JSON schedules across repeated runs with identical input", () => {
+  // T11: Randomness Only Breaks Ties (docs/court-allocation.md, section 7)
+  //
+  // The allocation is randomised where the rules leave a choice open, so two
+  // runs of the same input may differ. What must not differ is the outcome of
+  // a scenario that has no tie to break.
+  it("T11: produces identical schedules across repeated runs when there is no tie to break", () => {
+    // A single priority-0 anchor with a chain of friends leaves no choice:
+    // A -> B -> C -> D is the only possible court.
+    const roster = makeNamedRoster([
+      { id: "A", friendIds: ["B"], priority: 0 },
+      { id: "B", friendIds: ["C"], priority: 5 },
+      { id: "C", friendIds: ["D"], priority: 5 },
+      { id: "D", priority: 5 },
+      { id: "E", priority: 9 },
+      { id: "F", priority: 9 },
+      { id: "G", priority: 9 },
+      { id: "H", priority: 9 },
+    ]);
+    const session = { id: "test", startsAt: "18:00", durationMinutes: 15, courtCount: 2 };
+
+    const first = JSON.stringify(allocateCourtSchedule(session, roster));
+    for (let run = 0; run < 25; run++) {
+      expect(JSON.stringify(allocateCourtSchedule(session, roster))).toBe(first);
+    }
+  });
+
+  // T12: Randomness Never Breaks the Hard Guarantees (docs/court-allocation.md, sections 6 to 8)
+  it("T12: keeps every hard guarantee in scenarios that are full of ties", () => {
     const friendPreferences: Record<string, string[]> = {
-      "player-1": ["player-2", "player-3"],
-      "player-5": ["player-6"],
-      "player-10": ["player-11", "player-12"],
+      "player-1": ["player-2", "player-3", "player-4"],
+      "player-2": ["player-3", "player-5", "player-6"],
+      "player-3": ["player-1", "player-2", "player-7"],
+      "player-4": ["player-1", "player-2"],
+      "player-5": ["player-2"],
+      "player-6": ["player-1", "player-3"],
+      "player-7": ["player-3", "player-8"],
+      "player-8": ["player-4", "player-7"],
     };
-    const roster = makeRoster(20, { friendPreferences });
+    const roster = makeRoster(10, { friendPreferences });
 
-    const scheduleA = allocateCourtSchedule(wednesday120min, roster);
-    const scheduleB = allocateCourtSchedule(wednesday120min, roster);
+    for (let run = 0; run < 40; run++) {
+      const schedule = allocateCourtSchedule(monday60min, roster);
 
-    expect(JSON.stringify(scheduleA)).toBe(JSON.stringify(scheduleB));
+      // Every court is full and every player is on at most one court a round.
+      for (const game of schedule) {
+        expect(game.players).toHaveLength(4);
+        expect(new Set(game.players.map((p) => p.id)).size).toBe(4);
+      }
+      for (const startAt of roundsOf(schedule)) {
+        const ids = schedule
+          .filter((g) => g.startAt === startAt)
+          .flatMap((g) => g.players.map((p) => p.id));
+        expect(new Set(ids).size).toBe(ids.length);
+      }
+
+      // The number of games is exactly courts x rounds.
+      expect(schedule).toHaveLength(monday60min.courtCount * 4);
+    }
+  });
+
+  // A1: One-Way Friend Requests (docs/court-allocation.md, section 2)
+  it("A1: honours a one-way friend request without needing a mutual request", () => {
+    const roster = makeNamedRoster([
+      { id: "A", friendIds: ["B"] },
+      { id: "B" },
+      { id: "C" },
+      { id: "D" },
+      { id: "E" },
+      { id: "F" },
+      { id: "G" },
+      { id: "H" },
+    ]);
+    const session = { id: "test", startsAt: "18:00", durationMinutes: 15, courtCount: 2 };
+
+    for (let run = 0; run < 25; run++) {
+      const schedule = allocateCourtSchedule(session, roster);
+      const court = courtOf(schedule, "A");
+      expect(court).toBeDefined();
+      expect(courtPlayerIds(court)).toContain("B");
+    }
+  });
+
+  // A2: Anchor Ranking - Committee Precedence (docs/court-allocation.md, section 3)
+  it("A2: gives a committee member the contested friend before a non-committee anchor", () => {
+    // Both anchors ask for F, so only one of them can have F.
+    const roster = makeNamedRoster([
+      { id: "COM", friendIds: ["F"], priority: 0 },
+      { id: "POP", friendIds: ["F"], priority: 1 },
+      { id: "F" },
+      { id: "E" },
+      { id: "G" },
+      { id: "H" },
+      { id: "I" },
+      { id: "J" },
+    ]);
+    const session = { id: "test", startsAt: "18:00", durationMinutes: 15, courtCount: 2 };
+
+    for (let run = 0; run < 25; run++) {
+      const schedule = allocateCourtSchedule(session, roster);
+      expect(courtPlayerIds(courtOf(schedule, "COM"))).toContain("F");
+    }
+  });
+
+  // A3: Anchor Ranking - Incoming Requests Before Outgoing Ones (docs/court-allocation.md, section 3)
+  it("A3: prefers the anchor with more incoming requests over the one with more outgoing requests", () => {
+    // P1 has two incoming requests but only one outgoing request; P2 has one
+    // incoming request but three outgoing ones. Both ask for F.
+    const roster = makeNamedRoster([
+      { id: "P1", friendIds: ["F"] },
+      { id: "P2", friendIds: ["F", "G", "H"] },
+      { id: "P3", friendIds: ["P1"] },
+      { id: "P4", friendIds: ["P1"] },
+      { id: "F" },
+      { id: "G" },
+      { id: "H" },
+      { id: "I" },
+      { id: "J" },
+      { id: "K" },
+    ]);
+    const session = { id: "test", startsAt: "18:00", durationMinutes: 15, courtCount: 2 };
+
+    for (let run = 0; run < 25; run++) {
+      const schedule = allocateCourtSchedule(session, roster);
+      expect(courtPlayerIds(courtOf(schedule, "P1"))).toContain("F");
+    }
+  });
+
+  // A4: Anchor Ranking - Outgoing Requests Break The Remaining Tie (docs/court-allocation.md, section 3)
+  it("A4: prefers the anchor with more outgoing requests when the incoming counts are equal", () => {
+    const roster = makeNamedRoster([
+      { id: "P1", friendIds: ["F", "G", "H"] },
+      { id: "P2", friendIds: ["F"] },
+      { id: "F" },
+      { id: "G" },
+      { id: "H" },
+      { id: "I" },
+      { id: "J" },
+      { id: "K" },
+      { id: "L" },
+    ]);
+    const session = { id: "test", startsAt: "18:00", durationMinutes: 15, courtCount: 2 };
+
+    for (let run = 0; run < 25; run++) {
+      const schedule = allocateCourtSchedule(session, roster);
+      expect(courtPlayerIds(courtOf(schedule, "P1"))).toContain("F");
+    }
+  });
+
+  // A5: Nested Anchors (docs/court-allocation.md, section 5.1)
+  it("A5: follows a chain of nested anchors onto one court", () => {
+    // A -> B, B -> C, C -> D. Every link in the chain is followed, so the
+    // four players share a court.
+    const roster = makeNamedRoster([
+      { id: "A", friendIds: ["B"], priority: 0 },
+      { id: "B", friendIds: ["C"], priority: 5 },
+      { id: "C", friendIds: ["D"], priority: 5 },
+      { id: "D", priority: 5 },
+      { id: "E", priority: 9 },
+      { id: "F", priority: 9 },
+      { id: "G", priority: 9 },
+      { id: "H", priority: 9 },
+    ]);
+    const session = { id: "test", startsAt: "18:00", durationMinutes: 15, courtCount: 2 };
+
+    for (let run = 0; run < 25; run++) {
+      const schedule = allocateCourtSchedule(session, roster);
+      expect(courtPlayerIds(courtOf(schedule, "A"))).toEqual([
+        "A",
+        "B",
+        "C",
+        "D",
+      ]);
+    }
+  });
+
+  // A6: Two-Person Friendship Pairs (docs/court-allocation.md, section 5.2)
+  it("A6: combines two two-person preference pairs into one court", () => {
+    const roster = makeNamedRoster([
+      { id: "A", friendIds: ["B"] },
+      { id: "B" },
+      { id: "C", friendIds: ["D"] },
+      { id: "D" },
+      { id: "E" },
+      { id: "F" },
+      { id: "G" },
+      { id: "H" },
+    ]);
+    const session = { id: "test", startsAt: "18:00", durationMinutes: 15, courtCount: 2 };
+
+    for (let run = 0; run < 25; run++) {
+      const schedule = allocateCourtSchedule(session, roster);
+      const court = courtOf(schedule, "A");
+      const playerIds = courtPlayerIds(court);
+      expect(playerIds).toContain("B");
+      expect(playerIds).toContain("C");
+      expect(playerIds).toContain("D");
+    }
+  });
+
+  // A7: Anchor Satisfaction Cycles (docs/court-allocation.md, section 4)
+  //
+  // B is only ever taken along as somebody else's friend in the first round,
+  // because their own friend C is already on another court. Being somebody
+  // else's friend does not satisfy an anchor, so B gets their own anchor
+  // turn in the next round and plays with C.
+  it("A7: keeps an unsatisfied anchor's own friend for a later round", () => {
+    const roster = makeNamedRoster([
+      { id: "H", friendIds: ["C"], priority: 0 },
+      { id: "A", friendIds: ["B"], priority: 1 },
+      { id: "B", friendIds: ["C"], priority: 2 },
+      { id: "C", friendIds: ["D"], priority: 3 },
+      { id: "D", priority: 4 },
+      { id: "E", priority: 5 },
+      { id: "F", priority: 6 },
+      { id: "G", priority: 7 },
+    ]);
+    const session = { id: "test", startsAt: "18:00", durationMinutes: 30, courtCount: 2 };
+
+    for (let run = 0; run < 25; run++) {
+      const schedule = allocateCourtSchedule(session, roster);
+      const firstRound = schedule.filter((game) => game.startAt === "18:00");
+      const secondRound = schedule.filter((game) => game.startAt === "18:15");
+
+      // C is taken by the leading anchor's court in the first round, so B
+      // cannot be with their own friend yet.
+      expect(courtPlayerIds(courtOf(firstRound, "C"))).toContain("C");
+      expect(courtPlayerIds(courtOf(firstRound, "B"))).not.toContain("C");
+
+      // In the next round B is an unsatisfied anchor and plays with C.
+      expect(courtPlayerIds(courtOf(secondRound, "B"))).toContain("C");
+    }
+  });
+
+  // A8: Game Fairness Is A Hard Constraint (docs/court-allocation.md, section 6)
+  it("A8: never gives a player a second game before everyone has had a first", () => {
+    const sessions = [
+      { session: monday60min, rosterSizes: [9, 10, 12, 16] },
+      { session: wednesday120min, rosterSizes: [16, 20, 24] },
+    ];
+
+    for (const { session, rosterSizes } of sessions) {
+      for (const rosterSize of rosterSizes) {
+        const roster = makeRoster(rosterSize);
+        const schedule = allocateCourtSchedule(session, roster);
+        const gamesPlayed = new Map<string, number>(
+          roster.map((player) => [player.id, 0]),
+        );
+
+        for (const startAt of roundsOf(schedule)) {
+          // Before the round, nobody is more than one game ahead of anybody else.
+          const counts = Array.from(gamesPlayed.values());
+          expect(Math.max(...counts) - Math.min(...counts)).toBeLessThanOrEqual(1);
+
+          for (const game of schedule.filter((g) => g.startAt === startAt)) {
+            for (const player of game.players) {
+              gamesPlayed.set(
+                player.id,
+                (gamesPlayed.get(player.id) ?? 0) + 1,
+              );
+            }
+          }
+        }
+      }
+    }
+  });
+
+  // A9: Requests For Players Who Are Not In The Session (docs/court-allocation.md, section 8:
+  // "Never allocate a player who is not available.")
+  it("A9: ignores a request for a player who is not in the session", () => {
+    const roster = makeNamedRoster([
+      { id: "A", friendIds: ["GHOST"] },
+      { id: "B" },
+      { id: "C" },
+      { id: "D" },
+    ]);
+    const schedule = allocateCourtSchedule(
+      { id: "test", startsAt: "18:00", durationMinutes: 15, courtCount: 1 },
+      roster,
+    );
+
+    expect(schedule).toHaveLength(1);
+    expect(schedule[0]!.players).toHaveLength(4);
+  });
+
+  // A10: The Allocation Rejects Broken Input
+  it("A10: rejects a roster and a session it cannot allocate", () => {
+    const session = { id: "test", startsAt: "18:00", durationMinutes: 60, courtCount: 2 };
+
+    expect(() => allocateCourtSchedule(session, [])).toThrow(
+      /at least one confirmed player/,
+    );
+    expect(() =>
+      allocateCourtSchedule(session, [
+        { id: "A", displayName: "A" },
+        { id: "A", displayName: "A again" },
+      ]),
+    ).toThrow(/duplicate player IDs/);
+    expect(() =>
+      allocateCourtSchedule({ ...session, durationMinutes: 0 }, makeRoster(4)),
+    ).toThrow(/positive whole-number session duration/);
+    expect(() =>
+      allocateCourtSchedule({ ...session, courtCount: 0 }, makeRoster(4)),
+    ).toThrow(/at least one court/);
   });
 
   // Extra Test: createPlayerGameSchedule integration
