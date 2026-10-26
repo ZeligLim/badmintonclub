@@ -104,6 +104,7 @@ export async function addDevFriend(formData: FormData) {
     .from("club_friend_list")
     .insert({ user_id: user.id, friend_user_id: friend.id });
   if (error && error.code !== "23505") throw new Error(error.message);
+  await supabase.from("session_timetables").delete().neq("session_id", "00000000-0000-0000-0000-000000000000");
   revalidatePath("/dev");
 }
 
@@ -124,6 +125,7 @@ export async function removeDevFriend(formData: FormData) {
     .eq("user_id", user.id)
     .eq("friend_user_id", friend.id);
   if (error) throw new Error(error.message);
+  await supabase.from("session_timetables").delete().neq("session_id", "00000000-0000-0000-0000-000000000000");
   revalidatePath("/dev");
 }
 
