@@ -16,7 +16,7 @@ import type {
   SessionSignupStatus,
   SessionStatus,
 } from "../types";
-import { getCourtCount, createPlayerGameSchedule } from "../court-schedule";
+import { allocateCourtSchedule, getCourtCount } from "../court-schedule";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type DashboardSessionRow =
@@ -151,24 +151,6 @@ export async function loadDashboardData(): Promise<DashboardData> {
           });
         }
       }
-      const { data: persistedTimetableRows } =
-        confirmedSessionIds.length
-          ? await (async () => {
-              const admin2 = createAdminClient();
-              return admin2
-                .from("session_timetables")
-                .select("session_id, court_schedule")
-                .in("session_id", confirmedSessionIds);
-            })()
-          : { data: [] };
-
-      const persistedTimetableMap = new Map(
-        (persistedTimetableRows ?? []).map((row) => [
-          row.session_id,
-          row.court_schedule,
-        ]),
-      );
-
       const prefsBySession = new Map<string, Map<string, string[]>>();
       for (const pref of allFriendPrefs ?? []) {
         const sessionMap = prefsBySession.get(pref.session_id) ?? new Map();
@@ -186,22 +168,25 @@ export async function loadDashboardData(): Promise<DashboardData> {
           priority: player.slot_number ?? 1,
           friendIds: sessionPrefs.get(player.user_id) ?? [],
         }));
-        const persistedSchedule = persistedTimetableMap.get(sessionRow.id);
-        const yourGames = Array.isArray(persistedSchedule)
-          ? (persistedSchedule as any[])
-              .filter((game) =>
-                Array.isArray(game?.players) &&
-                game.players.some((player: any) => player?.id === user.id),
-              )
-              .map((game) => ({
-                courtNumber: game.courtNumber,
-                startAt: game.startAt,
-                endAt: game.endAt,
-                courtPlayers: game.players
-                  .filter((player: any) => player?.id !== user.id)
-                  .map((player: any) => player.displayName ?? player),
-              }))
-          : [];
+        const schedule = allocateCourtSchedule(
+          {
+            id: sessionRow.id,
+            startsAt: sessionRow.starts_at,
+            durationMinutes: sessionRow.duration_minutes,
+            courtCount: getCourtCount(sessionRow.capacity),
+          },
+          rosterPlayers,
+        );
+        const yourGames = schedule
+          .filter((game) => game.players.some((player) => player.id === user.id))
+          .map((game) => ({
+            courtNumber: game.courtNumber,
+            startAt: game.startAt,
+            endAt: game.endAt,
+            courtPlayers: game.players
+              .filter((player) => player.id !== user.id)
+              .map((player) => player.displayName),
+          }));
         userPlayerGameSchedules.set(sessionRow.id, yourGames);
       }
     } catch (error) {

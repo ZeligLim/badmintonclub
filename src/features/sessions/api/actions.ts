@@ -46,14 +46,17 @@ export async function updateSessionFriendPreferences(
 }
 
 async function invalidateSessionTimetable(sessionId: string): Promise<void> {
-  try {
-    const admin = createAdminClient();
-    await admin
-      .from("session_timetables")
-      .delete()
-      .eq("session_id", sessionId);
-  } catch (error) {
-    console.error("Could not invalidate session timetable.", error);
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("session_timetables")
+    .delete()
+    .eq("session_id", sessionId);
+
+  if (error) {
+    console.error("Could not invalidate session timetable.", {
+      code: error.code,
+    });
+    throw new Error("Could not refresh this session’s court matching.");
   }
 }
 export async function searchClubMembers(
