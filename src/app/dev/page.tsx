@@ -7,7 +7,6 @@ import {
   createTestAccount,
   deleteTestAccount,
   randomSessionSignups,
-  removeDevFriend,
   seedTestAccounts,
 } from "./actions";
 import { VirtualTimeControl } from "./VirtualTimeControl";
@@ -22,40 +21,6 @@ type Row = {
   level: string;
   role: string;
 };
-
-type FriendPair = {
-  friendEmail: string;
-  friendId: string;
-  userEmail: string;
-  userId: string;
-};
-
-async function loadFriendPairs(): Promise<FriendPair[]> {
-  const supabase = createAdminClient();
-  const { data: userRows, error: userError } = await supabase.rpc(
-    "list_dev_test_users",
-  );
-  if (userError) throw new Error(userError.message);
-
-  const { data: pairRows, error: pairError } =
-    await supabase.from("club_friend_list").select("user_id, friend_user_id");
-  if (pairError) throw new Error(pairError.message);
-
-  const userById = new Map(
-    (userRows ?? []).map((user: { email: string; id: string }) => [
-      user.id,
-      user.email,
-    ]),
-  );
-  return (pairRows ?? [])
-    .map((pair: { friend_user_id: string; user_id: string }) => ({
-      friendEmail: userById.get(pair.friend_user_id) ?? pair.friend_user_id,
-      friendId: pair.friend_user_id,
-      userEmail: userById.get(pair.user_id) ?? pair.user_id,
-      userId: pair.user_id,
-    }))
-    .filter((pair) => pair.userEmail && pair.friendEmail);
-}
 
 async function loadRows(): Promise<Row[]> {
   const supabase = createAdminClient();
@@ -90,7 +55,6 @@ export default async function DevPage() {
   }
 
   const rows = await loadRows();
-  const friendPairs = await loadFriendPairs();
 
   return (
     <main className="min-h-screen bg-background px-4 py-10 sm:px-8">
@@ -118,20 +82,20 @@ export default async function DevPage() {
           className="mb-6 grid gap-3 rounded-xl bg-muted/40 p-4 sm:grid-cols-4"
         >
           <input
-            className="h-9 rounded-md bg-background px-2.5 text-sm"
+            className="h-9 rounded-md bg-muted px-2.5 text-sm"
             name="email"
             placeholder="email@atu.ie"
             required
             type="email"
           />
           <input
-            className="h-9 rounded-md bg-background px-2.5 text-sm"
+            className="h-9 rounded-md bg-muted px-2.5 text-sm"
             name="displayName"
             placeholder="Display name"
             type="text"
           />
           <select
-            className="h-9 rounded-md bg-background px-2.5 text-sm"
+            className="h-9 rounded-md bg-muted px-2.5 text-sm"
             name="role"
           >
             <option value="player">Player</option>
@@ -153,7 +117,7 @@ export default async function DevPage() {
           <label className="flex flex-col gap-1 text-sm font-medium">
             Accounts to seed
             <input
-              className="h-9 rounded-md bg-background px-2.5 text-sm"
+              className="h-9 rounded-md bg-muted px-2.5 text-sm"
               defaultValue="40"
               max="200"
               min="1"
@@ -204,7 +168,7 @@ export default async function DevPage() {
                         value={row.email}
                       />
                       <input
-                        className="h-8 min-w-48 rounded-md bg-background px-2 text-xs"
+                        className="h-8 min-w-48 rounded-md bg-muted px-2 text-xs"
                         name="friendEmail"
                         placeholder="add friend@atu.ie"
                         required
@@ -241,7 +205,7 @@ export default async function DevPage() {
           <label className="flex flex-col gap-1 text-sm font-medium">
             Players per open session
             <input
-              className="h-9 rounded-md bg-background px-2.5 text-sm"
+              className="h-9 rounded-md bg-muted px-2.5 text-sm"
               defaultValue="8"
               max="100"
               min="1"

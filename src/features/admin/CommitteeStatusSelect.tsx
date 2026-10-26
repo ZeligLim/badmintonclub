@@ -59,7 +59,7 @@ export function CommitteeStatusSelect({
       ) : (
         <select
           aria-label={`${displayName} committee status`}
-          className="h-7 rounded-md border-0 bg-background px-2 py-0 outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="h-7 rounded-md border-0 bg-muted px-2 py-0 outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           onChange={(event) => changeCommitteeStatus(event.target.value)}
           value={isCommittee ? "true" : "false"}
         >
