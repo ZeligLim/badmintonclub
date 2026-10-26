@@ -90,7 +90,7 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
                       return (
                         <div
                           key={courtNumber}
-                          className="min-w-0 rounded-lg bg-secondary/30 p-2"
+                          className="min-w-0 rounded-lg bg-background p-2"
                         >
                           <div className="mb-1 text-xs font-semibold text-muted-foreground">
                             Court {courtNumber}
