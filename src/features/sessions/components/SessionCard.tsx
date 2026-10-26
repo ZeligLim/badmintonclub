@@ -372,7 +372,7 @@ export function SessionCard({
                 {!isSignedIn && session.status !== "cancelled" ? (
                   <Link
                     className="text-xs font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    href="https://badmintonclub.vercel.app/sign-in"
+                    href="/sign-in"
                   >
                     Sign in to join
                   </Link>
