@@ -269,7 +269,7 @@ isOneToOne: false
                            },
 "list_dev_test_users":
 { Args: Record<PropertyKey, never>; Returns: {
-              "configured_friend_email": string,"display_name": string,"email": string,"friend_count": number,"id": string,"is_committee": boolean,"is_committee_admin": boolean,"player_level": string
+              "configured_friend_emails": (string)[],"display_name": string,"email": string,"friend_count": number,"id": string,"is_committee": boolean,"is_committee_admin": boolean,"player_level": string
             }[]
                            },
 "now":

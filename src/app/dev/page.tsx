@@ -15,7 +15,7 @@ import { VirtualTimeControl } from "./VirtualTimeControl";
 export const instant = false;
 
 type Row = {
-  configuredFriend: string;
+  configuredFriends: string[];
   friendCount: number;
   id: string;
   email: string;
@@ -63,16 +63,16 @@ async function loadRows(): Promise<Row[]> {
   if (error) throw new Error(error.message);
 
   return (data ?? []).map((row: {
-    configured_friend_email: string | null;
+    configured_friend_emails: string[];
     email: string;
-    friend_count: number | null;
+    friend_count: number;
     id: string;
-    is_committee: boolean | null;
-    is_committee_admin: boolean | null;
-    player_level: string | null;
+    is_committee: boolean;
+    is_committee_admin: boolean;
+    player_level: string;
   }) => ({
+    configuredFriends: row.configured_friend_emails ?? [],
     email: row.email,
-    configuredFriend: row.configured_friend_email ?? "",
     friendCount: Number(row.friend_count ?? 0),
     id: row.id,
     level: row.player_level ?? "—",
@@ -189,6 +189,11 @@ export default async function DevPage() {
                   <td className="px-3 py-2">{row.role}</td>
                   <td className="px-3 py-2">{row.level}</td>
                   <td className="px-3 py-2">
+                    <div className="mb-1 text-xs text-muted-foreground">
+                      {row.configuredFriends.length > 0
+                        ? row.configuredFriends.join(", ")
+                        : "No friends configured"}
+                    </div>
                     <form
                       action={addDevFriend}
                       className="flex min-w-48 items-center gap-2"
@@ -200,9 +205,8 @@ export default async function DevPage() {
                       />
                       <input
                         className="h-8 min-w-48 rounded-md bg-background px-2 text-xs"
-                        defaultValue={row.configuredFriend}
                         name="friendEmail"
-                        placeholder="friend@atu.ie"
+                        placeholder="add friend@atu.ie"
                         required
                         type="email"
                       />
