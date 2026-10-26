@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 
+import { VirtualTimeControl } from "./VirtualTimeControl";
+
 export const instant = false;
 
 const TEST_ACCOUNTS = [
@@ -23,6 +25,10 @@ export default async function DevPage() {
         <p className="mb-8 text-sm text-muted-foreground">
           This page is development-only. It lists accounts seeded in the local database.
         </p>
+
+        <section className="rounded-xl border border-border bg-card p-4">
+          <VirtualTimeControl />
+        </section>
 
         <section className="rounded-xl border border-border bg-card p-4">
           <h2 className="mb-4 text-lg font-semibold">Test accounts</h2>
