@@ -70,9 +70,7 @@ export default async function DevPage() {
           in a new tab after requesting a magic link at <code>/sign-in</code>.
         </p>
 
-        <section className="mb-6 rounded-xl bg-muted/40 p-4">
-          <VirtualTimeControl />
-        </section>
+        <VirtualTimeControl />
 
         <form
           action={createTestAccount}
