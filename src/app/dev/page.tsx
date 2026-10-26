@@ -33,7 +33,7 @@ export default async function DevPage() {
                   <th className="px-3 py-2 font-medium">Email</th>
                   <th className="px-3 py-2 font-medium">Role</th>
                   <th className="px-3 py-2 font-medium">Level</th>
-                  <th className="px-3 py-2 font-medium">How to sign in</th>
+                  <th className="px-3 py-2 font-medium">Mailpit (sign-in links)</th>
                 </tr>
               </thead>
               <tbody>
@@ -45,9 +45,16 @@ export default async function DevPage() {
                     <td className="px-3 py-2">{account.role}</td>
                     <td className="px-3 py-2">{account.level}</td>
                     <td className="px-3 py-2">
-                      Request a magic link at <code>/sign-in</code>, then open
-                      it from Mailpit at{" "}
-                      <code>http://127.0.0.1:54324</code>.
+                      Open{" "}
+                      <a
+                        href="http://127.0.0.1:54324"
+                        rel="noreferrer"
+                        target="_blank"
+                        className="font-medium text-primary underline-offset-4 hover:underline"
+                      >
+                        Mailpit
+                      </a>{" "}
+                      after requesting a magic link at <code>/sign-in</code>.
                     </td>
                   </tr>
                 ))}
