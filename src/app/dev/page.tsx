@@ -166,76 +166,6 @@ export default async function DevPage() {
           </button>
         </form>
 
-        <form
-          action={addDevFriend}
-          className="mb-6 grid gap-3 rounded-xl bg-muted/40 p-4 sm:grid-cols-3"
-        >
-          <input
-            className="h-9 rounded-md bg-background px-2.5 text-sm"
-            name="userEmail"
-            placeholder="user@atu.ie"
-            required
-            type="email"
-          />
-          <input
-            className="h-9 rounded-md bg-background px-2.5 text-sm"
-            name="friendEmail"
-            placeholder="friend@atu.ie"
-            required
-            type="email"
-          />
-          <button
-            className="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
-            type="submit"
-          >
-            Add friend shortcut
-          </button>
-        </form>
-
-        {friendPairs.length > 0 && (
-          <div className="mb-6 rounded-xl bg-muted/40 p-4">
-            <table className="min-w-full border-collapse text-sm">
-              <thead>
-                <tr>
-                  <th className="px-3 py-2 text-left font-medium">User</th>
-                  <th className="px-3 py-2 text-left font-medium">Configured friend</th>
-                  <th className="px-3 py-2 text-left font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {friendPairs.map((pair) => (
-                  <tr key={`${pair.userId}-${pair.friendId}`}>
-                    <td className="px-3 py-2 font-mono text-xs">
-                      {pair.userEmail}
-                    </td>
-                    <td className="px-3 py-2 font-mono text-xs">
-                      {pair.friendEmail}
-                    </td>
-                    <td className="px-3 py-2">
-                      <form
-                        action={removeDevFriend.bind(
-                          null,
-                          Object.fromEntries([
-                            ["userEmail", pair.userEmail],
-                            ["friendEmail", pair.friendEmail],
-                          ]) as unknown as FormData,
-                        )}
-                      >
-                        <button
-                          className="h-7 rounded-md bg-destructive/10 px-3 text-xs font-medium text-destructive"
-                          type="submit"
-                        >
-                          Remove
-                        </button>
-                      </form>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
         <div className="rounded-xl bg-muted/40 p-4">
           <table className="min-w-full border-collapse text-sm">
             <thead>
@@ -256,10 +186,28 @@ export default async function DevPage() {
                   <td className="px-3 py-2">{row.role}</td>
                   <td className="px-3 py-2">{row.level}</td>
                   <td className="px-3 py-2">
-                    {row.friendCount} saved friend
-                    {row.friendCount === 1 ? "" : "s"}.
-                    Configure by signing in and using the session
-                    &ldquo;Play with friends&rdquo; picker.
+                    <form
+                      action={addDevFriend}
+                      className="flex min-w-48 items-center gap-2"
+                    >
+                      <input
+                        name="userEmail"
+                        type="hidden"
+                        value={row.email}
+                      />
+                      <input
+                        className="h-8 min-w-0 rounded-md bg-background px-2 text-xs"
+                        name="friendEmail"
+                        placeholder="friend@atu.ie"
+                        type="email"
+                      />
+                      <button
+                        className="h-8 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground"
+                        type="submit"
+                      >
+                        Save
+                      </button>
+                    </form>
                   </td>
                   <td className="px-3 py-2">
                     <form action={deleteTestAccount.bind(null, row.id)}>
