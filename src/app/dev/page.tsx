@@ -15,11 +15,12 @@ import { VirtualTimeControl } from "./VirtualTimeControl";
 export const instant = false;
 
 type Row = {
+  configuredFriend: string;
+  friendCount: number;
   id: string;
   email: string;
-  role: string;
   level: string;
-  friendCount: number;
+  role: string;
 };
 
 type FriendPair = {
@@ -62,6 +63,7 @@ async function loadRows(): Promise<Row[]> {
   if (error) throw new Error(error.message);
 
   return (data ?? []).map((row: {
+    configured_friend_email: string | null;
     email: string;
     friend_count: number | null;
     id: string;
@@ -70,6 +72,7 @@ async function loadRows(): Promise<Row[]> {
     player_level: string | null;
   }) => ({
     email: row.email,
+    configuredFriend: row.configured_friend_email ?? "",
     friendCount: Number(row.friend_count ?? 0),
     id: row.id,
     level: row.player_level ?? "—",
@@ -173,7 +176,7 @@ export default async function DevPage() {
                 <th className="px-3 py-2 text-left font-medium">Email</th>
                 <th className="px-3 py-2 text-left font-medium">Role</th>
                 <th className="px-3 py-2 text-left font-medium">Level</th>
-                <th className="px-3 py-2 text-left font-medium">
+                <th className="min-w-72 px-3 py-2 text-left font-medium">
                   Configure friend to play with
                 </th>
                 <th className="px-3 py-2 text-left font-medium">Actions</th>
@@ -196,7 +199,8 @@ export default async function DevPage() {
                         value={row.email}
                       />
                       <input
-                        className="h-8 min-w-0 rounded-md bg-background px-2 text-xs"
+                        className="h-8 min-w-48 rounded-md bg-background px-2 text-xs"
+                        defaultValue={row.configuredFriend}
                         name="friendEmail"
                         placeholder="friend@atu.ie"
                         required
