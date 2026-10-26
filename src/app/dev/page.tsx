@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 import {
   addDevFriend,
+  removeDevFriend,
   createTestAccount,
   deleteTestAccount,
   randomSessionSignups,
@@ -153,10 +154,38 @@ export default async function DevPage() {
                   <td className="px-3 py-2">{row.role}</td>
                   <td className="px-3 py-2">{row.level}</td>
                   <td className="px-3 py-2">
-                    <div className="mb-1 text-xs text-muted-foreground">
+                    <div className="mb-1 flex flex-wrap gap-1">
                       {row.configuredFriends.length > 0
-                        ? row.configuredFriends.join(", ")
-                        : "No friends configured"}
+                        ? row.configuredFriends.map((friend) => (
+                            <form
+                              action={removeDevFriend}
+                              className="inline-flex"
+                              key={friend}
+                            >
+                              <input
+                                name="userEmail"
+                                type="hidden"
+                                value={row.email}
+                              />
+                              <input
+                                name="friendEmail"
+                                type="hidden"
+                                value={friend}
+                              />
+                              <button
+                                className="h-7 rounded-md bg-muted px-2 text-xs font-medium text-foreground"
+                                type="submit"
+                                title="Remove friend"
+                              >
+                                {friend} ×
+                              </button>
+                            </form>
+                          ))
+                        : (
+                            <span className="text-xs text-muted-foreground">
+                              No friends configured
+                            </span>
+                          )}
                     </div>
                     <form
                       action={addDevFriend}
@@ -167,13 +196,20 @@ export default async function DevPage() {
                         type="hidden"
                         value={row.email}
                       />
-                      <input
+                      <select
                         className="h-8 min-w-48 rounded-md bg-white px-2 text-xs"
                         name="friendEmail"
-                        placeholder="add friend@atu.ie"
                         required
-                        type="email"
-                      />
+                      >
+                        <option value="">add friend@atu.ie</option>
+                        {rows
+                          .filter((candidate) => candidate.email !== row.email)
+                          .map((candidate) => (
+                            <option key={candidate.id} value={candidate.email}>
+                              {candidate.email}
+                            </option>
+                          ))}
+                      </select>
                       <button
                         className="h-8 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground"
                         type="submit"
