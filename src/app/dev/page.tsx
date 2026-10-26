@@ -176,7 +176,7 @@ export default async function DevPage() {
                 <th className="px-3 py-2 text-left font-medium">Email</th>
                 <th className="px-3 py-2 text-left font-medium">Role</th>
                 <th className="px-3 py-2 text-left font-medium">Level</th>
-                <th className="min-w-72 px-3 py-2 text-left font-medium">
+                <th className="min-w-[28rem] px-3 py-2 text-left font-medium">
                   Configure friend to play with
                 </th>
                 <th className="px-3 py-2 text-left font-medium">Actions</th>
