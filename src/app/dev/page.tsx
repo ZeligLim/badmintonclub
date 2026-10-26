@@ -142,12 +142,26 @@ export default async function DevPage() {
           </button>
         </form>
 
-        <form action={seedTestAccounts} className="mb-6">
+        <form
+          action={seedTestAccounts}
+          className="mb-6 flex flex-wrap items-end gap-3 rounded-xl bg-muted/40 p-4"
+        >
+          <label className="flex flex-col gap-1 text-sm font-medium">
+            Accounts to seed
+            <input
+              className="h-9 rounded-md bg-background px-2.5 text-sm"
+              defaultValue="40"
+              max="200"
+              min="1"
+              name="seedCount"
+              type="number"
+            />
+          </label>
           <button
             className="h-9 rounded-md bg-secondary px-4 text-sm font-medium text-secondary-foreground"
             type="submit"
           >
-            Seed 40 test accounts
+            Seed accounts
           </button>
         </form>
 

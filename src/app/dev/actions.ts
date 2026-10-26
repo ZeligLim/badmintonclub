@@ -50,13 +50,19 @@ export async function deleteTestAccount(userId: string) {
   revalidatePath("/dev");
 }
 
-export async function seedTestAccounts() {
+export async function seedTestAccounts(formData: FormData) {
   assertDevelopment();
+  const requestedCount = Number(formData.get("seedCount"));
+  const count =
+    Number.isInteger(requestedCount) && requestedCount > 0 && requestedCount <= 200
+      ? requestedCount
+      : 40;
+
   const supabase = createAdminClient();
   const { data } = await supabase.auth.admin.listUsers({ perPage: 1000 });
   const existing = new Set((data?.users ?? []).map((user) => user.email?.toLowerCase()));
 
-  for (let index = 1; index <= 40; index += 1) {
+  for (let index = 1; index <= count; index += 1) {
     const number = String(index).padStart(2, "0");
     const email = `player${number}@atu.ie`;
     if (existing.has(email)) continue;

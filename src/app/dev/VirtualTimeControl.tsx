@@ -43,7 +43,7 @@ export function VirtualTimeControl() {
   }
 
   return (
-    <section className="rounded-xl bg-muted/40 p-4">
+    <section className="mb-6 rounded-xl bg-muted/40 p-4">
       <h2 className="mb-4 text-lg font-semibold">Virtual time</h2>
       <p className="mb-4 text-sm text-muted-foreground">
         Overrides Postgres <code>now()</code> for local testing. Leave empty and apply to reset to real time.
