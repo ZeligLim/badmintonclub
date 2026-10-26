@@ -6,6 +6,7 @@ import {
   addDevFriend,
   createTestAccount,
   deleteTestAccount,
+  randomSessionSignups,
   removeDevFriend,
   seedTestAccounts,
 } from "./actions";
@@ -276,11 +277,32 @@ export default async function DevPage() {
           </table>
         </div>
 
-        <p className="mt-3 text-xs text-muted-foreground">
-          Account list is seeded in the local database only. Sign-in is magic-link
-          based: request a link at <code>/sign-in</code>, then open it from
-          Mailpit at <code>http://127.0.0.1:54324</code>.
-        </p>
+        <form
+          action={randomSessionSignups}
+          className="mt-6 flex flex-wrap items-end gap-3 rounded-xl bg-muted/40 p-4"
+        >
+          <label className="flex flex-col gap-1 text-sm font-medium">
+            Players per open session
+            <input
+              className="h-9 rounded-md bg-background px-2.5 text-sm"
+              defaultValue="8"
+              max="100"
+              min="1"
+              name="signupCount"
+              type="number"
+            />
+          </label>
+          <button
+            className="h-9 rounded-md bg-secondary px-4 text-sm font-medium text-secondary-foreground"
+            type="submit"
+          >
+            Randomly sign up test players
+          </button>
+          <p className="w-full text-xs text-muted-foreground">
+            Randomly selects local @atu.ie test accounts for every open session,
+            using the current virtual time.
+          </p>
+        </form>
       </div>
     </main>
   );

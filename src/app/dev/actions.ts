@@ -126,3 +126,20 @@ export async function removeDevFriend(formData: FormData) {
   if (error) throw new Error(error.message);
   revalidatePath("/dev");
 }
+
+
+export async function randomSessionSignups(formData: FormData) {
+  assertDevelopment();
+  const requestedCount = Number(formData.get("signupCount"));
+  const count =
+    Number.isInteger(requestedCount) && requestedCount > 0 && requestedCount <= 100
+      ? requestedCount
+      : 5;
+  const supabase = createAdminClient();
+  const { error } = await supabase.rpc("dev_random_session_signups", {
+    p_count: count,
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath("/dev");
+  revalidatePath("/");
+}
