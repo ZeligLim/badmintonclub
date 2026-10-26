@@ -2,6 +2,7 @@ import "server-only";
 
 import { hasSupabaseConfig } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   finalizeDueSessionsAndEmail,
   sendBookingConfirmationEmailBestEffort,
@@ -40,8 +41,21 @@ export async function updateSessionFriendPreferences(
     });
     throw new Error("Could not save your friend choices.");
   }
+
+  await invalidateSessionTimetable(sessionId);
 }
 
+async function invalidateSessionTimetable(sessionId: string): Promise<void> {
+  try {
+    const admin = createAdminClient();
+    await admin
+      .from("session_timetables")
+      .delete()
+      .eq("session_id", sessionId);
+  } catch (error) {
+    console.error("Could not invalidate session timetable.", error);
+  }
+}
 export async function searchClubMembers(
   query: string,
   sessionId?: string,
@@ -225,6 +239,8 @@ async function updateSignup(
         : "Could not cancel this session.",
     );
   }
+
+  await invalidateSessionTimetable(sessionId);
 }
 
 async function requireAuthenticatedClient() {
