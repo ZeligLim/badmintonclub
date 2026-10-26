@@ -43,7 +43,7 @@ export function VirtualTimeControl() {
   }
 
   return (
-    <section className="rounded-xl border border-border bg-card p-4">
+    <section className="rounded-xl bg-muted/40 p-4">
       <h2 className="mb-4 text-lg font-semibold">Virtual time</h2>
       <p className="mb-4 text-sm text-muted-foreground">
         Overrides Postgres <code>now()</code> for local testing. Leave empty and apply to reset to real time.
@@ -52,7 +52,7 @@ export function VirtualTimeControl() {
         <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm font-medium">
           Date and time
           <input
-            className="h-9 rounded-md border-0 bg-background px-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="h-9 rounded-md bg-background px-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
             onChange={(event) => setValue(event.target.value)}
             type="datetime-local"
             value={value}
@@ -66,7 +66,7 @@ export function VirtualTimeControl() {
           Apply
         </button>
         <button
-          className="h-9 rounded-md border border-border px-4 text-sm font-medium"
+          className="h-9 rounded-md bg-background px-4 text-sm font-medium"
           onClick={() => {
             setValue("");
             void applyTime();

@@ -3,8 +3,10 @@ import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 import {
+  addDevFriend,
   createTestAccount,
   deleteTestAccount,
+  removeDevFriend,
   seedTestAccounts,
 } from "./actions";
 import { VirtualTimeControl } from "./VirtualTimeControl";
@@ -18,6 +20,40 @@ type Row = {
   level: string;
   friendCount: number;
 };
+
+type FriendPair = {
+  friendEmail: string;
+  friendId: string;
+  userEmail: string;
+  userId: string;
+};
+
+async function loadFriendPairs(): Promise<FriendPair[]> {
+  const supabase = createAdminClient();
+  const { data: userRows, error: userError } = await supabase.rpc(
+    "list_dev_test_users",
+  );
+  if (userError) throw new Error(userError.message);
+
+  const { data: pairRows, error: pairError } =
+    await supabase.from("club_friend_list").select("user_id, friend_user_id");
+  if (pairError) throw new Error(pairError.message);
+
+  const userById = new Map(
+    (userRows ?? []).map((user: { email: string; id: string }) => [
+      user.id,
+      user.email,
+    ]),
+  );
+  return (pairRows ?? [])
+    .map((pair: { friend_user_id: string; user_id: string }) => ({
+      friendEmail: userById.get(pair.friend_user_id) ?? pair.friend_user_id,
+      friendId: pair.friend_user_id,
+      userEmail: userById.get(pair.user_id) ?? pair.user_id,
+      userId: pair.user_id,
+    }))
+    .filter((pair) => pair.userEmail && pair.friendEmail);
+}
 
 async function loadRows(): Promise<Row[]> {
   const supabase = createAdminClient();
@@ -50,6 +86,7 @@ export default async function DevPage() {
   }
 
   const rows = await loadRows();
+  const friendPairs = await loadFriendPairs();
 
   return (
     <main className="min-h-screen bg-background px-4 py-10 sm:px-8">
@@ -113,6 +150,76 @@ export default async function DevPage() {
             Seed 40 test accounts
           </button>
         </form>
+
+        <form
+          action={addDevFriend}
+          className="mb-6 grid gap-3 rounded-xl bg-muted/40 p-4 sm:grid-cols-3"
+        >
+          <input
+            className="h-9 rounded-md bg-background px-2.5 text-sm"
+            name="userEmail"
+            placeholder="user@atu.ie"
+            required
+            type="email"
+          />
+          <input
+            className="h-9 rounded-md bg-background px-2.5 text-sm"
+            name="friendEmail"
+            placeholder="friend@atu.ie"
+            required
+            type="email"
+          />
+          <button
+            className="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
+            type="submit"
+          >
+            Add friend shortcut
+          </button>
+        </form>
+
+        {friendPairs.length > 0 && (
+          <div className="mb-6 rounded-xl bg-muted/40 p-4">
+            <table className="min-w-full border-collapse text-sm">
+              <thead>
+                <tr>
+                  <th className="px-3 py-2 text-left font-medium">User</th>
+                  <th className="px-3 py-2 text-left font-medium">Configured friend</th>
+                  <th className="px-3 py-2 text-left font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {friendPairs.map((pair) => (
+                  <tr key={`${pair.userId}-${pair.friendId}`}>
+                    <td className="px-3 py-2 font-mono text-xs">
+                      {pair.userEmail}
+                    </td>
+                    <td className="px-3 py-2 font-mono text-xs">
+                      {pair.friendEmail}
+                    </td>
+                    <td className="px-3 py-2">
+                      <form
+                        action={removeDevFriend.bind(
+                          null,
+                          Object.fromEntries([
+                            ["userEmail", pair.userEmail],
+                            ["friendEmail", pair.friendEmail],
+                          ]) as unknown as FormData,
+                        )}
+                      >
+                        <button
+                          className="h-7 rounded-md bg-destructive/10 px-3 text-xs font-medium text-destructive"
+                          type="submit"
+                        >
+                          Remove
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         <div className="rounded-xl bg-muted/40 p-4">
           <table className="min-w-full border-collapse text-sm">

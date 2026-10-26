@@ -74,3 +74,49 @@ export async function seedTestAccounts() {
   }
   revalidatePath("/dev");
 }
+
+
+export async function addDevFriend(formData: FormData) {
+  assertDevelopment();
+  const userEmail = normalizeEmail(formData.get("userEmail"));
+  const friendEmail = normalizeEmail(formData.get("friendEmail"));
+  if (!userEmail.endsWith("@atu.ie") || !friendEmail.endsWith("@atu.ie")) {
+    throw new Error("Both accounts must use @atu.ie email addresses.");
+  }
+  if (userEmail === friendEmail) {
+    throw new Error("Choose two different accounts.");
+  }
+
+  const supabase = createAdminClient();
+  const { data: users, error: usersError } = await supabase.rpc("list_dev_test_users");
+  if (usersError) throw new Error(usersError.message);
+  const user = (users ?? []).find((item: { email: string }) => item.email.toLowerCase() === userEmail);
+  const friend = (users ?? []).find((item: { email: string }) => item.email.toLowerCase() === friendEmail);
+  if (!user || !friend) throw new Error("Both accounts must already exist.");
+
+  const { error } = await supabase
+    .from("club_friend_list")
+    .insert({ user_id: user.id, friend_user_id: friend.id });
+  if (error && error.code !== "23505") throw new Error(error.message);
+  revalidatePath("/dev");
+}
+
+export async function removeDevFriend(formData: FormData) {
+  assertDevelopment();
+  const userEmail = normalizeEmail(formData.get("userEmail"));
+  const friendEmail = normalizeEmail(formData.get("friendEmail"));
+  const supabase = createAdminClient();
+  const { data: users, error: usersError } = await supabase.rpc("list_dev_test_users");
+  if (usersError) throw new Error(usersError.message);
+  const user = (users ?? []).find((item: { email: string }) => item.email.toLowerCase() === userEmail);
+  const friend = (users ?? []).find((item: { email: string }) => item.email.toLowerCase() === friendEmail);
+  if (!user || !friend) throw new Error("Account not found.");
+
+  const { error } = await supabase
+    .from("club_friend_list")
+    .delete()
+    .eq("user_id", user.id)
+    .eq("friend_user_id", friend.id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/dev");
+}
