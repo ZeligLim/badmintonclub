@@ -65,7 +65,7 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
               .map(([slotKey, slot]) => (
                 <div
                   key={slotKey}
-                  className="grid grid-cols-[5rem_1fr] items-start gap-3 rounded-xl border border-border bg-card p-3 sm:grid-cols-[6rem_1fr]"
+                  className="grid grid-cols-[5rem_1fr] items-start gap-3 rounded-xl bg-muted/40 p-3 sm:grid-cols-[6rem_1fr]"
                 >
                   <div className="whitespace-nowrap tabular-nums text-muted-foreground">
                     <span className="block text-sm font-medium text-foreground">
@@ -90,7 +90,7 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
                       return (
                         <div
                           key={courtNumber}
-                          className="min-w-0 rounded-lg border border-border bg-muted/20 p-2"
+                          className="min-w-0 rounded-lg bg-secondary/30 p-2"
                         >
                           <div className="mb-1 text-xs font-semibold text-muted-foreground">
                             Court {courtNumber}
