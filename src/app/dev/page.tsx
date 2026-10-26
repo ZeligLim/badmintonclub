@@ -199,6 +199,7 @@ export default async function DevPage() {
                         className="h-8 min-w-0 rounded-md bg-background px-2 text-xs"
                         name="friendEmail"
                         placeholder="friend@atu.ie"
+                        required
                         type="email"
                       />
                       <button
