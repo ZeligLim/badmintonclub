@@ -42,7 +42,7 @@ export function runProductionBenchmark() {
 
   // Measure initial cold run (warmup run 1)
   const tWarmup0 = performance.now();
-  allocateCourtSchedule(session, roster40);
+  allocateCourtSchedule(session, roster40, { candidateCount: 1 });
   const tWarmup1 = performance.now();
   const coldTime = tWarmup1 - tWarmup0;
 
@@ -50,7 +50,7 @@ export function runProductionBenchmark() {
   const warmupTimes = [coldTime];
   for (let i = 0; i < 49; i++) {
     const t0 = performance.now();
-    allocateCourtSchedule(session, roster40);
+    allocateCourtSchedule(session, roster40, { candidateCount: 1 });
     const t1 = performance.now();
     warmupTimes.push(t1 - t0);
   }
@@ -60,7 +60,7 @@ export function runProductionBenchmark() {
   const steadyTimes: number[] = [];
   for (let i = 0; i < SAMPLES; i++) {
     const t0 = performance.now();
-    allocateCourtSchedule(session, roster40);
+    allocateCourtSchedule(session, roster40, { candidateCount: 1 });
     const t1 = performance.now();
     steadyTimes.push(t1 - t0);
   }
