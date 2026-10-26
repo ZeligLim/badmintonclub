@@ -21,45 +21,27 @@ type Row = {
 
 async function loadRows(): Promise<Row[]> {
   const supabase = createAdminClient();
-  const { data: usersData, error: usersError } =
-    await supabase.auth.admin.listUsers({ perPage: 1000 });
-  if (usersError) throw new Error(usersError.message);
+  const { data, error } = await supabase.rpc("list_dev_test_users");
+  if (error) throw new Error(error.message);
 
-  const clubUsers = (usersData?.users ?? []).filter((user) =>
-    user.email?.toLowerCase().endsWith("@atu.ie"),
-  );
-  const ids = clubUsers.map((user) => user.id);
-
-  const [{ data: profiles }, { data: friendRows }] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("id, display_name, player_level, is_committee, is_committee_admin"),
-    ids.length
-      ? supabase.from("club_friend_list").select("user_id").in("user_id", ids)
-      : Promise.resolve({ data: [] }),
-  ]);
-
-  const profileById = new Map((profiles ?? []).map((profile) => [profile.id, profile]));
-  const friendCountById = new Map<string, number>();
-  for (const row of friendRows ?? []) {
-    friendCountById.set(row.user_id, (friendCountById.get(row.user_id) ?? 0) + 1);
-  }
-
-  return clubUsers.map((user) => {
-    const profile = profileById.get(user.id);
-    const role = profile?.is_committee_admin
+  return (data ?? []).map((row: {
+    email: string;
+    friend_count: number | null;
+    id: string;
+    is_committee: boolean | null;
+    is_committee_admin: boolean | null;
+    player_level: string | null;
+  }) => ({
+    email: row.email,
+    friendCount: Number(row.friend_count ?? 0),
+    id: row.id,
+    level: row.player_level ?? "—",
+    role: row.is_committee_admin
       ? "Committee admin"
-      : profile?.is_committee
+      : row.is_committee
         ? "Committee member"
-        : "Player";
-    return {
-      email: user.email ?? "",
-      friendCount: friendCountById.get(user.id) ?? 0,
-      id: user.id,
-      level: profile?.player_level ?? "—",
-      role,
-    };
-  });
+        : "Player",
+  }));
 }
 
 export default async function DevPage() {
