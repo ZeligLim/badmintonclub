@@ -140,6 +140,7 @@ export async function randomSessionSignups(formData: FormData) {
     p_count: count,
   });
   if (error) throw new Error(error.message);
+  await supabase.from("session_timetables").delete().neq("session_id", "00000000-0000-0000-0000-000000000000");
   revalidatePath("/dev");
   revalidatePath("/");
 }
