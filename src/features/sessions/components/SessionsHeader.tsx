@@ -377,6 +377,7 @@ export function SessionsHeader({
             </span>
             <Button
               className="h-10 rounded-md bg-white px-3 text-xs font-normal hover:bg-white"
+              nativeButton={false}
               render={<Link href="/admin" />}
               variant="outline"
             >

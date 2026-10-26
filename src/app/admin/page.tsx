@@ -32,6 +32,7 @@ export default async function AdminPage() {
         <header className="mb-8 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
           <Button
             className="h-10 rounded-md bg-white px-3 hover:bg-white"
+            nativeButton={false}
             render={<Link href="/" />}
             variant="outline"
           >
