@@ -3,9 +3,12 @@ import "server-only";
 import { connection } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import type { Json } from "@/lib/supabase/database.types";
 import {
   allocateCourtSchedule,
   getCourtCount,
+  isCurrentPersistedCourtSchedule,
+  markCourtScheduleCurrent,
   type SessionAllocationMode,
 } from "@/features/sessions";
 import { getSessionDayName } from "@/lib/sessions/schedule";
@@ -268,10 +271,11 @@ export async function loadAdminData(): Promise<AdminSession[]> {
       .filter((p) => p.status === "selected" || p.status === "played")
       .sort((a, b) => (a.slotNumber ?? 99) - (b.slotNumber ?? 99));
 
-    const persistedCourtSchedule = (timetableMap.get(session.id) as unknown) as any;
-    const hasPersistedCourtSchedule = Array.isArray(persistedCourtSchedule);
+    const persistedCourtSchedule = timetableMap.get(session.id);
+    const hasCurrentPersistedCourtSchedule =
+      isCurrentPersistedCourtSchedule(persistedCourtSchedule);
 
-    const rawAllocation = !hasPersistedCourtSchedule && selectedPlayers.length
+    const rawAllocation = !hasCurrentPersistedCourtSchedule && selectedPlayers.length
       ? allocateCourtSchedule(
           {
             id: session.id,
@@ -289,20 +293,21 @@ export async function loadAdminData(): Promise<AdminSession[]> {
         )
       : null;
 
-    const rawPersistedOrNew: any = hasPersistedCourtSchedule
+    const rawPersistedOrNew = hasCurrentPersistedCourtSchedule
       ? persistedCourtSchedule
       : (rawAllocation ?? []);
 
     // Persist the full raw allocation, including player ids, so it is usable
     // as the single source of truth for every viewer.
-    if (!hasPersistedCourtSchedule && rawAllocation && rawAllocation.length) {
+    if (!hasCurrentPersistedCourtSchedule && rawAllocation && rawAllocation.length) {
       try {
         const adminClient = createAdminClient();
+        const currentSchedule = markCourtScheduleCurrent(rawAllocation);
         await adminClient
           .from("session_timetables")
           .upsert({
             session_id: session.id,
-            court_schedule: rawAllocation as any,
+            court_schedule: currentSchedule as Exclude<Json, null>,
             generated_by: null,
             generated_at: new Date().toISOString(),
           }, { onConflict: "session_id" });
@@ -311,9 +316,9 @@ export async function loadAdminData(): Promise<AdminSession[]> {
       }
     }
 
-    const courtSchedule = (rawPersistedOrNew ?? []).map((game: any) => ({
+    const courtSchedule = (rawPersistedOrNew ?? []).map((game) => ({
       ...game,
-      players: game.players.map((player: any) =>
+      players: game.players.map((player) =>
         typeof player === "string" ? player : player.displayName,
       ),
     }));

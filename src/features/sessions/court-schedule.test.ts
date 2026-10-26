@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   allocateCourtSchedule,
   createPlayerGameSchedule,
+  isCurrentPersistedCourtSchedule,
+  markCourtScheduleCurrent,
   type AllocatedCourtGame,
   type CourtRosterPlayer,
 } from "./court-schedule";
@@ -240,8 +242,8 @@ describe("Court Scheduling Algorithm", () => {
     }
   });
 
-  // T6: Fairness Independence (Hard Guarantee)
-  it("T6: ensures friend preferences do not alter each player's total games played", () => {
+  // T6: Fairness remains a hard constraint while ties can honor friend links.
+  it("T6: maintains fair game counts when friend preferences influence tied selections", () => {
     const plainRoster = makeRoster(10);
     const plainSchedule = allocateCourtSchedule(monday60min, plainRoster);
     const plainCounts = countGamesPerPlayer(plainSchedule, plainRoster);
@@ -257,10 +259,11 @@ describe("Court Scheduling Algorithm", () => {
     const friendSchedule = allocateCourtSchedule(monday60min, rosterWithFriends);
     const friendCounts = countGamesPerPlayer(friendSchedule, rosterWithFriends);
 
-    // Each player must have the exact same total games played
-    for (const player of plainRoster) {
-      expect(friendCounts.get(player.id)).toBe(plainCounts.get(player.id));
-    }
+    const counts = [...friendCounts.values()];
+    expect(Math.max(...counts) - Math.min(...counts)).toBeLessThanOrEqual(1);
+    expect(counts.reduce((sum, count) => sum + count, 0)).toBe(
+      [...plainCounts.values()].reduce((sum, count) => sum + count, 0),
+    );
   });
 
   // T7: Overlapping Preferences Scenario (Best-Effort Scenario-Specific Optimality)
@@ -296,6 +299,18 @@ describe("Court Scheduling Algorithm", () => {
     const game = courtOf(schedule, "player-1");
     expect(game).toBeDefined();
     expect(game?.players.some((p) => p.id === "player-2")).toBe(true);
+  });
+
+  it("includes a requested friend when fairness leaves a selection tie", () => {
+    const roster = makeRoster(10, {
+      friendPreferences: { "player-1": ["player-10"] },
+    });
+    const schedule = allocateCourtSchedule(
+      { id: "test", startsAt: "18:00", durationMinutes: 15, courtCount: 2 },
+      roster,
+    );
+
+    expect(courtPlayerIds(courtOf(schedule, "player-1"))).toContain("player-10");
   });
 
   // T9: Full Friend Group of 4 (Best-Effort Priority)
@@ -642,6 +657,21 @@ describe("Court Scheduling Algorithm", () => {
       expect(game.courtPlayers.length).toBe(3); // 3 other players on court
       expect(game.courtPlayers).not.toContain("Player 1");
     }
+  });
+
+  it("invalidates persisted court schedules created by an older allocator version", () => {
+    const schedule = allocateCourtSchedule(monday60min, makeRoster(8));
+    const currentSchedule = markCourtScheduleCurrent(schedule);
+
+    expect(isCurrentPersistedCourtSchedule(schedule)).toBe(false);
+    expect(isCurrentPersistedCourtSchedule(currentSchedule)).toBe(true);
+    expect(
+      isCurrentPersistedCourtSchedule(
+        currentSchedule.map((game, index) =>
+          index === 0 ? { ...game, allocationVersion: 1 } : game,
+        ),
+      ),
+    ).toBe(false);
   });
 
   // Benchmark Verification: Wednesday scale 40 players, 4 courts, 8 rounds

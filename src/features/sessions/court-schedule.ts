@@ -3,6 +3,7 @@ import type { ClubSession } from "./types";
 
 const GAME_DURATION_MINUTES = 15;
 const PLAYERS_PER_COURT = 4;
+export const COURT_ALLOCATION_VERSION = 2;
 
 export type PlayerLevel = "BEGINNER" | "INTERMEDIATE" | "ADVANCED";
 
@@ -25,6 +26,35 @@ export type AllocatedCourtGame = {
   teamA?: [CourtRosterPlayer, CourtRosterPlayer];
   teamB?: [CourtRosterPlayer, CourtRosterPlayer];
 };
+
+export type PersistedCourtGame = AllocatedCourtGame & {
+  allocationVersion: typeof COURT_ALLOCATION_VERSION;
+};
+
+export function isCurrentPersistedCourtSchedule(
+  value: unknown,
+): value is PersistedCourtGame[] {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every(
+      (game) =>
+        typeof game === "object" &&
+        game !== null &&
+        "allocationVersion" in game &&
+        game.allocationVersion === COURT_ALLOCATION_VERSION,
+    )
+  );
+}
+
+export function markCourtScheduleCurrent(
+  schedule: AllocatedCourtGame[],
+): PersistedCourtGame[] {
+  return schedule.map((game) => ({
+    ...game,
+    allocationVersion: COURT_ALLOCATION_VERSION,
+  }));
+}
 
 export function getCourtCount(capacity: number): number {
   return Math.min(Math.ceil(capacity / 8), 4);
@@ -86,6 +116,14 @@ function compareGameFairness(
   b: InternalPlayer,
   state: ScheduleTrackingState,
 ): number {
+  return compareGameFairnessPriority(a, b, state) || a.rosterIndex - b.rosterIndex;
+}
+
+function compareGameFairnessPriority(
+  a: InternalPlayer,
+  b: InternalPlayer,
+  state: ScheduleTrackingState,
+): number {
   const gamesA = state.gamesPlayed.get(a.id) ?? 0;
   const gamesB = state.gamesPlayed.get(b.id) ?? 0;
   if (gamesA !== gamesB) return gamesA - gamesB;
@@ -98,7 +136,63 @@ function compareGameFairness(
   const totalRestsB = state.totalRests.get(b.id) ?? 0;
   if (totalRestsA !== totalRestsB) return totalRestsB - totalRestsA;
 
-  return a.rosterIndex - b.rosterIndex;
+  return 0;
+}
+
+function countFriendEdgesBetween(
+  firstId: string,
+  secondId: string,
+  friendMap: Map<string, Set<string>>,
+): number {
+  return Number(friendMap.get(firstId)?.has(secondId) ?? false) +
+    Number(friendMap.get(secondId)?.has(firstId) ?? false);
+}
+
+/**
+ * Select active players by the hard fairness ranking first. When players are
+ * tied on games and rest, choose a friend-connected group before using roster
+ * order so friend requests can actually be matched on court.
+ */
+function selectActivePlayers(
+  roster: InternalPlayer[],
+  count: number,
+  state: ScheduleTrackingState,
+  cycle: AnchorCycle,
+  friendMap: Map<string, Set<string>>,
+): InternalPlayer[] {
+  const active: InternalPlayer[] = [];
+  const remaining = [...roster];
+
+  while (active.length < count && remaining.length > 0) {
+    remaining.sort((a, b) => compareGameFairnessPriority(a, b, state));
+    const bestFairness = remaining[0]!;
+    const tied = remaining.filter(
+      (player) => compareGameFairnessPriority(player, bestFairness, state) === 0,
+    );
+
+    const score = (candidate: InternalPlayer): number => {
+      const others = active.length > 0
+        ? active
+        : tied.filter((player) => player.id !== candidate.id);
+      return others.reduce(
+        (total, other) =>
+          total + countFriendEdgesBetween(candidate.id, other.id, friendMap),
+        0,
+      );
+    };
+
+    const selected = [...tied].sort(
+      (a, b) =>
+        score(b) - score(a) ||
+        (cycle.eligibleAnchorIds.has(b.id) ? 1 : 0) -
+          (cycle.eligibleAnchorIds.has(a.id) ? 1 : 0) ||
+        compareAnchorPriority(a, b),
+    )[0]!;
+    active.push(selected);
+    remaining.splice(remaining.findIndex((player) => player.id === selected.id), 1);
+  }
+
+  return active;
 }
 
 /**
@@ -570,9 +664,13 @@ function allocateOnce(
     // HARD FAIRNESS RULE:
     // Select players with the fewest games first. Among equal game counts,
     // prefer the longest consecutive rest, then the greatest total rest.
-    const activePlayers = [...orderedRoster]
-      .sort((a, b) => compareGameFairness(a, b, state))
-      .slice(0, activeSpotsPerRound);
+    const activePlayers = selectActivePlayers(
+      orderedRoster,
+      activeSpotsPerRound,
+      state,
+      cycle,
+      friendMap,
+    );
 
     const activeSet = new Set(activePlayers.map((player) => player.id));
 
