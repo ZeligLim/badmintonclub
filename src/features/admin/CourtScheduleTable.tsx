@@ -50,42 +50,61 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
           This session will not take place. Existing sign-ups are retained.
         </p>
       ) : session.courtSchedule.length > 0 ? (
-        <div className="overflow-x-auto rounded-xl border border-border">
-          <table className="w-full table-fixed text-sm">
-            <colgroup>
-              <col className="w-24 sm:w-32" />
-              <col className="w-14 sm:w-20" />
-              <col />
-            </colgroup>
-            <thead>
-              <tr className="border-b border-border bg-muted/50">
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                  Time
-                </th>
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                  #
-                </th>
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                  Players
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {session.courtSchedule.map((game, i) => (
-                <tr
-                  key={`${game.startAt}-${game.courtNumber}`}
-                  className={i % 2 === 0 ? "bg-card" : "bg-muted/20"}
+        <div className="overflow-x-auto">
+          <div className="flex flex-col gap-3">
+            {Array.from(
+              session.courtSchedule.reduce((slots, game) => {
+                const key = `${game.startAt}|${game.endAt}`;
+                if (!slots.has(key)) {
+                  slots.set(key, { startAt: game.startAt, endAt: game.endAt });
+                }
+                return slots;
+              }, new Map<string, { startAt: string; endAt: string }>()),
+            )
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([slotKey, slot]) => (
+                <div
+                  key={slotKey}
+                  className="grid grid-cols-[5rem_1fr] items-start gap-3 rounded-xl border border-border bg-card p-3 sm:grid-cols-[6rem_1fr]"
                 >
-                  <td className="whitespace-nowrap px-4 py-2.5 tabular-nums text-muted-foreground">
-                    <span className="block">{game.startAt}</span>
-                    <span className="block">{game.endAt}</span>
-                  </td>
-                  <td className="px-3 py-2.5 font-medium">{game.courtNumber}</td>
-                  <td className="wrap-break-word px-4 py-2.5">{game.players.join(", ")}</td>
-                </tr>
+                  <div className="whitespace-nowrap tabular-nums text-muted-foreground">
+                    <span className="block text-sm font-medium text-foreground">
+                      {slot.startAt}
+                    </span>
+                    <span className="block text-xs">{slot.endAt}</span>
+                  </div>
+                  <div
+                    className="grid gap-2"
+                    style={{
+                      gridTemplateColumns: `repeat(${session.courtCount}, minmax(0, 1fr))`,
+                    }}
+                  >
+                    {Array.from({ length: session.courtCount }, (_, courtIndex) => {
+                      const courtNumber = courtIndex + 1;
+                      const game = session.courtSchedule.find(
+                        (item) =>
+                          item.startAt === slot.startAt &&
+                          item.endAt === slot.endAt &&
+                          item.courtNumber === courtNumber,
+                      );
+                      return (
+                        <div
+                          key={courtNumber}
+                          className="min-w-0 rounded-lg border border-border bg-muted/20 p-2"
+                        >
+                          <div className="mb-1 text-xs font-semibold text-muted-foreground">
+                            Court {courtNumber}
+                          </div>
+                          <div className="whitespace-pre-line text-xs text-foreground">
+                            {game?.players.join("\n") ?? "—"}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
+          </div>
         </div>
       ) : (
         <p className="text-sm text-muted-foreground">
@@ -94,7 +113,6 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
             : "Players will be assigned after confirmation."}
         </p>
       )}
-
       {/* Player summary */}
       <div className="mt-4 flex flex-wrap gap-6 text-xs text-muted-foreground">
         <span>
