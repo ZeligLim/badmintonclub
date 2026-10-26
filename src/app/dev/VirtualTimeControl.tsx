@@ -52,7 +52,7 @@ export function VirtualTimeControl() {
         <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm font-medium">
           Date and time
           <input
-            className="h-9 rounded-md bg-muted px-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="h-9 rounded-md bg-white px-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
             onChange={(event) => setValue(event.target.value)}
             type="datetime-local"
             value={value}

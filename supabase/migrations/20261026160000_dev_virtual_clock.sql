@@ -10,7 +10,7 @@ values (1, null)
 on conflict (id) do nothing;
 
 revoke all on table public.dev_virtual_clock from public, anon, authenticated;
-grant select, update on table public.dev_virtual_clock to anon, authenticated, service_role;
+grant select, update on table public.dev_virtual_clock to anon, authenticated, service_role, supabase_auth_admin;
 
 alter table public.dev_virtual_clock disable row level security;
 
@@ -27,7 +27,7 @@ as $$
 $$;
 
 revoke all on function public.get_virtual_now() from public, anon, authenticated;
-grant execute on function public.get_virtual_now() to anon, authenticated, service_role;
+grant execute on function public.get_virtual_now() to anon, authenticated, service_role, supabase_auth_admin;
 
 create or replace function public.set_virtual_now(p_virtual_now timestamptz)
 returns void
@@ -44,7 +44,7 @@ end;
 $$;
 
 revoke all on function public.set_virtual_now(timestamptz) from public, anon, authenticated;
-grant execute on function public.set_virtual_now(timestamptz) to anon, authenticated, service_role;
+grant execute on function public.set_virtual_now(timestamptz) to anon, authenticated, service_role, supabase_auth_admin;
 
 create or replace function public.reset_virtual_now()
 returns void
@@ -61,7 +61,7 @@ end;
 $$;
 
 revoke all on function public.reset_virtual_now() from public, anon, authenticated;
-grant execute on function public.reset_virtual_now() to anon, authenticated, service_role;
+grant execute on function public.reset_virtual_now() to anon, authenticated, service_role, supabase_auth_admin;
 
 -- Override unqualified now() for rebuilt schemas/search paths.
 create or replace function public.now()

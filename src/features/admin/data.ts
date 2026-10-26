@@ -197,10 +197,17 @@ export async function loadAdminData(): Promise<AdminSession[]> {
 
   const userIds = [...new Set((signups ?? []).map((s) => s.user_id))];
 
-  const { data: friendPrefs } = await admin
+  const { data: sessionFriendPrefs } = await admin
     .from("session_friend_preferences")
     .select("session_id, user_id, friend_user_id")
     .in("session_id", sessionIds);
+
+  const { data: clubFriendPrefs } = userIds.length
+    ? await admin
+        .from("club_friend_list")
+        .select("user_id, friend_user_id")
+        .in("user_id", userIds)
+    : { data: [] };
 
   const profileMap = new Map<string, string>();
   if (userIds.length) {
@@ -215,15 +222,30 @@ export async function loadAdminData(): Promise<AdminSession[]> {
     }
   }
 
-  return sessions.map((session) => {
+  const { data: persistedTimetables } = await admin
+    .from("session_timetables")
+    .select("session_id, court_schedule")
+    .in("session_id", sessionIds);
+  const timetableMap = new Map(
+    (persistedTimetables ?? []).map((row) => [row.session_id, row.court_schedule]),
+  );
+
+  return await Promise.all(sessions.map(async (session) => {
     const sessionSignups = (signups ?? []).filter(
       (s) => s.session_id === session.id,
     );
 
     const sessionFriendMap = new Map<string, string[]>();
-    for (const pref of friendPrefs ?? []) {
+    for (const pref of sessionFriendPrefs ?? []) {
       if (pref.session_id === session.id) {
         const list = sessionFriendMap.get(pref.user_id) ?? [];
+        list.push(pref.friend_user_id);
+        sessionFriendMap.set(pref.user_id, list);
+      }
+    }
+    for (const pref of clubFriendPrefs ?? []) {
+      const list = sessionFriendMap.get(pref.user_id) ?? [];
+      if (!list.includes(pref.friend_user_id)) {
         list.push(pref.friend_user_id);
         sessionFriendMap.set(pref.user_id, list);
       }
@@ -241,7 +263,10 @@ export async function loadAdminData(): Promise<AdminSession[]> {
       .filter((p) => p.status === "selected" || p.status === "played")
       .sort((a, b) => (a.slotNumber ?? 99) - (b.slotNumber ?? 99));
 
-    const courtSchedule = selectedPlayers.length
+    const persistedCourtSchedule = (timetableMap.get(session.id) as unknown) as any;
+    const hasPersistedCourtSchedule = Array.isArray(persistedCourtSchedule);
+
+    const rawAllocation = !hasPersistedCourtSchedule && selectedPlayers.length
       ? allocateCourtSchedule(
           {
             id: session.id,
@@ -255,11 +280,38 @@ export async function loadAdminData(): Promise<AdminSession[]> {
             priority: player.slotNumber ?? 1,
             friendIds: sessionFriendMap.get(player.userId) ?? [],
           })),
-        ).map((game) => ({
-          ...game,
-          players: game.players.map(({ displayName }) => displayName),
-        }))
-      : [];
+        )
+      : null;
+
+    const rawPersistedOrNew: any = hasPersistedCourtSchedule
+      ? persistedCourtSchedule
+      : (rawAllocation ?? []);
+
+    // Persist the full raw allocation, including player ids, so it is usable
+    // as the single source of truth for every viewer.
+    if (!hasPersistedCourtSchedule && rawAllocation && rawAllocation.length) {
+      try {
+        const adminClient = createAdminClient();
+        await adminClient
+          .from("session_timetables")
+          .upsert({
+            session_id: session.id,
+            court_schedule: rawAllocation as any,
+            generated_by: null,
+            generated_at: new Date().toISOString(),
+          }, { onConflict: "session_id" });
+      } catch (error) {
+        console.error("Could not persist session timetable.", error);
+      }
+    }
+
+    const courtSchedule = (rawPersistedOrNew ?? []).map((game: any) => ({
+      ...game,
+      players: game.players.map((player: any) =>
+        typeof player === "string" ? player : player.displayName,
+      ),
+    }));
+
 
     return {
       id: session.id,
@@ -277,7 +329,7 @@ export async function loadAdminData(): Promise<AdminSession[]> {
       players,
       courtSchedule,
     };
-  });
+  }));
 }
 
 function getLondonDateTime(date: Date) {

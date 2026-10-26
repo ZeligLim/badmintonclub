@@ -143,6 +143,32 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"session_timetables": {
+                  Row: {
+                    "court_schedule": NonNullable<Json>,"generated_at": string,"generated_by": string | null,"session_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "court_schedule": NonNullable<Json>,"generated_at"?: string,"generated_by"?: string | null,"session_id": string
+                  }
+                  Update: {
+                    "court_schedule"?: NonNullable<Json>,"generated_at"?: string,"generated_by"?: string | null,"session_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "session_timetables_generated_by_fkey"
+      columns: ["generated_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "session_timetables_session_id_fkey"
+      columns: ["session_id"]
+isOneToOne: true
+      referencedRelation: "sessions"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"sessions": {
                   Row: {
                     "allocation_mode": string,"capacity": number,"committee_auto_signup": boolean,"confirmation_at": string,"created_at": string,"duration_minutes": number,"event_date": string,"fee_cents": number,"id": string,"signup_opens_at": string,"starts_at": string,"status": string,"template_id": string | null
@@ -197,13 +223,13 @@ isOneToOne: false
 { Args: { "p_happening": boolean,"p_session_id": string }; Returns: undefined
                            },
 "admin_set_session_template_active":
-{ Args: { "p_is_active": boolean,"p_template_id": string | null }; Returns: undefined
+{ Args: { "p_is_active": boolean,"p_template_id": string }; Returns: undefined
                            },
 "admin_update_player_access":
 { Args: { "p_is_committee": boolean,"p_player_level": string,"p_user_id": string }; Returns: undefined
                            },
 "admin_upsert_session_template":
-{ Args: { "p_allocation_mode": string,"p_capacity": number,"p_committee_auto_signup": boolean,"p_confirmation_at": string,"p_confirmation_lead_days": number,"p_duration_minutes": number,"p_fee_cents": number,"p_is_active": boolean,"p_name": string,"p_signup_opens_at": string,"p_signup_opens_lead_days": number,"p_starts_at": string,"p_template_id": string | null,"p_valid_from": string | null,"p_valid_until": string | null,"p_weekday": number }; Returns: string
+{ Args: { "p_allocation_mode": string,"p_capacity": number,"p_committee_auto_signup": boolean,"p_confirmation_at": string,"p_confirmation_lead_days": number,"p_duration_minutes": number,"p_fee_cents": number,"p_is_active": boolean,"p_name": string,"p_signup_opens_at": string,"p_signup_opens_lead_days": number,"p_starts_at": string,"p_template_id": string,"p_valid_from": string,"p_valid_until": string,"p_weekday": number }; Returns: string
                            },
 "cancel_session_signup":
 { Args: { "p_session_id": string }; Returns: undefined

@@ -16,7 +16,8 @@ import type {
   SessionSignupStatus,
   SessionStatus,
 } from "../types";
-import { getCourtCount } from "../court-schedule";
+import { getCourtCount, createPlayerGameSchedule } from "../court-schedule";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 type DashboardSessionRow =
   Database["public"]["Functions"]["get_dashboard_sessions"]["Returns"][number];
@@ -88,6 +89,126 @@ export async function loadDashboardData(): Promise<DashboardData> {
     ? await getFriendList(supabase)
     : [];
 
+  const userPlayerGameSchedules = new Map<string, import("../types").PlayerGame[]>();
+  if (user) {
+    try {
+      const admin = createAdminClient();
+      const confirmedSessionIds = sessionRows
+        .filter((row) => row.status === "confirmed")
+        .map((row) => row.id);
+
+      const rosterBySession = new Map<string, RosterRow[]>();
+      for (const row of rosterRows) {
+        if (row.session_id) {
+          const list = rosterBySession.get(row.session_id) ?? [];
+          list.push(row);
+          rosterBySession.set(row.session_id, list);
+        }
+      }
+
+      const { data: allFriendPrefs } = confirmedSessionIds.length
+        ? await admin
+            .from("session_friend_preferences")
+            .select("session_id, user_id, friend_user_id")
+            .in("session_id", confirmedSessionIds)
+        : { data: [] };
+
+      const confirmedRosterUserIds = Array.from(
+        new Set(
+          rosterRows
+            .filter((row) =>
+              confirmedSessionIds.includes(row.session_id ?? ""),
+            )
+            .map((row) => row.user_id)
+            .filter((value): value is string => typeof value === "string"),
+        ),
+      );
+      const { data: allClubPrefs } =
+        confirmedSessionIds.length && confirmedRosterUserIds.length
+          ? await admin
+              .from("club_friend_list")
+              .select("user_id, friend_user_id")
+              .in("user_id", confirmedRosterUserIds)
+          : { data: [] };
+
+      const friendRosterBySession = new Map(
+        confirmedSessionIds.map((sessionId) => [
+          sessionId,
+          new Set(
+            (rosterBySession.get(sessionId) ?? []).map((row) => row.user_id),
+          ),
+        ]),
+      );
+      for (const pref of allClubPrefs ?? []) {
+        if (!pref?.user_id || !pref?.friend_user_id) continue;
+        for (const sessionId of confirmedSessionIds) {
+          const players = friendRosterBySession.get(sessionId);
+          if (!players || !players.has(pref.user_id)) continue;
+          (allFriendPrefs ?? []).push({
+            session_id: sessionId,
+            user_id: pref.user_id,
+            friend_user_id: pref.friend_user_id,
+          });
+        }
+      }
+      const { data: persistedTimetableRows } =
+        confirmedSessionIds.length
+          ? await (async () => {
+              const admin2 = createAdminClient();
+              return admin2
+                .from("session_timetables")
+                .select("session_id, court_schedule")
+                .in("session_id", confirmedSessionIds);
+            })()
+          : { data: [] };
+
+      const persistedTimetableMap = new Map(
+        (persistedTimetableRows ?? []).map((row) => [
+          row.session_id,
+          row.court_schedule,
+        ]),
+      );
+
+      const prefsBySession = new Map<string, Map<string, string[]>>();
+      for (const pref of allFriendPrefs ?? []) {
+        const sessionMap = prefsBySession.get(pref.session_id) ?? new Map();
+        const list = sessionMap.get(pref.user_id) ?? [];
+        list.push(pref.friend_user_id);
+        sessionMap.set(pref.user_id, list);
+        prefsBySession.set(pref.session_id, sessionMap);
+      }
+      for (const sessionRow of sessionRows.filter((row) => row.status === "confirmed")) {
+        const sessionRoster = rosterBySession.get(sessionRow.id) ?? [];
+        const sessionPrefs = prefsBySession.get(sessionRow.id) ?? new Map();
+        const rosterPlayers = sessionRoster.map((player) => ({
+          id: player.user_id,
+          displayName: player.display_name,
+          priority: player.slot_number ?? 1,
+          friendIds: sessionPrefs.get(player.user_id) ?? [],
+        }));
+        const persistedSchedule = persistedTimetableMap.get(sessionRow.id);
+        const yourGames = Array.isArray(persistedSchedule)
+          ? (persistedSchedule as any[])
+              .filter((game) =>
+                Array.isArray(game?.players) &&
+                game.players.some((player: any) => player?.id === user.id),
+              )
+              .map((game) => ({
+                courtNumber: game.courtNumber,
+                startAt: game.startAt,
+                endAt: game.endAt,
+                courtPlayers: game.players
+                  .filter((player: any) => player?.id !== user.id)
+                  .map((player: any) => player.displayName ?? player),
+              }))
+          : [];
+        userPlayerGameSchedules.set(sessionRow.id, yourGames);
+      }
+    } catch (error) {
+      console.error("Could not build personalized game schedule.", error);
+    }
+  }
+
   return {
     mode: "live",
     user: user
@@ -106,7 +227,12 @@ export async function loadDashboardData(): Promise<DashboardData> {
         }
       : null,
     sessions: sessionRows.map((row) =>
-      mapSession(row, rosterRows, friendCandidates.get(row.id) ?? []),
+      mapSession(
+        row,
+        rosterRows,
+        friendCandidates.get(row.id) ?? [],
+        userPlayerGameSchedules.get(row.id) ?? [],
+      ),
     ),
     nextScheduleChangeAt: window.next_change_at,
   };
@@ -207,6 +333,7 @@ function mapSession(
   row: DashboardSessionRow,
   rosterRows: RosterRow[],
   friendCandidates: FriendCandidate[],
+  playerGameSchedule: import("../types").PlayerGame[] = [],
 ): ClubSession {
   const dayName = getDayName(row.day_name);
   const status = getSessionStatus(row.status);
@@ -252,6 +379,7 @@ function mapSession(
     currentUserSlot: row.current_user_slot,
     friendCandidates,
     timeSlots,
+    playerGameSchedule,
   };
 }
 

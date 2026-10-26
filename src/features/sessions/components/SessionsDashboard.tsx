@@ -7,7 +7,6 @@ import {
   addFriendToList,
   finalizeDueSessions,
   joinConfirmedSessionFcfs,
-  markSessionPlayed,
   saveSessionFriendPreferences,
   removeFriendFromList,
   signUpForSession,
@@ -32,7 +31,7 @@ import {
   isSessionViewVisible,
 } from "../session-timing";
 import { useBrowserClock } from "../use-browser-clock";
-import { SessionsHeader } from "./SessionsHeader";
+import { createClient } from "@/lib/supabase/client";import { SessionsHeader } from "./SessionsHeader";
 import { SessionCard } from "./SessionCard";
 import { FriendListCard } from "./FriendListCard";
 import { DemoClock } from "./DemoClock";
@@ -71,7 +70,21 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
     initialData.sessions,
   );
   const [demoTimeOverride, setDemoTimeOverride] = useState<Date | null>(null);
-  const [demoPlayerLevel, setDemoPlayerLevel] = useState<
+  const [virtualOffset, setVirtualOffset] = useState<number | null>(null);
+  useEffect(() => {
+    const supabase = createClient();
+    supabase
+      .from("dev_virtual_clock")
+      .select("virtual_now")
+      .eq("id", 1)
+      .single()
+      .then(({ data, error }) => {
+        if (error || !data?.virtual_now) return;
+        setVirtualOffset(
+          new Date(data.virtual_now).getTime() - Date.now(),
+        );
+      });
+  }, []);  const [demoPlayerLevel, setDemoPlayerLevel] = useState<
     "BEGINNER" | "INTERMEDIATE"
   >("INTERMEDIATE");
   const [demoSignupCounts, setDemoSignupCounts] = useState<DemoSignupCounts>(
@@ -86,18 +99,14 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
   const finalizedSessionIds = useRef(new Set<string>());
   const isFinalizationPending = useRef(false);
   const isScheduleRefreshPending = useRef(false);
-  const [playedSessionIds, setPlayedSessionIds] = useState<Set<string>>(
-    () =>
-      new Set(
-        initialData.sessions
-          .filter((session) => session.currentUserStatus === "played")
-          .map((session) => session.id),
-      ),
-  );
   const [errorMessage, setErrorMessage] = useState("");
   const currentTime = useBrowserClock();
+  const appCurrentTime =
+    virtualOffset !== null && currentTime !== null
+      ? new Date(currentTime.getTime() + virtualOffset)
+      : currentTime;
   const isDemo = initialData.mode === "demo";
-  const sessionClockTime = demoTimeOverride ?? currentTime;
+  const sessionClockTime = demoTimeOverride ?? appCurrentTime;
   const sessions =
     isDemo && sessionClockTime
       ? createDemoDashboardData(sessionClockTime, demoSignupCounts).sessions.map(
@@ -337,21 +346,6 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
     }
   }
 
-  async function recordPlayedSession(sessionId: string) {
-    setErrorMessage("");
-    setPendingSessionId(sessionId);
-
-    try {
-      await markSessionPlayed(sessionId);
-      setPlayedSessionIds((currentIds) => new Set(currentIds).add(sessionId));
-      router.refresh();
-    } catch {
-      setErrorMessage("We couldn’t record your attendance. Please try again.");
-    } finally {
-      setPendingSessionId(null);
-    }
-  }
-
   function updateDemoSession(session: ClubSession) {
     const storedSession =
       demoSessions.find(({ sessionId }) => sessionId === session.id) ??
@@ -541,16 +535,6 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
                   onSaveFriendPreferences={(friendIds) =>
                     saveFriendPreferences(session, friendIds)
                   }
-                  canMarkPlayed={
-                    !isDemo &&
-                    Boolean(initialData.user) &&
-                    session.currentUserStatus === "selected" &&
-                    !playedSessionIds.has(session.id) &&
-                    sessionClockTime !== null &&
-                    getSessionPeriod(session, sessionClockTime) === "over"
-                  }
-                  hasBeenPlayed={playedSessionIds.has(session.id)}
-                  onMarkPlayed={() => recordPlayedSession(session.id)}
                 />
               );
             })}

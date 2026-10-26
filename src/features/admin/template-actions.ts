@@ -63,7 +63,7 @@ export async function saveSessionTemplate(
     p_is_active: template.isActive,
     p_valid_from: template.validFrom,
     p_valid_until: template.validUntil,
-  });
+  } as any);
   if (error) {
     throw new Error(`Could not save the session template: ${error.message}`);
   }

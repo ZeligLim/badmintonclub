@@ -58,10 +58,27 @@ export type ScheduleTrackingState = {
   doublesOpponents: Map<string, Map<string, number>>;
 };
 
-function shuffle<T>(items: T[]): T[] {
+function hashText(text: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function createDeterministicRng(seedText: string): () => number {
+  let state = hashText(seedText) || 1;
+  return () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 0x100000000;
+  };
+}
+
+function shuffle<T>(items: T[], rng: () => number = Math.random): T[] {
   const result = [...items];
   for (let i = result.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rng() * (i + 1));
     [result[i], result[j]] = [result[j]!, result[i]!];
   }
   return result;
@@ -196,8 +213,9 @@ function buildCourtGroup(args: {
   friendMap: Map<string, Set<string>>;
   byId: Map<string, InternalPlayer>;
   state: ScheduleTrackingState;
+  rng: () => number;
 }): InternalPlayer[] {
-  const { activePlayers, availableIds, cycle, friendMap, byId, state } = args;
+  const { activePlayers, availableIds, cycle, friendMap, byId, state, rng } = args;
   const group: InternalPlayer[] = [];
   const anchorsUsed: InternalPlayer[] = [];
 
@@ -227,6 +245,7 @@ function buildCourtGroup(args: {
 
     const candidates = shuffle(
       getAvailableFriends(anchor, availableIds, friendMap, byId),
+      rng,
     );
 
     // Prefer a friend who can act as another unsatisfied anchor and has at
@@ -294,6 +313,7 @@ function buildCourtGroup(args: {
       const owner = anchorsUsed[index]!;
       const candidates = shuffle(
         getAvailableFriends(owner, availableIds, friendMap, byId),
+        rng,
       );
 
       const nested = candidates
@@ -331,6 +351,7 @@ function buildCourtGroup(args: {
 
     const secondPairFriends = shuffle(
       getAvailableFriends(secondAnchor, availableIds, friendMap, byId),
+      rng,
     );
     if (secondPairFriends.length === 0) {
       // Do not mark this player satisfied: their own preference could not
@@ -348,6 +369,7 @@ function buildCourtGroup(args: {
       promoteAnchor(alternative);
       const friend = shuffle(
         getAvailableFriends(alternative, availableIds, friendMap, byId),
+        rng,
       )[0];
       if (friend) addPlayer(friend);
       break;
@@ -484,6 +506,10 @@ export function allocateCourtSchedule(
     }
   }
 
+  const deterministicRng = createDeterministicRng(
+    `${session.id}|${roster.map((player) => player.id).sort().join(",")}`,
+  );
+
   // Normalize outgoing requests. Keep requests for absent friends when
   // determining anchor eligibility/ranking; friend selection itself is
   // restricted to confirmed players in the current session. Self-requests
@@ -498,7 +524,7 @@ export function allocateCourtSchedule(
       ].filter((id) => id !== player.id),
       incomingFriendCount: incomingCounts.get(player.id) ?? 0,
       rosterIndex: index,
-      randomRank: Math.random(),
+      randomRank: deterministicRng(),
     }))
     .sort((a, b) => a.rosterIndex - b.rosterIndex);
 
@@ -602,6 +628,7 @@ export function allocateCourtSchedule(
         friendMap,
         byId,
         state,
+        rng: deterministicRng,
       });
 
       if (group.length !== playersPerCourt) {

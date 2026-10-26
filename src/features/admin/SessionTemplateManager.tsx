@@ -270,7 +270,7 @@ export function SessionTemplateManager({
                   </td>
                   <td className="px-4 py-2.5">
                     <button
-                      className="inline-flex h-7 items-center justify-center rounded-md px-2.5 text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="inline-flex h-7 items-center justify-center rounded-md bg-primary px-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       onClick={() => startEditing(template)}
                       type="button"
                     >
@@ -284,13 +284,28 @@ export function SessionTemplateManager({
         </table>
       </div>
 
+      {form.templateId ? (
+        <button
+          aria-label="Close"
+          className="fixed inset-0 z-40 bg-black/40"
+          onClick={cancelEditing}
+          type="button"
+        />
+      ) : null}
+      <div
+        className={
+          form.templateId
+            ? "fixed left-1/2 top-1/2 z-50 max-h-[85vh] w-[min(95vw,70rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-border bg-background p-5 shadow-2xl"
+            : ""
+        }
+      >
       <h3 className="mb-2 mt-8 text-sm font-semibold">
         {form.templateId ? "Edit template" : "New template"}
       </h3>
       <div className="grid gap-4 rounded-xl border border-border p-4 sm:grid-cols-2 lg:grid-cols-3">
         <Field label="Name">
           <input
-            className="h-9 w-full rounded-md bg-muted px-2.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="h-9 w-full rounded-md bg-white px-2.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
             onChange={(event) => updateForm("name", event.target.value)}
             placeholder="Monday evening"
             type="text"
@@ -299,7 +314,7 @@ export function SessionTemplateManager({
         </Field>
         <Field label="Day">
           <select
-            className="h-9 w-full rounded-md bg-muted px-2.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="h-9 w-full rounded-md bg-white px-2.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
             onChange={(event) => updateForm("weekday", Number(event.target.value))}
             value={form.weekday}
           >
@@ -312,7 +327,7 @@ export function SessionTemplateManager({
         </Field>
         <Field label="Start time">
           <input
-            className="h-9 w-full rounded-md bg-muted px-2.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="h-9 w-full rounded-md bg-white px-2.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
             onChange={(event) => updateForm("startsAt", event.target.value)}
             type="time"
             value={form.startsAt}
@@ -320,7 +335,7 @@ export function SessionTemplateManager({
         </Field>
         <Field label="Length (minutes)">
           <input
-            className="h-9 w-full rounded-md bg-muted px-2.5 text-sm tabular-nums text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="h-9 w-full rounded-md bg-white px-2.5 text-sm tabular-nums text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
             min={30}
             max={360}
             onChange={(event) =>
@@ -333,7 +348,7 @@ export function SessionTemplateManager({
         </Field>
         <Field label="Capacity (players)">
           <input
-            className="h-9 w-full rounded-md bg-muted px-2.5 text-sm tabular-nums text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="h-9 w-full rounded-md bg-white px-2.5 text-sm tabular-nums text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
             min={4}
             max={64}
             onChange={(event) => updateForm("capacity", event.target.value)}
@@ -344,7 +359,7 @@ export function SessionTemplateManager({
         </Field>
         <Field label="Fee per player (€)">
           <input
-            className="h-9 w-full rounded-md bg-muted px-2.5 text-sm tabular-nums text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="h-9 w-full rounded-md bg-white px-2.5 text-sm tabular-nums text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
             min={0}
             onChange={(event) => updateForm("fee", event.target.value)}
             step={0.5}
@@ -354,7 +369,7 @@ export function SessionTemplateManager({
         </Field>
         <Field label="Allocation">
           <select
-            className="h-9 w-full rounded-md bg-muted px-2.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="h-9 w-full rounded-md bg-white px-2.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
             onChange={(event) =>
               updateForm("allocationMode", event.target.value as SessionAllocationMode)
             }
@@ -368,7 +383,7 @@ export function SessionTemplateManager({
           <div className="flex items-center gap-2">
             <input
               aria-label="Days before the session that sign-ups open"
-              className="h-9 w-20 rounded-md bg-muted px-2.5 text-sm tabular-nums text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="h-9 w-20 rounded-md bg-white px-2.5 text-sm tabular-nums text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
               max={21}
               min={0}
               onChange={(event) =>
@@ -380,7 +395,7 @@ export function SessionTemplateManager({
             <span className="text-xs text-muted-foreground">days before at</span>
             <input
               aria-label="Time sign-ups open"
-              className="h-9 w-28 rounded-md bg-muted px-2.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="h-9 w-28 rounded-md bg-white px-2.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
               onChange={(event) =>
                 updateForm("signupOpensAt", event.target.value)
               }
@@ -393,7 +408,7 @@ export function SessionTemplateManager({
           <div className="flex items-center gap-2">
             <input
               aria-label="Days before the session that sign-ups close"
-              className="h-9 w-20 rounded-md bg-muted px-2.5 text-sm tabular-nums text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="h-9 w-20 rounded-md bg-white px-2.5 text-sm tabular-nums text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
               max={21}
               min={0}
               onChange={(event) =>
@@ -405,7 +420,7 @@ export function SessionTemplateManager({
             <span className="text-xs text-muted-foreground">days before at</span>
             <input
               aria-label="Time sign-ups close"
-              className="h-9 w-28 rounded-md bg-muted px-2.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="h-9 w-28 rounded-md bg-white px-2.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
               onChange={(event) =>
                 updateForm("confirmationAt", event.target.value)
               }
@@ -416,7 +431,7 @@ export function SessionTemplateManager({
         </Field>
         <Field label="Runs from (optional)">
           <input
-            className="h-9 w-full rounded-md bg-muted px-2.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="h-9 w-full rounded-md bg-white px-2.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
             onChange={(event) => updateForm("validFrom", event.target.value)}
             type="date"
             value={form.validFrom}
@@ -424,7 +439,7 @@ export function SessionTemplateManager({
         </Field>
         <Field label="Runs until (optional)">
           <input
-            className="h-9 w-full rounded-md bg-muted px-2.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="h-9 w-full rounded-md bg-white px-2.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
             onChange={(event) => updateForm("validUntil", event.target.value)}
             type="date"
             value={form.validUntil}
@@ -471,6 +486,7 @@ export function SessionTemplateManager({
             {statusMessage}
           </p>
         ) : null}
+      </div>
       </div>
     </section>
   );

@@ -1,5 +1,6 @@
 import type { PlayerLevel } from "@/types/player";
 import type { ClubSessionDay } from "@/lib/sessions/schedule";
+import type { PlayerGame as CourtPlayerGame } from "./court-schedule";
 
 export type SessionSignupStatus =
   | "requested"
@@ -38,6 +39,8 @@ export type SessionTimeSlot = {
   players: SessionPlayer[];
 };
 
+export type PlayerGame = CourtPlayerGame;
+
 export type ClubSession = {
   id: string;
   date: string;
@@ -58,6 +61,7 @@ export type ClubSession = {
   currentUserSlot: number | null;
   friendCandidates: FriendCandidate[];
   timeSlots: SessionTimeSlot[];
+  playerGameSchedule?: PlayerGame[];
 };
 
 export type DemoSignupCounts = Partial<Record<ClubSessionDay, number>>;

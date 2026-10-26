@@ -39,12 +39,9 @@ type SessionCardProps = {
   isSignedIn: boolean;
   isPending: boolean;
   friendList: FriendCandidate[];
-  canMarkPlayed: boolean;
-  hasBeenPlayed: boolean;
   onSignup: (friendIds: string[]) => void;
   onAddToFriendList: (friend: FriendCandidate) => Promise<void>;
   onSaveFriendPreferences: (friendIds: string[]) => Promise<void>;
-  onMarkPlayed: () => void;
 };
 
 export function SessionCard({
@@ -60,12 +57,9 @@ export function SessionCard({
   isSignedIn,
   isPending,
   friendList,
-  canMarkPlayed,
-  hasBeenPlayed,
   onSignup,
   onAddToFriendList,
   onSaveFriendPreferences,
-  onMarkPlayed,
 }: SessionCardProps) {
   const friendCandidates = session.friendCandidates ?? [];
   const [selectedFriendIds, setSelectedFriendIds] = useState(() => {
@@ -98,24 +92,21 @@ export function SessionCard({
         selectedFriendIds,
         friendCandidates,
       )
-    : session.timeSlots.flatMap((slot) =>
-        slot.players.map((player) => ({
-          id: player.id,
-          displayName: player.displayName,
-          priority: slot.number,
-          friendIds: player.id === currentPlayerId ? selectedFriendIds : [],
-        })),
-      );
-  const playerGameSchedule =
-    signupStatus === "selected" &&
-    currentPlayerId &&
-    scheduleRoster.some((player) => player.id === currentPlayerId)
-    ? createPlayerGameSchedule(
-        { ...session, id: session.id },
-        scheduleRoster,
-        currentPlayerId,
-      )
     : [];
+  const playerGameSchedule =
+    isDemo
+      ? signupStatus === "selected" &&
+        currentPlayerId &&
+        scheduleRoster.some((player) => player.id === currentPlayerId)
+        ? createPlayerGameSchedule(
+            { ...session, id: session.id },
+            scheduleRoster,
+            currentPlayerId,
+          )
+        : []
+      : signupStatus === "selected"
+        ? session.playerGameSchedule ?? []
+        : [];
   const hasFcfsSpace =
     session.status === "confirmed" &&
     !isPastCancellationDeadline &&
@@ -184,7 +175,7 @@ export function SessionCard({
           </div>
 
           {session.feeCents > 0 && session.status !== "cancelled" && (
-            <div className="mt-3 flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/70 px-3.5 py-2 text-xs text-emerald-950 dark:border-emerald-800/40 dark:bg-emerald-950/20 dark:text-emerald-200">
+            <div className="mt-3 flex items-center justify-between rounded-xl bg-emerald-50/70 px-3.5 py-2 text-xs text-emerald-950 dark:bg-emerald-950/20 dark:text-emerald-200">
               <span className="flex items-center gap-2">
                 <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-200 font-bold text-emerald-900 dark:bg-emerald-800 dark:text-emerald-100">
                   €
@@ -318,7 +309,7 @@ export function SessionCard({
                 {playerGameSchedule.map((game) => (
                   <li
                     key={`${game.startAt}-${game.courtNumber}`}
-                    className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-foreground"
+                    className="rounded-xl bg-primary/5 p-3 text-foreground"
                   >
                     <div className="font-semibold text-primary">
                       Court {game.courtNumber} ·{" "}
@@ -417,34 +408,7 @@ export function SessionCard({
               </Button>
             )}
           </div>
-          {session.status !== "cancelled" &&
-            (canMarkPlayed || hasBeenPlayed) && (
-            <div className="mt-3 flex items-center justify-between gap-3 pt-2">
-              <p className="text-xs text-muted-foreground">
-                {hasBeenPlayed
-                  ? "Attendance recorded for fairness tracking."
-                  : "Played this session? Check in to update your play history."}
-              </p>
-              {canMarkPlayed && (
-                <Button
-                  className="h-auto min-h-10 shrink-0 py-2.5"
-                  disabled={isPending}
-                  onClick={onMarkPlayed}
-                  size="sm"
-                  variant="secondary"
-                >
-                  {isPending ? (
-                    <>
-                      <LoaderCircle aria-hidden="true" className="animate-spin" />
-                      Saving
-                    </>
-                  ) : (
-                    "Mark played"
-                  )}
-                </Button>
-              )}
-            </div>
-          )}
+          {null}
         </div>
       </div>
     </article>
