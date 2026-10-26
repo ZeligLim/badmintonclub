@@ -269,18 +269,13 @@ export function SessionTemplateManager({
                     />
                   </td>
                   <td className="px-4 py-2.5">
-                    <Button
-                      className="h-7"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        startEditing(template);
-                      }}
-                      size="sm"
+                    <button
+                      className="inline-flex h-7 items-center justify-center rounded-md px-2.5 text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      onClick={() => startEditing(template)}
                       type="button"
-                      variant="ghost"
                     >
                       Edit
-                    </Button>
+                    </button>
                   </td>
                 </tr>
               ))
