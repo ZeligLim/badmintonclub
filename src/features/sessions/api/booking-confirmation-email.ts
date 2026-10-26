@@ -173,17 +173,32 @@ async function createBookingConfirmationEmail(
     throw new Error("Could not load the confirmed session roster.");
   }
 
-  const { data: friendPrefs } = await supabase
-    .from("session_friend_preferences")
-    .select("user_id, friend_user_id")
-    .eq("session_id", sessionId);
+  const rosterUserIds = roster.map((player) => player.user_id);
+  const [{ data: friendPrefs }, { data: clubFriendPrefs }, { data: profiles }] =
+    await Promise.all([
+      admin
+        .from("session_friend_preferences")
+        .select("user_id, friend_user_id")
+        .eq("session_id", sessionId),
+      admin
+        .from("club_friend_list")
+        .select("user_id, friend_user_id")
+        .in("user_id", rosterUserIds),
+      admin
+        .from("profiles")
+        .select("id, is_committee")
+        .in("id", rosterUserIds),
+    ]);
 
   const friendMap = new Map<string, string[]>();
-  for (const pref of friendPrefs ?? []) {
+  for (const pref of [...(friendPrefs ?? []), ...(clubFriendPrefs ?? [])]) {
     const list = friendMap.get(pref.user_id) ?? [];
-    list.push(pref.friend_user_id);
+    if (!list.includes(pref.friend_user_id)) list.push(pref.friend_user_id);
     friendMap.set(pref.user_id, list);
   }
+  const committeeByUser = new Map(
+    (profiles ?? []).map((profile) => [profile.id, profile.is_committee]),
+  );
 
   const sessionDetails = {
     id: sessionId,
@@ -198,6 +213,7 @@ async function createBookingConfirmationEmail(
       displayName: player.display_name,
       priority: player.slot_number,
       friendIds: friendMap.get(player.user_id) ?? [],
+      isCommittee: committeeByUser.get(player.user_id) ?? false,
     })),
     userId,
   );

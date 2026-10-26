@@ -9,10 +9,7 @@ export type PlayerLevel = "BEGINNER" | "INTERMEDIATE" | "ADVANCED";
 export type CourtRosterPlayer = {
   id: string;
   displayName: string;
-  /**
-   * Lower values mean higher committee priority, matching the previous
-   * implementation's priority ordering.
-   */
+  /** Legacy signup ordering metadata; anchor precedence uses isCommittee. */
   priority?: number;
   /** One-way outgoing friendship requests. Mutual requests are not required. */
   friendIds?: string[];
@@ -43,7 +40,6 @@ export type PlayerGame = {
 type InternalPlayer = CourtRosterPlayer & {
   rosterIndex: number;
   normalizedFriendIds: string[];
-  incomingFriendCount: number;
   /** Stable random tie-break value for this schedule generation. */
   randomRank: number;
 };
@@ -106,17 +102,12 @@ function compareGameFairness(
 }
 
 /**
- * Anchor ranking:
- * 1. Committee priority (lower numeric priority first).
- * 2. More incoming friend requests.
- * 3. More outgoing friend requests.
- * 4. Random tie-break assigned once per schedule generation.
+ * Committee members anchor before other eligible players. Ties are randomized
+ * once per schedule generation so the ranking stays stable within a schedule.
  */
 function compareAnchorPriority(a: InternalPlayer, b: InternalPlayer): number {
   return (
-    (a.priority ?? 0) - (b.priority ?? 0) ||
-    b.incomingFriendCount - a.incomingFriendCount ||
-    b.normalizedFriendIds.length - a.normalizedFriendIds.length ||
+    Number(Boolean(b.isCommittee)) - Number(Boolean(a.isCommittee)) ||
     a.randomRank - b.randomRank
   );
 }
@@ -497,17 +488,6 @@ function allocateOnce(
     throw new Error("Court allocation roster contains duplicate player IDs.");
   }
 
-  const rosterIds = new Set(roster.map((player) => player.id));
-  const incomingCounts = new Map<string, number>(roster.map((player) => [player.id, 0]));
-
-  for (const player of roster) {
-    for (const friendId of new Set(player.friendIds ?? [])) {
-      if (friendId !== player.id && rosterIds.has(friendId)) {
-        incomingCounts.set(friendId, (incomingCounts.get(friendId) ?? 0) + 1);
-      }
-    }
-  }
-
   const deterministicRng = createDeterministicRng(
     `${session.id}|${roster.map((player) => player.id).sort().join(",")}|${seedText}`,
   );
@@ -524,7 +504,6 @@ function allocateOnce(
       normalizedFriendIds: [
         ...new Set(player.friendIds ?? []),
       ].filter((id) => id !== player.id),
-      incomingFriendCount: incomingCounts.get(player.id) ?? 0,
       rosterIndex: index,
       randomRank: deterministicRng(),
     }))
@@ -728,9 +707,6 @@ export function allocateCourtSchedule(
     throw new Error("Court allocation requires at least one court.");
   }
   const candidateCount = resolveCandidateCount(options?.candidateCount);
-  const rosterIds = [...new Set(roster.map((player) => player.id))].sort();
-  const seedBase = `${session.id}|${rosterIds.join(",")}`;
-
   let bestSchedule: AllocatedCourtGame[] | null = null;
   let bestScore: number[] | null = null;
 
@@ -774,7 +750,7 @@ export function createPlayerGameSchedule(
   roster: CourtRosterPlayer[],
   playerId: string,
 ): PlayerGame[] {
-  return allocateOnce(session, roster, "player-game")
+  return allocateCourtSchedule(session, roster)
     .filter((game) => game.players.some((player) => player.id === playerId))
     .map(({ courtNumber, startAt, endAt, players }) => ({
       courtNumber,

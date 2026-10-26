@@ -16,6 +16,7 @@ export type AdminPlayer = {
   displayName: string;
   status: string;
   slotNumber: number | null;
+  isCommittee?: boolean;
 };
 
 export type AdminCourtGame = {
@@ -209,16 +210,19 @@ export async function loadAdminData(): Promise<AdminSession[]> {
         .in("user_id", userIds)
     : { data: [] };
 
-  const profileMap = new Map<string, string>();
+  const profileMap = new Map<string, { displayName: string; isCommittee: boolean }>();
   if (userIds.length) {
     const { data: profiles, error: profilesErr } = await admin
       .from("profiles")
-      .select("id, display_name")
+      .select("id, display_name, is_committee")
       .in("id", userIds);
 
     if (profilesErr) throw new Error(`Could not load profiles: ${profilesErr.message}`);
     for (const p of profiles ?? []) {
-      profileMap.set(p.id, p.display_name);
+      profileMap.set(p.id, {
+        displayName: p.display_name,
+        isCommittee: p.is_committee,
+      });
     }
   }
 
@@ -253,9 +257,10 @@ export async function loadAdminData(): Promise<AdminSession[]> {
 
     const players: AdminPlayer[] = sessionSignups.map((s) => ({
       userId: s.user_id,
-      displayName: profileMap.get(s.user_id) ?? s.user_id.slice(0, 8),
+      displayName: profileMap.get(s.user_id)?.displayName ?? s.user_id.slice(0, 8),
       status: s.status,
       slotNumber: s.slot_number,
+      isCommittee: profileMap.get(s.user_id)?.isCommittee ?? false,
     }));
 
     const courtCount = getCourtCount(session.capacity);
@@ -279,6 +284,7 @@ export async function loadAdminData(): Promise<AdminSession[]> {
             displayName: player.displayName,
             priority: player.slotNumber ?? 1,
             friendIds: sessionFriendMap.get(player.userId) ?? [],
+            isCommittee: player.isCommittee,
           })),
         )
       : null;

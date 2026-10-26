@@ -123,6 +123,15 @@ export async function loadDashboardData(): Promise<DashboardData> {
             .filter((value): value is string => typeof value === "string"),
         ),
       );
+      const { data: committeeProfiles } = confirmedRosterUserIds.length
+        ? await admin
+            .from("profiles")
+            .select("id, is_committee")
+            .in("id", confirmedRosterUserIds)
+        : { data: [] };
+      const committeeByUser = new Map(
+        (committeeProfiles ?? []).map((row) => [row.id, row.is_committee]),
+      );
       const { data: allClubPrefs } =
         confirmedSessionIds.length && confirmedRosterUserIds.length
           ? await admin
@@ -167,6 +176,7 @@ export async function loadDashboardData(): Promise<DashboardData> {
           displayName: player.display_name,
           priority: player.slot_number ?? 1,
           friendIds: sessionPrefs.get(player.user_id) ?? [],
+          isCommittee: committeeByUser.get(player.user_id) ?? false,
         }));
         const schedule = allocateCourtSchedule(
           {

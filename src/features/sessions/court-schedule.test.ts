@@ -36,6 +36,7 @@ function makeNamedRoster(
     id: string;
     friendIds?: string[];
     priority?: number;
+    isCommittee?: boolean;
   }>,
 ): CourtRosterPlayer[] {
   return players.map((player) => ({
@@ -43,6 +44,7 @@ function makeNamedRoster(
     displayName: player.id,
     priority: player.priority ?? 1,
     friendIds: player.friendIds ?? [],
+    isCommittee: player.isCommittee ?? false,
   }));
 }
 
@@ -437,8 +439,8 @@ describe("Court Scheduling Algorithm", () => {
   it("A2: gives a committee member the contested friend before a non-committee anchor", () => {
     // Both anchors ask for F, so only one of them can have F.
     const roster = makeNamedRoster([
-      { id: "COM", friendIds: ["F"], priority: 0 },
-      { id: "POP", friendIds: ["F"], priority: 1 },
+      { id: "COM", friendIds: ["F"], isCommittee: true },
+      { id: "POP", friendIds: ["F"], priority: 0 },
       { id: "F" },
       { id: "E" },
       { id: "G" },
@@ -451,51 +453,6 @@ describe("Court Scheduling Algorithm", () => {
     for (let run = 0; run < 25; run++) {
       const schedule = allocateCourtSchedule(session, roster);
       expect(courtPlayerIds(courtOf(schedule, "COM"))).toContain("F");
-    }
-  });
-
-  // A3: Anchor Ranking - Incoming Requests Before Outgoing Ones (docs/court-allocation.md, section 3)
-  it("A3: prefers the anchor with more incoming requests over the one with more outgoing requests", () => {
-    // P1 has two incoming requests but only one outgoing request; P2 has one
-    // incoming request but three outgoing ones. Both ask for F.
-    const roster = makeNamedRoster([
-      { id: "P1", friendIds: ["F"] },
-      { id: "P2", friendIds: ["F", "G", "H"] },
-      { id: "P3", friendIds: ["P1"] },
-      { id: "P4", friendIds: ["P1"] },
-      { id: "F" },
-      { id: "G" },
-      { id: "H" },
-      { id: "I" },
-      { id: "J" },
-      { id: "K" },
-    ]);
-    const session = { id: "test", startsAt: "18:00", durationMinutes: 15, courtCount: 2 };
-
-    for (let run = 0; run < 25; run++) {
-      const schedule = allocateCourtSchedule(session, roster);
-      expect(courtPlayerIds(courtOf(schedule, "P1"))).toContain("F");
-    }
-  });
-
-  // A4: Anchor Ranking - Outgoing Requests Break The Remaining Tie (docs/court-allocation.md, section 3)
-  it("A4: prefers the anchor with more outgoing requests when the incoming counts are equal", () => {
-    const roster = makeNamedRoster([
-      { id: "P1", friendIds: ["F", "G", "H"] },
-      { id: "P2", friendIds: ["F"] },
-      { id: "F" },
-      { id: "G" },
-      { id: "H" },
-      { id: "I" },
-      { id: "J" },
-      { id: "K" },
-      { id: "L" },
-    ]);
-    const session = { id: "test", startsAt: "18:00", durationMinutes: 15, courtCount: 2 };
-
-    for (let run = 0; run < 25; run++) {
-      const schedule = allocateCourtSchedule(session, roster);
-      expect(courtPlayerIds(courtOf(schedule, "P1"))).toContain("F");
     }
   });
 
@@ -558,7 +515,7 @@ describe("Court Scheduling Algorithm", () => {
   // turn in the next round and plays with C.
   it("A7: keeps an unsatisfied anchor's own friend for a later round", () => {
     const roster = makeNamedRoster([
-      { id: "H", friendIds: ["C"], priority: 0 },
+      { id: "H", friendIds: ["C"], isCommittee: true },
       { id: "A", friendIds: ["B"], priority: 1 },
       { id: "B", friendIds: ["C"], priority: 2 },
       { id: "C", friendIds: ["D"], priority: 3 },
@@ -658,9 +615,27 @@ describe("Court Scheduling Algorithm", () => {
 
   // Extra Test: createPlayerGameSchedule integration
   it("creates accurate player personal game timetable with court companions", () => {
-    const roster = makeRoster(10);
+    const roster = makeRoster(10, {
+      friendPreferences: {
+        "player-1": ["player-2", "player-3", "player-4"],
+        "player-2": ["player-5"],
+        "player-3": ["player-6"],
+      },
+    });
     const playerGames = createPlayerGameSchedule(monday60min, roster, "player-1");
+    const fullSchedule = allocateCourtSchedule(monday60min, roster);
+    const expectedPlayerGames = fullSchedule
+      .filter((game) => game.players.some((player) => player.id === "player-1"))
+      .map((game) => ({
+        courtNumber: game.courtNumber,
+        startAt: game.startAt,
+        endAt: game.endAt,
+        courtPlayers: game.players
+          .filter((player) => player.id !== "player-1")
+          .map((player) => player.displayName),
+      }));
 
+    expect(playerGames).toEqual(expectedPlayerGames);
     expect(playerGames.length).toBeGreaterThanOrEqual(3);
     for (const game of playerGames) {
       expect(game.courtNumber).toBeGreaterThanOrEqual(1);
