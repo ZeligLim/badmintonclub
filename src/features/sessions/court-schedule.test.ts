@@ -313,6 +313,25 @@ describe("Court Scheduling Algorithm", () => {
     expect(courtPlayerIds(courtOf(schedule, "player-1"))).toContain("player-10");
   });
 
+  it("fills unused court places with players who have no friend requests first", () => {
+    const roster = makeNamedRoster([
+      { id: "A", friendIds: ["B"], isCommittee: true },
+      { id: "B" },
+      { id: "C", friendIds: ["A"] },
+      { id: "D", friendIds: ["B"] },
+      { id: "E" },
+      { id: "F" },
+      { id: "G" },
+      { id: "H" },
+    ]);
+    const schedule = allocateCourtSchedule(
+      { id: "test", startsAt: "18:00", durationMinutes: 15, courtCount: 2 },
+      roster,
+    );
+
+    expect(courtPlayerIds(courtOf(schedule, "A"))).toEqual(["A", "B", "E", "F"]);
+  });
+
   // T9: Full Friend Group of 4 (Best-Effort Priority)
   it("T9: keeps a 4-player friend group together on the same court", () => {
     const friendPreferences: Record<string, string[]> = {

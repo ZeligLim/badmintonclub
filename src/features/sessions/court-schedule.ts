@@ -472,9 +472,16 @@ function buildCourtGroup(args: {
   }
 
   // Final fallback: fill remaining places with the fairest available players.
+  // Preserve players with outgoing requests for later anchor opportunities;
+  // players who did not request a friend are the first choice as fillers.
   const fallbackPlayers = activePlayers
     .filter((player) => availableIds.has(player.id))
-    .sort((a, b) => compareGameFairness(a, b, state));
+    .sort(
+      (a, b) =>
+        Number(a.normalizedFriendIds.length > 0) -
+          Number(b.normalizedFriendIds.length > 0) ||
+        compareGameFairness(a, b, state),
+    );
 
   for (const player of fallbackPlayers) {
     if (group.length >= PLAYERS_PER_COURT) break;
