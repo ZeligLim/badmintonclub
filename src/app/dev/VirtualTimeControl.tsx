@@ -15,18 +15,19 @@ export function VirtualTimeControl() {
   const [status, setStatus] = useState<string | null>(null);
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase
-      .rpc("get_virtual_now")
-      .then(({ data, error }) => {
-        if (error) {
-          setStatus(error.message);
-          return;
-        }
-        setCurrentTime(data ?? "");
-        setValue(toDatetimeLocal(data));
-      });
+    void loadCurrentTime();
   }, []);
+
+  async function loadCurrentTime() {
+    const supabase = createClient();
+    const { data, error } = await supabase.rpc("get_virtual_now");
+    if (error) {
+      setStatus(error.message);
+      return;
+    }
+    setCurrentTime(data ?? "");
+    setValue(toDatetimeLocal(data));
+  }
 
   async function applyTime() {
     setStatus(null);
@@ -40,6 +41,7 @@ export function VirtualTimeControl() {
       return;
     }
     setStatus(value ? "Virtual time set." : "Virtual time reset to real time.");
+    await loadCurrentTime();
   }
 
   return (

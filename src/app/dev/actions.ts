@@ -50,6 +50,32 @@ export async function deleteTestAccount(userId: string) {
   revalidatePath("/dev");
 }
 
+export async function setTestAccountRole(userId: string, role: string) {
+  assertDevelopment();
+  userId = String(userId ?? "").trim();
+  role = String(role ?? "").trim();
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      userId,
+    )
+  ) {
+    throw new Error("The account request is invalid.");
+  }
+  if (!["player", "committee", "committee-admin"].includes(role)) {
+    throw new Error("The role request is invalid.");
+  }
+
+  const supabase = createAdminClient();
+  const isCommittee = role === "committee" || role === "committee-admin";
+  const isCommitteeAdmin = role === "committee-admin";
+  const { error } = await supabase
+    .from("profiles")
+    .update({ is_committee: isCommittee, is_committee_admin: isCommitteeAdmin })
+    .eq("id", userId);
+  if (error) throw new Error(error.message);
+  revalidatePath("/dev");
+}
+
 export async function seedTestAccounts(formData: FormData) {
   assertDevelopment();
   const requestedCount = Number(formData.get("seedCount"));

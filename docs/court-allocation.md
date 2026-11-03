@@ -1,18 +1,10 @@
 Badminton Court Allocation Rules
 1. Purpose
 Allocate players into doubles teams of four while respecting friendship preferences, ensuring every eligible player gets an opportunity to act as an anchor, and maintaining fair game distribution.
-2. Friendship Preferences
-- Friendship requests are one-way preferences.
-- A request from A to B is meaningful even if B has not listed A.
-- Do not require mutual friendship requests.
-- A player's outgoing friend list is the list of players they would prefer to play with.
-- An incoming request is a request another player made to that player.
 3. Anchor Ranking
 Rank eligible anchors using the following priorities, in order:
-1. Committee precedence.
-2. Number of incoming friend requests (how many players listed this person).
-3. Number of outgoing friend requests (how many friends this person listed).
-4. Random tie-breaker among otherwise equal candidates.
+1. Committee precedence with randomisation.
+2. Other candidates with friend request.
 An eligible anchor is a player with at least one outgoing friend request.
 4. Anchor Satisfaction Cycles
 Anchor satisfaction is tracked separately from game participation and from being selected as somebody else's friend.
@@ -65,9 +57,7 @@ Game fairness is separate from anchor satisfaction.
 - After everyone has played once, prioritise players with the fewest games played.
 - Among players with equal game counts, prioritise the player who has waited longest / rested longest.
 - Anchor priority must never override the hard game-fairness constraint.
-7. Randomness
-- Use randomness only to break ties or choose among equally suitable available friends.
-- Randomness must not override anchor satisfaction, anchor ranking, or game fairness.
+
 8. Allocation Constraints and Fallbacks
 - A player can be allocated to at most one team per round.
 - Never allocate a player who is not available.

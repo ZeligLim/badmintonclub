@@ -37,7 +37,9 @@ export async function loadDashboardData(): Promise<DashboardData> {
 
   const supabase = await createClient();
   const { data: authData, error: authError } = await supabase.auth.getUser();
-  if (authError && authError.name !== "AuthSessionMissingError") {
+  if (authError?.message?.includes("does not exist")) {
+    await supabase.auth.signOut();
+  } else if (authError && authError.name !== "AuthSessionMissingError") {
     throw new Error(`Could not load your sign-in status: ${authError.message}`);
   }
   const user =
@@ -178,6 +180,11 @@ export async function loadDashboardData(): Promise<DashboardData> {
           friendIds: sessionPrefs.get(player.user_id) ?? [],
           isCommittee: committeeByUser.get(player.user_id) ?? false,
         }));
+        if (rosterPlayers.length === 0) {
+          userPlayerGameSchedules.set(sessionRow.id, []);
+          continue;
+        }
+
         const schedule = allocateCourtSchedule(
           {
             id: sessionRow.id,

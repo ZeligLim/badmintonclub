@@ -96,7 +96,12 @@ export async function proxy(request: NextRequest) {
       error.code === "refresh_token_not_found" ||
       error.code === "refresh_token_already_used" ||
       error.code === "session_expired";
-    if (error.name !== "AuthSessionMissingError" && !isExpiredSession) {
+    const isMissingUser = error.message?.includes("does not exist");
+    if (
+      error.name !== "AuthSessionMissingError" &&
+      !isExpiredSession &&
+      !isMissingUser
+    ) {
       throw new Error(`Could not refresh your sign-in: ${error.message}`);
     }
   }

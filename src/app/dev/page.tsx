@@ -10,6 +10,7 @@ import {
   randomSessionSignups,
   seedTestAccounts,
 } from "./actions";
+import { RoleSelect } from "./RoleSelect";
 import { VirtualTimeControl } from "./VirtualTimeControl";
 
 export const instant = false;
@@ -139,6 +140,7 @@ export default async function DevPage() {
             <thead>
               <tr>
                 <th className="px-3 py-2 text-left font-medium">Email</th>
+                <th className="px-3 py-2 text-left font-medium">Role</th>
                 <th className="min-w-[28rem] px-3 py-2 text-left font-medium">
                   Configure friend to play with
                 </th>
@@ -149,6 +151,18 @@ export default async function DevPage() {
               {rows.map((row) => (
                 <tr key={row.id}>
                   <td className="px-3 py-2 font-mono text-xs">{row.email}</td>
+                  <td className="px-3 py-2">
+                    <RoleSelect
+                      userId={row.id}
+                      initialRole={
+                        row.role === "Committee admin"
+                          ? "committee-admin"
+                          : row.role === "Committee member"
+                            ? "committee"
+                            : "player"
+                      }
+                    />
+                  </td>
                   <td className="px-3 py-2">
                     <div className="mb-1 flex flex-wrap gap-1">
                       {row.configuredFriends.length > 0

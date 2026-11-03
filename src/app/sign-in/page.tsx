@@ -12,7 +12,9 @@ export default async function SignInPage() {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getUser();
 
-  if (
+  if (error?.message?.includes("does not exist")) {
+    await supabase.auth.signOut();
+  } else if (
     error &&
     error.name !== "AuthSessionMissingError" &&
     error.status !== 401

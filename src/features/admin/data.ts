@@ -75,7 +75,9 @@ export async function requireAdminUser() {
   await connection();
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getUser();
-  if (error && error.name !== "AuthSessionMissingError") {
+  if (error?.message?.includes("does not exist")) {
+    await supabase.auth.signOut();
+  } else if (error && error.name !== "AuthSessionMissingError") {
     throw new Error(`Could not verify club administrator: ${error.message}`);
   }
   if (!data.user) {
