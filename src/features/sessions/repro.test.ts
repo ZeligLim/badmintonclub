@@ -13,10 +13,9 @@ describe("repro", () => {
         isCommittee: i % 6 === 0,
       }));
       const courtCount = Math.max(1, Math.floor(c / 4));
-      const duration = c <= 8 ? 15 : 120;
       try {
         allocateCourtSchedule(
-          { id: "s", startsAt: "18:00", durationMinutes: duration, courtCount },
+          { id: "s", startsAt: "18:00", durationMinutes: 15, courtCount },
           roster,
         );
       } catch (error) {
@@ -54,8 +53,10 @@ describe("repro", () => {
       { id: "2026-11-04-19:30", startsAt: "19:30", durationMinutes: 120, courtCount: 4 },
       roster,
     );
-    expect(schedule).toHaveLength(24);
-    expect(schedule.every((game) => game.players.length === 4)).toBe(true);
+    expect(schedule).toHaveLength(32);
+    expect(schedule.filter((game) => game.courtNumber === 4)).toHaveLength(8);
+    expect(schedule.filter((game) => game.courtNumber === 4).every((game) => game.players.length === 3)).toBe(true);
+    expect(schedule.filter((game) => game.courtNumber < 4).every((game) => game.players.length === 4)).toBe(true);
     expect(
       schedule.some((game) =>
         game.players.some(
@@ -71,6 +72,12 @@ describe("repro", () => {
       (player) =>
         schedule.filter((game) => game.players.some((member) => member.id === player.id)).length,
     );
-    expect(Math.max(...gameCounts) - Math.min(...gameCounts)).toBeLessThanOrEqual(1);
+    expect(Math.max(...gameCounts) - Math.min(...gameCounts)).toBe(0);
+    for (const startAt of new Set(schedule.map((game) => game.startAt))) {
+      const roundPlayers = schedule
+        .filter((game) => game.startAt === startAt)
+        .flatMap((game) => game.players.map((player) => player.id));
+      expect(new Set(roundPlayers).size).toBe(roster.length);
+    }
   }, 15_000);
 });

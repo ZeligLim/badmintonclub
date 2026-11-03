@@ -3,7 +3,7 @@ import type { ClubSession } from "./types";
 
 const GAME_DURATION_MINUTES = 15;
 const PLAYERS_PER_COURT = 4;
-export const COURT_ALLOCATION_VERSION = 7;
+export const COURT_ALLOCATION_VERSION = 8;
 
 export type PlayerLevel = "BEGINNER" | "INTERMEDIATE" | "ADVANCED";
 
@@ -58,6 +58,20 @@ export function markCourtScheduleCurrent(
 
 export function getCourtCount(capacity: number): number {
   return Math.min(Math.ceil(capacity / 8), 4);
+}
+
+function getCourtSizes(rosterSize: number, courtCount: number): number[] {
+  if (rosterSize < PLAYERS_PER_COURT) return [rosterSize];
+
+  const fullCourtCount = Math.min(courtCount, Math.floor(rosterSize / PLAYERS_PER_COURT));
+  const sizes = Array.from({ length: fullCourtCount }, () => PLAYERS_PER_COURT);
+  const remainingPlayers = rosterSize - fullCourtCount * PLAYERS_PER_COURT;
+
+  // Use a free court for the three-player game when exactly three players
+  // remain after filling every full doubles court.
+  if (sizes.length < courtCount && remainingPlayers === 3) sizes.push(3);
+
+  return sizes;
 }
 
 export type PlayerGame = {
@@ -400,6 +414,7 @@ function getCommitteeCourtCompanions(
   friendMap: Map<string, Set<string>>,
   byId: Map<string, InternalPlayer>,
   state: ScheduleTrackingState,
+  courtSize = PLAYERS_PER_COURT,
 ): InternalPlayer[] {
   const directFriends = getAvailableFriends(
     committee,
@@ -440,13 +455,13 @@ function getCommitteeCourtCompanions(
   const reserveNestedPlace = allDirectRequestsSeen && nestedFriends.length > 0;
   const directLimit = Math.min(
     directFriends.length,
-    PLAYERS_PER_COURT - 1 - Number(reserveNestedPlace),
+    courtSize - 1 - Number(reserveNestedPlace),
   );
   const companions = directFriends.slice(0, directLimit);
   if (reserveNestedPlace && nestedFriends[0]) companions.push(nestedFriends[0].player);
 
   for (const candidate of nestedFriends) {
-    if (companions.length >= PLAYERS_PER_COURT - 1) break;
+    if (companions.length >= courtSize - 1) break;
     if (!companions.some((player) => player.id === candidate.player.id)) {
       companions.push(candidate.player);
     }
@@ -479,13 +494,14 @@ function buildCourtGroup(args: {
   byId: Map<string, InternalPlayer>;
   state: ScheduleTrackingState;
   rng: () => number;
+  courtSize: number;
 }): InternalPlayer[] {
-  const { activePlayers, availableIds, cycle, friendMap, byId, state, rng } = args;
+  const { activePlayers, availableIds, cycle, friendMap, byId, state, rng, courtSize } = args;
   const group: InternalPlayer[] = [];
   const anchorsUsed: InternalPlayer[] = [];
 
   const addPlayer = (player: InternalPlayer): boolean => {
-    if (group.length >= PLAYERS_PER_COURT || !availableIds.has(player.id)) return false;
+    if (group.length >= courtSize || !availableIds.has(player.id)) return false;
     group.push(player);
     availableIds.delete(player.id);
     return true;
@@ -506,7 +522,7 @@ function buildCourtGroup(args: {
    * direct friends when the court has limited spaces.
    */
   const followNestedPreferences = (anchor: InternalPlayer): void => {
-    if (group.length >= PLAYERS_PER_COURT) return;
+    if (group.length >= courtSize) return;
 
     const candidates = shuffle(
       getAvailableFriends(anchor, availableIds, friendMap, byId),
@@ -573,6 +589,7 @@ function buildCourtGroup(args: {
       friendMap,
       byId,
       state,
+      courtSize,
     );
     for (const companion of companions) {
       addPlayer(companion);
@@ -587,11 +604,11 @@ function buildCourtGroup(args: {
 
     // A committee pack can be smaller than the court only if no more direct
     // or nested requests are available among the active players.
-    if (group.length < PLAYERS_PER_COURT) {
+    if (group.length < courtSize) {
       for (const friend of group.slice(1)) {
         if (!cycle.eligibleAnchorIds.has(friend.id)) continue;
         followNestedPreferences(friend);
-        if (group.length >= PLAYERS_PER_COURT) break;
+        if (group.length >= courtSize) break;
       }
     }
   } else if (cycle.eligibleAnchorIds.has(primaryAnchor.id)) {
@@ -603,7 +620,7 @@ function buildCourtGroup(args: {
   // Fill remaining spaces using preferences from every anchor already used.
   // Iterate because a newly selected friend may itself be an anchor.
   let changed = true;
-  while (group.length < PLAYERS_PER_COURT && changed) {
+  while (group.length < courtSize && changed) {
     changed = false;
 
     for (let index = 0; index < anchorsUsed.length; index++) {
@@ -635,13 +652,13 @@ function buildCourtGroup(args: {
         followNestedPreferences(next);
       }
 
-      if (group.length >= PLAYERS_PER_COURT) break;
+      if (group.length >= courtSize) break;
     }
   }
 
   // If there is room, try to combine another two-person preference pair.
   // This is the A->B plus C->D case; requests may be one-way.
-  while (group.length <= PLAYERS_PER_COURT - 2) {
+  while (group.length <= courtSize - 2) {
     const remaining = activePlayers.filter((player) => availableIds.has(player.id));
     const secondAnchor = getNextAnchor(remaining, cycle);
     if (!secondAnchor) break;
@@ -677,7 +694,7 @@ function buildCourtGroup(args: {
     addPlayer(secondPairFriends[0]!);
 
     // The second anchor's preference has now contributed to this team.
-    if (group.length < PLAYERS_PER_COURT) {
+    if (group.length < courtSize) {
       followNestedPreferences(secondAnchor);
     }
   }
@@ -703,7 +720,7 @@ function buildCourtGroup(args: {
     );
 
   for (const player of fallbackPlayers) {
-    if (group.length >= PLAYERS_PER_COURT) break;
+    if (group.length >= courtSize) break;
     addPlayer(player);
   }
 
@@ -852,18 +869,8 @@ function allocateOnce(
   };
 
   const roundCount = Math.ceil(session.durationMinutes / GAME_DURATION_MINUTES);
-  const activeCourtCount =
-    orderedRoster.length < PLAYERS_PER_COURT
-      ? 1
-      : Math.min(
-        session.courtCount,
-        Math.floor(orderedRoster.length / PLAYERS_PER_COURT),
-      );
-  const playersPerCourt =
-    orderedRoster.length < PLAYERS_PER_COURT
-      ? orderedRoster.length
-      : PLAYERS_PER_COURT;
-  const activeSpotsPerRound = activeCourtCount * playersPerCourt;
+  const courtSizes = getCourtSizes(orderedRoster.length, session.courtCount);
+  const activeSpotsPerRound = courtSizes.reduce((total, size) => total + size, 0);
 
   const state: ScheduleTrackingState = {
     gamesPlayed: new Map(orderedRoster.map((player) => [player.id, 0])),
@@ -925,7 +932,7 @@ function allocateOnce(
     const availableIds = new Set(activePlayers.map((player) => player.id));
     const courtGroups: InternalPlayer[][] = [];
 
-    for (let courtIndex = 0; courtIndex < activeCourtCount; courtIndex++) {
+    for (let courtIndex = 0; courtIndex < courtSizes.length; courtIndex++) {
       const group = buildCourtGroup({
         activePlayers,
         availableIds,
@@ -934,11 +941,12 @@ function allocateOnce(
         byId,
         state,
         rng: deterministicRng,
+        courtSize: courtSizes[courtIndex]!,
       });
 
-      if (group.length !== playersPerCourt) {
+      if (group.length !== courtSizes[courtIndex]) {
         throw new Error(
-          `Court ${courtIndex + 1} in round ${roundIndex + 1} has ${group.length} players; expected ${playersPerCourt}.`,
+          `Court ${courtIndex + 1} in round ${roundIndex + 1} has ${group.length} players; expected ${courtSizes[courtIndex]}.`,
         );
       }
 
@@ -997,7 +1005,8 @@ function allocateOnce(
           players: [...teamA, ...teamB],
         });
       } else {
-        // A partial court is only possible when the entire roster has < 4.
+        // The final court can be a three-player game when a spare court is
+        // available and exactly three players remain after full courts.
         schedule.push({
           courtNumber,
           startAt,
@@ -1008,7 +1017,7 @@ function allocateOnce(
     }
   }
 
-  validateSchedule(schedule, activeCourtCount * roundCount, orderedRoster.length);
+  validateSchedule(schedule, courtSizes, roundCount);
   return schedule;
 }
 
@@ -1064,9 +1073,8 @@ export function allocateCourtSchedule(
   try {
     validateSchedule(
       bestSchedule,
-      Math.ceil(session.durationMinutes / GAME_DURATION_MINUTES) *
-        Math.max(1, Math.min(session.courtCount, Math.floor(roster.length / (roster.length < 4 ? 1 : 4)))),
-      roster.length,
+      getCourtSizes(roster.length, session.courtCount),
+      Math.ceil(session.durationMinutes / GAME_DURATION_MINUTES),
     );
   } catch {
     // Keep deterministic allocation even if validation reports an edge case.
@@ -1094,17 +1102,18 @@ export function createPlayerGameSchedule(
 
 function validateSchedule(
   games: AllocatedCourtGame[],
-  expectedGameCount: number,
-  rosterSize: number,
+  courtSizes: number[],
+  expectedRounds: number,
 ): void {
+  const expectedGameCount = expectedRounds * courtSizes.length;
   if (games.length !== expectedGameCount) {
     throw new Error(
       `Court allocation produced ${games.length} games; expected ${expectedGameCount}.`,
     );
   }
 
-  const expectedPerGame = Math.min(PLAYERS_PER_COURT, rosterSize);
   for (const game of games) {
+    const expectedPerGame = courtSizes[game.courtNumber - 1];
     if (game.players.length !== expectedPerGame) {
       throw new Error(
         `Court ${game.courtNumber} at ${game.startAt} has ${game.players.length} players; expected ${expectedPerGame}.`,
@@ -1165,12 +1174,9 @@ function scoreAllocation(
   );
 
   let hardViolations = 0;
-  const expectedPerGame = Math.min(PLAYERS_PER_COURT, roster.length);
   const expectedRounds = Math.ceil(session.durationMinutes / GAME_DURATION_MINUTES);
-  const expectedCourtsPerRound =
-    roster.length < PLAYERS_PER_COURT
-      ? 1
-      : Math.min(session.courtCount, Math.floor(roster.length / PLAYERS_PER_COURT));
+  const expectedCourtSizes = getCourtSizes(roster.length, session.courtCount);
+  const expectedCourtsPerRound = expectedCourtSizes.length;
 
   if (schedule.length !== expectedRounds * expectedCourtsPerRound) {
     hardViolations += Math.abs(schedule.length - expectedRounds * expectedCourtsPerRound) + 1;
@@ -1179,7 +1185,9 @@ function scoreAllocation(
   const seenPlayersByRound = new Map<number, Set<string>>();
   const roundByStart = new Map<string, number>();
   for (const game of schedule) {
-    if (game.players.length !== expectedPerGame) hardViolations += 1;
+    if (game.players.length !== expectedCourtSizes[game.courtNumber - 1]) {
+      hardViolations += 1;
+    }
     if (new Set(game.players.map((player) => player.id)).size !== game.players.length) {
       hardViolations += 1;
     }

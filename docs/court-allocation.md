@@ -61,6 +61,7 @@ Game fairness is separate from anchor satisfaction.
 8. Allocation Constraints and Fallbacks
 - A player can be allocated to at most one team per round.
 - Never allocate a player who is not available.
+- If exactly three players remain after filling the available full courts and a spare court is available, place those three on the spare court for a three-player game.
 - If an anchor's preferred friends are unavailable, consider their other available listed friends.
 - If the friendship preferences cannot fill all four positions, use the next suitable available friendship preferences as a fallback.
 - Keep filling available team positions rather than leaving a court partially empty when eligible players remain.
