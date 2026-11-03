@@ -290,7 +290,12 @@ function selectActivePlayers(
         activeIds.delete(committee.id);
         activeIds.add(replacement.id);
       } else {
-        throw new Error("Could not keep a committee court pack within the game fairness limit.");
+        // Keep the fair active roster when the committee pack cannot be
+        // completed or rotated out without creating a game-count gap. The
+        // court builder still gives this committee's available friends
+        // priority, and an infeasible preference pack must not abort the
+        // entire session schedule.
+        continue;
       }
       continue;
     }
@@ -1025,9 +1030,10 @@ export function allocateCourtSchedule(
   if (!Number.isInteger(session.courtCount) || session.courtCount <= 0) {
     throw new Error("Court allocation requires at least one court.");
   }
-  const candidateCount = resolveCandidateCount(options?.candidateCount);
+  const candidateCount = resolveCandidateCount(options?.candidateCount, roster);
   let bestSchedule: AllocatedCourtGame[] | null = null;
   let bestScore: number[] | null = null;
+  let lastCandidateError: unknown;
 
   for (let candidateIndex = 0; candidateIndex < candidateCount; candidateIndex += 1) {
     try {
@@ -1043,13 +1049,16 @@ export function allocateCourtSchedule(
         bestScore = score;
         bestSchedule = candidate;
       }
-    } catch {
+    } catch (error) {
       // Candidates that cannot be fully allocated are never candidates.
+      lastCandidateError = error;
     }
   }
 
   if (!bestSchedule) {
-    throw new Error("Court allocation could not produce a valid timetable.");
+    throw new Error("Court allocation could not produce a valid timetable.", {
+      cause: lastCandidateError,
+    });
   }
 
   try {
@@ -1120,9 +1129,23 @@ function compareScore(a: number[], b: number[]): number {
   return 0;
 }
 
-function resolveCandidateCount(value?: number): number {
+function resolveCandidateCount(
+  value: number | undefined,
+  roster: CourtRosterPlayer[],
+): number {
   if (typeof value !== "number" || !Number.isFinite(value) || value < 1) {
-    return 100;
+    const committeeIds = new Set(
+      roster.filter((player) => player.isCommittee).map((player) => player.id),
+    );
+    const overlappingCommitteeRequests = roster.reduce((total, player) => {
+      if (!player.isCommittee) return total;
+      const requestedIds = new Set(player.friendIds ?? []);
+      return total + [...requestedIds].filter((id) => committeeIds.has(id)).length;
+    }, 0);
+
+    // Dense committee friend networks need more candidate schedules to find
+    // fair rotations that keep the requested friends on court together.
+    return overlappingCommitteeRequests >= 4 ? 500 : 100;
   }
   return Math.round(value);
 }
