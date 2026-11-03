@@ -171,7 +171,7 @@ export async function loadAdminAccountCount(): Promise<number> {
   return count;
 }
 
-export async function loadAdminData(): Promise<AdminSession[]> {
+export async function loadAdminData(options?: { allocationSeed?: string }): Promise<AdminSession[]> {
   await connection();
   const admin = createAdminClient();
   const londonNow = getLondonDateTime(new Date());
@@ -290,6 +290,7 @@ export async function loadAdminData(): Promise<AdminSession[]> {
             friendIds: sessionFriendMap.get(player.userId) ?? [],
             isCommittee: player.isCommittee,
           })),
+          options?.allocationSeed ? { seed: options.allocationSeed } : undefined,
         )
       : null;
 

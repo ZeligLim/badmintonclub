@@ -1,5 +1,6 @@
 import type { AdminSession } from "./data";
 import { SessionAvailabilityToggle } from "./SessionAvailabilityToggle";
+import { RegenerateCourtScheduleButton } from "./RegenerateCourtScheduleButton";
 
 export function CourtScheduleTable({ session }: { session: AdminSession }) {
   const selectedPlayers = session.players.filter(
@@ -41,6 +42,9 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
             isHappening={!isCancelled}
             isConfirmed={session.status === "confirmed"}
           />
+        )}
+        {!isCancelled && selectedPlayers.length > 0 && (
+          <RegenerateCourtScheduleButton sessionId={session.id} />
         )}
       </div>
 

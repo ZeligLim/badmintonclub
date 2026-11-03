@@ -313,7 +313,7 @@ describe("Court Scheduling Algorithm", () => {
     expect(courtPlayerIds(courtOf(schedule, "player-1"))).toContain("player-10");
   });
 
-  it("fills unused court places with players who have no friend requests first", () => {
+  it("fills unused court places with players connected to the current friend group", () => {
     const roster = makeNamedRoster([
       { id: "A", friendIds: ["B"], isCommittee: true },
       { id: "B" },
@@ -329,7 +329,7 @@ describe("Court Scheduling Algorithm", () => {
       roster,
     );
 
-    expect(courtPlayerIds(courtOf(schedule, "A"))).toEqual(["A", "B", "E", "F"]);
+    expect(courtPlayerIds(courtOf(schedule, "A"))).toEqual(["A", "B", "C", "D"]);
   });
 
   // T9: Full Friend Group of 4 (Best-Effort Priority)
@@ -490,6 +490,54 @@ describe("Court Scheduling Algorithm", () => {
     }
   });
 
+  it("keeps all three of a committee member's requested friends on court", () => {
+    const roster = makeNamedRoster([
+      { id: "COM", friendIds: ["A", "B", "C"], isCommittee: true },
+      { id: "A" },
+      { id: "B" },
+      { id: "C" },
+      { id: "D" },
+      { id: "E" },
+      { id: "F" },
+      { id: "G" },
+      { id: "H" },
+    ]);
+    const schedule = allocateCourtSchedule(
+      { id: "committee-friend-partner", startsAt: "18:00", durationMinutes: 60, courtCount: 2 },
+      roster,
+    );
+    const committeeGames = schedule.filter((game) => game.players.some((player) => player.id === "COM"));
+
+    expect(committeeGames).toHaveLength(4);
+    for (const game of committeeGames) {
+      expect(courtPlayerIds(game)).toEqual(["A", "B", "C", "COM"]);
+    }
+  });
+
+  it("fills the remaining court place with a nested friend request for committee", () => {
+    const roster = makeNamedRoster([
+      { id: "COM", friendIds: ["A", "B"], isCommittee: true },
+      { id: "A", friendIds: ["C"] },
+      { id: "B" },
+      { id: "C" },
+      { id: "D" },
+      { id: "E" },
+      { id: "F" },
+      { id: "G" },
+      { id: "H" },
+    ]);
+    const schedule = allocateCourtSchedule(
+      { id: "committee-nested-friend", startsAt: "18:00", durationMinutes: 60, courtCount: 2 },
+      roster,
+    );
+    const committeeGames = schedule.filter((game) => game.players.some((player) => player.id === "COM"));
+
+    expect(committeeGames).toHaveLength(4);
+    for (const game of committeeGames) {
+      expect(courtPlayerIds(game)).toEqual(["A", "B", "C", "COM"]);
+    }
+  });
+
   // A5: Nested Anchors (docs/court-allocation.md, section 5.1)
   it("A5: follows a chain of nested anchors onto one court", () => {
     // A -> B, B -> C, C -> D. Every link in the chain is followed, so the
@@ -541,13 +589,8 @@ describe("Court Scheduling Algorithm", () => {
     }
   });
 
-  // A7: Anchor Satisfaction Cycles (docs/court-allocation.md, section 4)
-  //
-  // B is only ever taken along as somebody else's friend in the first round,
-  // because their own friend C is already on another court. Being somebody
-  // else's friend does not satisfy an anchor, so B gets their own anchor
-  // turn in the next round and plays with C.
-  it("A7: keeps an unsatisfied anchor's own friend for a later round", () => {
+  // A7: Committee Pack Priority and Compatible Friend Requests
+  it("fits a competing friend request into the committee's nested friend pack", () => {
     const roster = makeNamedRoster([
       { id: "H", friendIds: ["C"], isCommittee: true },
       { id: "A", friendIds: ["B"], priority: 1 },
@@ -565,13 +608,23 @@ describe("Court Scheduling Algorithm", () => {
       const firstRound = schedule.filter((game) => game.startAt === "18:00");
       const secondRound = schedule.filter((game) => game.startAt === "18:15");
 
-      // C is taken by the leading anchor's court in the first round, so B
-      // cannot be with their own friend yet.
+      // The committee's direct and nested requests take priority, while the
+      // fourth court place also fits B, who requested C.
       expect(courtPlayerIds(courtOf(firstRound, "C"))).toContain("C");
-      expect(courtPlayerIds(courtOf(firstRound, "B"))).not.toContain("C");
+      expect(courtPlayerIds(courtOf(firstRound, "H"))).toEqual([
+        "B",
+        "C",
+        "D",
+        "H",
+      ]);
 
-      // In the next round B is an unsatisfied anchor and plays with C.
-      expect(courtPlayerIds(courtOf(secondRound, "B"))).toContain("C");
+      // The same four-player pack stays together in the next round.
+      expect(courtPlayerIds(courtOf(secondRound, "H"))).toEqual([
+        "B",
+        "C",
+        "D",
+        "H",
+      ]);
     }
   });
 

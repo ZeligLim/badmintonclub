@@ -52,6 +52,13 @@ When an anchor has only one available friend, their preference forms a two-perso
 - If the second pair's anchor is eligible and unsatisfied, mark that anchor satisfied when their preference is used.
 - If no suitable second pair is available, fill the remaining team positions using other available friendship preferences where possible.
 - Do not leave team positions empty solely because a second pair could not be found.
+
+5.3 Committee Friend Coverage
+- Rank committee anchors ahead of other anchors, then rank by number of outgoing friend requests.
+- Put up to three of the committee anchor's available requested friends on the same court before following nested requests.
+- When the committee has more than three available requested friends, prefer friends who have shared fewer courts with them so requests rotate across the session.
+- Fill any court places left after direct requests with available nested friend requests. Once every direct request has been matched on court at least once, reserve one place for an available nested friend request in later games when possible, while keeping a direct friend on court.
+- A four-player court cannot include the committee member, all three direct friends, and an additional nested friend in the same game. Prioritize direct-request coverage first, then nested-request coverage across later games.
 6. Game Fairness (Hard Constraint)
 Game fairness is separate from anchor satisfaction.
 - No player may receive a second game until every eligible player has received their first game.

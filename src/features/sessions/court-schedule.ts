@@ -3,7 +3,7 @@ import type { ClubSession } from "./types";
 
 const GAME_DURATION_MINUTES = 15;
 const PLAYERS_PER_COURT = 4;
-export const COURT_ALLOCATION_VERSION = 2;
+export const COURT_ALLOCATION_VERSION = 7;
 
 export type PlayerLevel = "BEGINNER" | "INTERMEDIATE" | "ADVANCED";
 
@@ -192,6 +192,118 @@ function selectActivePlayers(
     remaining.splice(remaining.findIndex((player) => player.id === selected.id), 1);
   }
 
+  // Treat each committee member and their requested / nested friends as one
+  // court pack. If a full pack cannot fit without breaking game fairness or
+  // another committee pack, the committee member rests this round.
+  const byId = new Map(roster.map((player) => [player.id, player]));
+  const rosterIds = new Set(roster.map((player) => player.id));
+  const activeIds = new Set(active.map((player) => player.id));
+  const committeePacks = roster
+    .filter((player) => player.isCommittee && player.normalizedFriendIds.length > 0)
+    .map((player) => ({
+      committee: player,
+      ids: new Set([
+        player.id,
+        ...getCommitteeCourtCompanions(player, rosterIds, friendMap, byId, state).map(
+          (friend) => friend.id,
+        ),
+      ]),
+    }))
+    .sort((a, b) => compareAnchorPriority(a.committee, b.committee));
+  const protectedIds = new Set(committeePacks.flatMap((pack) => [...pack.ids]));
+  const reservedGroups: Set<string>[] = [];
+
+  const fairnessAfterSwap = (playingIds: Set<string>, removeId: string, addId: string) => {
+    const nextCounts = roster.map((player) =>
+      (state.gamesPlayed.get(player.id) ?? 0) +
+      Number(playingIds.has(player.id) && player.id !== removeId) +
+      Number(player.id === addId),
+    );
+    return Math.max(...nextCounts) - Math.min(...nextCounts) <= 1;
+  };
+
+  for (const pack of committeePacks) {
+    if (!activeIds.has(pack.committee.id)) continue;
+    const overlappingGroups = reservedGroups.filter((group) =>
+      [...pack.ids].some((id) => group.has(id)),
+    );
+    const mergedGroup = new Set([
+      ...pack.ids,
+      ...overlappingGroups.flatMap((group) => [...group]),
+    ]);
+    const reservedIds = new Set(reservedGroups.flatMap((group) => [...group]));
+    let trialPlayers = [...active];
+    const trialIds = new Set(activeIds);
+    let feasible =
+      pack.ids.size > 1 &&
+      (overlappingGroups.length === 0 || mergedGroup.size <= PLAYERS_PER_COURT);
+
+    for (const friendId of pack.ids) {
+      if (!feasible || trialIds.has(friendId)) continue;
+      const friend = byId.get(friendId);
+      if (!friend) {
+        feasible = false;
+        break;
+      }
+
+      const replacements = trialPlayers
+        .filter(
+          (player) =>
+            !pack.ids.has(player.id) &&
+            !reservedIds.has(player.id) &&
+            !protectedIds.has(player.id),
+        )
+        .sort(
+          (a, b) =>
+            Number(a.isCommittee) - Number(b.isCommittee) ||
+            Number(a.normalizedFriendIds.length > 0) -
+              Number(b.normalizedFriendIds.length > 0) ||
+            compareGameFairnessPriority(b, a, state),
+        );
+      const replacement = replacements.find((player) =>
+        fairnessAfterSwap(trialIds, player.id, friendId),
+      );
+      if (!replacement) {
+        feasible = false;
+        break;
+      }
+
+      trialPlayers = trialPlayers.filter((player) => player.id !== replacement.id);
+      trialPlayers.push(friend);
+      trialIds.delete(replacement.id);
+      trialIds.add(friendId);
+    }
+
+    if (!feasible) {
+      const committee = pack.committee;
+      const replacement = roster
+        .filter((player) => !activeIds.has(player.id) && !reservedIds.has(player.id))
+        .sort(
+          (a, b) =>
+            Number(a.isCommittee) - Number(b.isCommittee) ||
+            compareGameFairness(a, b, state),
+        )
+        .find((player) => fairnessAfterSwap(activeIds, committee.id, player.id));
+      if (replacement) {
+        const index = active.findIndex((player) => player.id === committee.id);
+        if (index >= 0) active[index] = replacement;
+        activeIds.delete(committee.id);
+        activeIds.add(replacement.id);
+      } else {
+        throw new Error("Could not keep a committee court pack within the game fairness limit.");
+      }
+      continue;
+    }
+
+    active.splice(0, active.length, ...trialPlayers);
+    activeIds.clear();
+    for (const id of trialIds) activeIds.add(id);
+    for (const group of overlappingGroups) {
+      reservedGroups.splice(reservedGroups.indexOf(group), 1);
+    }
+    reservedGroups.push(mergedGroup);
+  }
+
   return active;
 }
 
@@ -202,6 +314,7 @@ function selectActivePlayers(
 function compareAnchorPriority(a: InternalPlayer, b: InternalPlayer): number {
   return (
     Number(Boolean(b.isCommittee)) - Number(Boolean(a.isCommittee)) ||
+    b.normalizedFriendIds.length - a.normalizedFriendIds.length ||
     a.randomRank - b.randomRank
   );
 }
@@ -274,6 +387,67 @@ function getAvailableFriends(
     .filter((id) => availableIds.has(id))
     .map((id) => byId.get(id))
     .filter((player): player is InternalPlayer => player !== undefined);
+}
+
+function getCommitteeCourtCompanions(
+  committee: InternalPlayer,
+  availableIds: Set<string>,
+  friendMap: Map<string, Set<string>>,
+  byId: Map<string, InternalPlayer>,
+  state: ScheduleTrackingState,
+): InternalPlayer[] {
+  const directFriends = getAvailableFriends(
+    committee,
+    availableIds,
+    friendMap,
+    byId,
+  ).sort(
+    (a, b) =>
+      (state.courtCoPresence.get(committee.id)?.get(a.id) ?? 0) -
+        (state.courtCoPresence.get(committee.id)?.get(b.id) ?? 0) ||
+      a.randomRank - b.randomRank,
+  );
+  const allDirectRequestsSeen = [...(friendMap.get(committee.id) ?? [])]
+    .filter((id) => byId.has(id))
+    .every((id) => (state.courtCoPresence.get(committee.id)?.get(id) ?? 0) > 0);
+  const directFriendIds = new Set(friendMap.get(committee.id) ?? []);
+  const nestedFriends = directFriends
+    .flatMap((friend) =>
+      getAvailableFriends(friend, availableIds, friendMap, byId).map((player) => ({
+        owner: friend,
+        player,
+      })),
+    )
+    .filter(({ player }) => player.id !== committee.id && !directFriendIds.has(player.id))
+    .filter(
+      (candidate, index, candidates) =>
+        candidates.findIndex(({ player }) => player.id === candidate.player.id) === index,
+    )
+    .sort(
+      (a, b) =>
+        (state.courtCoPresence.get(committee.id)?.get(a.player.id) ?? 0) -
+        (state.courtCoPresence.get(committee.id)?.get(b.player.id) ?? 0) ||
+        (state.courtCoPresence.get(a.owner.id)?.get(a.player.id) ?? 0) -
+        (state.courtCoPresence.get(b.owner.id)?.get(b.player.id) ?? 0) ||
+        a.player.randomRank - b.player.randomRank,
+    );
+
+  const reserveNestedPlace = allDirectRequestsSeen && nestedFriends.length > 0;
+  const directLimit = Math.min(
+    directFriends.length,
+    PLAYERS_PER_COURT - 1 - Number(reserveNestedPlace),
+  );
+  const companions = directFriends.slice(0, directLimit);
+  if (reserveNestedPlace && nestedFriends[0]) companions.push(nestedFriends[0].player);
+
+  for (const candidate of nestedFriends) {
+    if (companions.length >= PLAYERS_PER_COURT - 1) break;
+    if (!companions.some((player) => player.id === candidate.player.id)) {
+      companions.push(candidate.player);
+    }
+  }
+
+  return companions;
 }
 
 /**
@@ -364,10 +538,10 @@ function buildCourtGroup(args: {
 
   // Primary anchor selection. If no unsatisfied anchor is currently
   // available, use the fairest remaining active player as a fallback.
-  let primaryAnchor = getNextAnchor(
-    activePlayers.filter((player) => availableIds.has(player.id)),
-    cycle,
-  );
+  const availablePlayers = activePlayers.filter((player) => availableIds.has(player.id));
+  let primaryAnchor = availablePlayers
+    .filter((player) => player.isCommittee && player.normalizedFriendIds.length > 0)
+    .sort(compareAnchorPriority)[0] ?? getNextAnchor(availablePlayers, cycle);
 
   if (!primaryAnchor) {
     primaryAnchor = activePlayers
@@ -384,8 +558,40 @@ function buildCourtGroup(args: {
     promoteAnchor(primaryAnchor);
   }
 
-  // First follow a nested chain from the primary anchor.
-  if (cycle.eligibleAnchorIds.has(primaryAnchor.id)) {
+  // Committee anchors get the available requested friends onto their court
+  // together as one complete group. Direct requests are covered first, then
+  // nested friends use any remaining place.
+  if (primaryAnchor.isCommittee) {
+    const companions = getCommitteeCourtCompanions(
+      primaryAnchor,
+      availableIds,
+      friendMap,
+      byId,
+      state,
+    );
+    for (const companion of companions) {
+      addPlayer(companion);
+      if (
+        cycle.eligibleAnchorIds.has(companion.id) &&
+        !cycle.satisfiedAnchorIds.has(companion.id) &&
+        hasAvailableFriend(companion, availableIds, friendMap)
+      ) {
+        promoteAnchor(companion);
+      }
+    }
+
+    // A committee pack can be smaller than the court only if no more direct
+    // or nested requests are available among the active players.
+    if (group.length < PLAYERS_PER_COURT) {
+      for (const friend of group.slice(1)) {
+        if (!cycle.eligibleAnchorIds.has(friend.id)) continue;
+        followNestedPreferences(friend);
+        if (group.length >= PLAYERS_PER_COURT) break;
+      }
+    }
+  } else if (cycle.eligibleAnchorIds.has(primaryAnchor.id)) {
+    // For other anchors, follow a nested friendship chain before filling the
+    // remaining places.
     followNestedPreferences(primaryAnchor);
   }
 
@@ -478,6 +684,14 @@ function buildCourtGroup(args: {
     .filter((player) => availableIds.has(player.id))
     .sort(
       (a, b) =>
+        group.reduce(
+          (total, other) => total + countFriendEdgesBetween(b.id, other.id, friendMap),
+          0,
+        ) -
+          group.reduce(
+            (total, other) => total + countFriendEdgesBetween(a.id, other.id, friendMap),
+            0,
+          ) ||
         Number(a.normalizedFriendIds.length > 0) -
           Number(b.normalizedFriendIds.length > 0) ||
         compareGameFairness(a, b, state),
@@ -796,7 +1010,7 @@ function allocateOnce(
 export function allocateCourtSchedule(
   session: Pick<ClubSession, "id" | "startsAt" | "durationMinutes" | "courtCount">,
   roster: CourtRosterPlayer[],
-  options?: { candidateCount?: number },
+  options?: { candidateCount?: number; seed?: string },
 ): AllocatedCourtGame[] {
   if (roster.length === 0) {
     throw new Error("Court allocation requires at least one confirmed player.");
@@ -817,8 +1031,10 @@ export function allocateCourtSchedule(
 
   for (let candidateIndex = 0; candidateIndex < candidateCount; candidateIndex += 1) {
     try {
-      const candidate =
-        allocateOnce(session, roster, `candidate-${candidateIndex}`);
+      const candidateSeed = options?.seed
+        ? `${options.seed}|candidate-${candidateIndex}`
+        : `candidate-${candidateIndex}`;
+      const candidate = allocateOnce(session, roster, candidateSeed);
       const score = scoreAllocation(session, roster, candidate);
       if (
         bestScore === null ||
@@ -971,6 +1187,9 @@ function scoreAllocation(
 
   const fulfilledUnique = new Set<string>();
   const committeeWeighted = { count: 0 };
+  const committeeNestedUnique = new Set<string>();
+  let committeeDirectOccurrences = 0;
+  let committeeNestedOccurrences = 0;
   let occurrences = 0;
   const courtPairOccurrences = new Map<string, number>();
   const doublesPairOccurrences = new Map<string, number>();
@@ -989,6 +1208,15 @@ function scoreAllocation(
           }
         }
         occurrences += 1;
+
+        if (rosterById.get(playerId)?.isCommittee) {
+          committeeDirectOccurrences += 1;
+          for (const nestedFriendId of normalizedFriends.get(friendId) ?? []) {
+            if (!playerSet.has(nestedFriendId) || nestedFriendId === playerId) continue;
+            committeeNestedOccurrences += 1;
+            committeeNestedUnique.add(`${playerId}->${friendId}->${nestedFriendId}`);
+          }
+        }
       }
     }
 
@@ -1034,6 +1262,9 @@ function scoreAllocation(
     hardViolations,
     fairnessViolation,
     -committeeWeighted.count,
+    -committeeNestedUnique.size,
+    -committeeDirectOccurrences,
+    -committeeNestedOccurrences,
     -uniqueCount,
     -occurrenceCount,
     repeatedCourtPairs + repeatedDoubles,

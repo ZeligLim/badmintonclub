@@ -1,8 +1,59 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { requireAdminUser } from "./data";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { isCurrentPersistedCourtSchedule } from "@/features/sessions";
+import { loadAdminData, requireAdminUser } from "./data";
+
+export async function regenerateSessionCourtSchedule(sessionId: string): Promise<void> {
+  if (!(await requireAdminUser())) {
+    throw new Error("Only a club administrator can regenerate a court schedule.");
+  }
+  if (
+    typeof sessionId !== "string" ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionId)
+  ) {
+    throw new Error("The session schedule request is invalid.");
+  }
+
+  const admin = createAdminClient();
+  const { data: session, error: sessionError } = await admin
+    .from("sessions")
+    .select("id, status")
+    .eq("id", sessionId)
+    .maybeSingle();
+  if (sessionError || !session || !["open", "confirmed"].includes(session.status)) {
+    throw new Error("This session cannot have its court schedule regenerated.");
+  }
+
+  const { error: deleteError } = await admin
+    .from("session_timetables")
+    .delete()
+    .eq("session_id", sessionId);
+  if (deleteError) {
+    throw new Error(`Could not clear the saved court schedule: ${deleteError.message}`);
+  }
+
+  const sessions = await loadAdminData({ allocationSeed: randomUUID() });
+  const regeneratedSession = sessions.find((item) => item.id === sessionId);
+  if (!regeneratedSession?.courtSchedule.length) {
+    throw new Error("The court schedule could not be regenerated.");
+  }
+
+  const { data: timetable, error: timetableError } = await admin
+    .from("session_timetables")
+    .select("court_schedule")
+    .eq("session_id", sessionId)
+    .maybeSingle();
+  if (timetableError || !isCurrentPersistedCourtSchedule(timetable?.court_schedule)) {
+    throw new Error("The regenerated court schedule could not be saved.");
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/");
+}
 
 export async function updateSessionAvailability(
   sessionId: string,
