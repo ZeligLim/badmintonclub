@@ -1,22 +1,20 @@
 import "server-only";
 
 import { connection } from "next/server";
+import {
+  ensureSessionTimetable,
+  readPersistedTimetables,
+} from "@/features/sessions/api/timetable";
 import { formatTimeOfDay } from "@/lib/format";
 import { toSessionStatus, toSignupStatus } from "@/features/sessions/status";
 import type {
   SessionSignupStatus,
-  SessionStatus,
 } from "@/features/sessions/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/database.types";
 import {
-  allocateCourtSchedule,
   getCourtCount,
-  isPersistedCourtSchedule,
-  isSessionTimetableLocked,
-  markCourtScheduleCurrent,
-  shouldRefreshPersistedCourtSchedule,
   type SessionAllocationMode,
 } from "@/features/sessions";
 import { getSessionDayName } from "@/lib/sessions/schedule";
@@ -250,13 +248,7 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
     }
   }
 
-  const { data: persistedTimetables } = await admin
-    .from("session_timetables")
-    .select("session_id, court_schedule")
-    .in("session_id", sessionIds);
-  const timetableMap = new Map(
-    (persistedTimetables ?? []).map((row) => [row.session_id, row.court_schedule]),
-  );
+  const timetableMap = await readPersistedTimetables(sessionIds);
 
   return await Promise.all(sessions.map(async (session) => {
     const sessionSignups = (signups ?? []).filter(
@@ -293,72 +285,28 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
       .filter((p) => p.status === "selected" || p.status === "played")
       .sort((a, b) => (a.slotNumber ?? 99) - (b.slotNumber ?? 99));
 
-    const persistedCourtSchedule = timetableMap.get(session.id);
-    const timetableLocked = isSessionTimetableLocked({
-      eventDate: session.event_date,
-      startsAt: session.starts_at,
-    });
-    // Once players can see the timetable it is frozen, including after an
-    // allocator upgrade. Before then a stale or missing timetable may be
-    // rebuilt for the current algorithm.
-    const refreshPersistedCourtSchedule = shouldRefreshPersistedCourtSchedule(
-      persistedCourtSchedule,
-      {
-        isLocked: timetableLocked,
+    const courtScheduleGames = await ensureSessionTimetable({
+      session: {
+        id: session.id,
+        date: session.event_date,
+        startsAt: session.starts_at,
+        durationMinutes: session.duration_minutes,
+        capacity: session.capacity,
         isConfirmed: session.status === "confirmed",
       },
-    );
-    const hasPersistedCourtSchedule =
-      isPersistedCourtSchedule(persistedCourtSchedule) &&
-      !refreshPersistedCourtSchedule;
+      players: selectedPlayers.map((player) => ({
+        id: player.userId,
+        displayName: player.displayName,
+        priority: player.slotNumber ?? 1,
+        friendIds: sessionFriendMap.get(player.userId) ?? [],
+        isCommittee: player.isCommittee,
+        level: player.playerLevel,
+      })),
+      persisted: timetableMap.get(session.id),
+      seed: options?.allocationSeed,
+    });
 
-    const rawAllocation =
-      !hasPersistedCourtSchedule && selectedPlayers.length
-        ? allocateCourtSchedule(
-            {
-              id: session.id,
-              startsAt: session.starts_at,
-              durationMinutes: session.duration_minutes,
-              courtCount,
-            },
-            selectedPlayers.map((player) => ({
-              id: player.userId,
-              displayName: player.displayName,
-              priority: player.slotNumber ?? 1,
-              friendIds: sessionFriendMap.get(player.userId) ?? [],
-              isCommittee: player.isCommittee,
-              level: player.playerLevel,
-            })),
-            options?.allocationSeed
-              ? { seed: options.allocationSeed }
-              : undefined,
-          )
-        : null;
-
-    const rawPersistedOrNew = hasPersistedCourtSchedule
-      ? persistedCourtSchedule
-      : (rawAllocation ?? []);
-
-    // Persist the full raw allocation, including player ids, so it is usable
-    // as the single source of truth for every viewer.
-    if (!hasPersistedCourtSchedule && rawAllocation && rawAllocation.length) {
-      try {
-        const adminClient = createAdminClient();
-        const currentSchedule = markCourtScheduleCurrent(rawAllocation);
-        await adminClient
-          .from("session_timetables")
-          .upsert({
-            session_id: session.id,
-            court_schedule: currentSchedule as Exclude<Json, null>,
-            generated_by: null,
-            generated_at: new Date().toISOString(),
-          }, { onConflict: "session_id" });
-      } catch (error) {
-        logError("Could not persist session timetable.", error);
-      }
-    }
-
-    const courtSchedule = (rawPersistedOrNew ?? []).map((game) => ({
+    const courtSchedule = courtScheduleGames.map((game) => ({
       ...game,
       players: game.players.map((player) =>
         typeof player === "string" ? player : player.displayName,

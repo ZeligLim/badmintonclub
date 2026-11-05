@@ -7,7 +7,7 @@ import {
 } from "@/lib/sessions/schedule";
 import { hasSupabaseConfig } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
-import type { Database, Json } from "@/lib/supabase/database.types";
+import type { Database } from "@/lib/supabase/database.types";
 import type {
   ClubSession,
   DashboardData,
@@ -17,12 +17,13 @@ import type {
   SessionStatus,
 } from "../types";
 import {
-  allocateCourtSchedule,
   getCourtCount,
   getPlayerGamesFromCourtSchedule,
-  isPersistedCourtSchedule,
-  markCourtScheduleCurrent,
 } from "../court-schedule";
+import {
+  ensureSessionTimetable,
+  readPersistedTimetables,
+} from "@/features/sessions/api/timetable";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isClubEmail } from "@/lib/validation";
 import { logError } from "@/lib/log";
@@ -159,18 +160,7 @@ export async function loadDashboardData(): Promise<DashboardData> {
 
       // Every viewer reads the same saved timetable. Recomputing a personal
       // timetable here was the source of members seeing different courts.
-      const { data: persistedTimetables } = confirmedSessionIds.length
-        ? await admin
-            .from("session_timetables")
-            .select("session_id, court_schedule")
-            .in("session_id", confirmedSessionIds)
-        : { data: [] };
-      const timetableBySession = new Map(
-        (persistedTimetables ?? []).map((row) => [
-          row.session_id,
-          row.court_schedule,
-        ]),
-      );
+      const timetableBySession = await readPersistedTimetables(confirmedSessionIds);
 
       const friendRosterBySession = new Map(
         confirmedSessionIds.map((sessionId) => [
@@ -201,60 +191,32 @@ export async function loadDashboardData(): Promise<DashboardData> {
         prefsBySession.set(pref.session_id, sessionMap);
       }
       for (const sessionRow of sessionRows.filter((row) => row.status === "confirmed")) {
-        const persistedSchedule = timetableBySession.get(sessionRow.id);
-        if (isPersistedCourtSchedule(persistedSchedule)) {
-          userPlayerGameSchedules.set(
-            sessionRow.id,
-            getPlayerGamesFromCourtSchedule(persistedSchedule, user.id),
-          );
-          continue;
-        }
-
         const sessionRoster = rosterBySession.get(sessionRow.id) ?? [];
         const sessionPrefs = prefsBySession.get(sessionRow.id) ?? new Map();
-        const rosterPlayers = sessionRoster.map((player) => ({
-          id: player.user_id,
-          displayName: player.display_name,
-          priority: player.slot_number ?? 1,
-          friendIds: sessionPrefs.get(player.user_id) ?? [],
-          isCommittee: committeeByUser.get(player.user_id) ?? false,
-          level: levelByUser.get(player.user_id) ?? "INTERMEDIATE",
-        }));
-        if (rosterPlayers.length === 0) {
-          userPlayerGameSchedules.set(sessionRow.id, []);
-          continue;
-        }
 
-        const schedule = allocateCourtSchedule(
-          {
+        const timetable = await ensureSessionTimetable({
+          session: {
             id: sessionRow.id,
+            date: sessionRow.event_date,
             startsAt: sessionRow.starts_at,
             durationMinutes: sessionRow.duration_minutes,
-            courtCount: getCourtCount(sessionRow.capacity),
+            capacity: sessionRow.capacity,
+            isConfirmed: true,
           },
-          rosterPlayers,
-        );
-        try {
-          await admin
-            .from("session_timetables")
-            .upsert(
-              {
-                session_id: sessionRow.id,
-                court_schedule: markCourtScheduleCurrent(schedule) as Exclude<
-                  Json,
-                  null
-                >,
-                generated_by: null,
-                generated_at: new Date().toISOString(),
-              },
-              { onConflict: "session_id" },
-            );
-        } catch (persistError) {
-          logError("Could not persist the session timetable.", persistError);
-        }
+          players: sessionRoster.map((player) => ({
+            id: player.user_id,
+            displayName: player.display_name,
+            priority: player.slot_number ?? 1,
+            friendIds: sessionPrefs.get(player.user_id) ?? [],
+            isCommittee: committeeByUser.get(player.user_id) ?? false,
+            level: levelByUser.get(player.user_id) ?? "INTERMEDIATE",
+          })),
+          persisted: timetableBySession.get(sessionRow.id),
+        });
+
         userPlayerGameSchedules.set(
           sessionRow.id,
-          getPlayerGamesFromCourtSchedule(schedule, user.id),
+          getPlayerGamesFromCourtSchedule(timetable, user.id),
         );
       }
     } catch (error) {

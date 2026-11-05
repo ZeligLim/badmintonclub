@@ -32,7 +32,7 @@ import {
 } from "../session-timing";
 import type { SessionSignupStatus } from "../types";
 import { useServerClock } from "../use-server-clock";
-import { createClient } from "@/lib/supabase/client";import { SessionsHeader } from "./SessionsHeader";
+import { SessionsHeader } from "./SessionsHeader";
 import { SessionCard } from "./SessionCard";
 import { FriendListCard } from "./FriendListCard";
 import { DemoClock } from "./DemoClock";

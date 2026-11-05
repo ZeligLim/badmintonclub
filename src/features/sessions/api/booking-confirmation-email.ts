@@ -5,13 +5,13 @@ import {
   type MailjetConfig,
   type MailjetEmail,
 } from "@shared/mailjet";
+import {
+  asPersistedTimetable,
+  ensureSessionTimetable,
+} from "@/features/sessions/api/timetable";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
-  allocateCourtSchedule,
-  getCourtCount,
   getPlayerGamesFromCourtSchedule,
-  isPersistedCourtSchedule,
-  markCourtScheduleCurrent,
   type PlayerGame,
 } from "../court-schedule";
 import type { createClient } from "@/lib/supabase/server";
@@ -204,7 +204,7 @@ async function createBookingConfirmationEmail(
     { data: friendPrefs },
     { data: clubFriendPrefs },
     { data: profiles },
-    { data: timetable },
+    { data: persistedTimetable },
   ] = await Promise.all([
     admin
       .from("session_friend_preferences")
@@ -241,42 +241,26 @@ async function createBookingConfirmationEmail(
     ]),
   );
 
-  const sessionDetails = {
-    id: sessionId,
-    startsAt: session.starts_at,
-    durationMinutes: session.duration_minutes,
-    courtCount: getCourtCount(session.capacity),
-  };
-  const persistedSchedule = timetable?.court_schedule;
-  let playerGames: PlayerGame[];
-  if (isPersistedCourtSchedule(persistedSchedule)) {
-    playerGames = getPlayerGamesFromCourtSchedule(persistedSchedule, userId);
-  } else {
-    const schedule = allocateCourtSchedule(sessionDetails, roster.map((player) => ({
+  const timetable = await ensureSessionTimetable({
+    session: {
+      id: sessionId,
+      date: session.event_date,
+      startsAt: session.starts_at,
+      durationMinutes: session.duration_minutes,
+      capacity: session.capacity,
+      isConfirmed: true,
+    },
+    players: roster.map((player) => ({
       id: player.user_id,
       displayName: player.display_name,
       priority: player.slot_number,
       friendIds: friendMap.get(player.user_id) ?? [],
       isCommittee: committeeByUser.get(player.user_id) ?? false,
       level: levelByUser.get(player.user_id) ?? "INTERMEDIATE",
-    })));
-    playerGames = getPlayerGamesFromCourtSchedule(schedule, userId);
-    try {
-      await admin
-        .from("session_timetables")
-        .upsert(
-          {
-            session_id: sessionId,
-            court_schedule: markCourtScheduleCurrent(schedule) as never,
-            generated_by: null,
-            generated_at: new Date().toISOString(),
-          },
-          { onConflict: "session_id" },
-        );
-    } catch (persistError) {
-      logError("Could not persist the confirmed timetable.", persistError);
-    }
-  }
+    })),
+    persisted: asPersistedTimetable(persistedTimetable?.court_schedule),
+  });
+  const playerGames = getPlayerGamesFromCourtSchedule(timetable, userId);
   const assignedCourts = [
     ...new Set(playerGames.map((game) => game.courtNumber)),
   ];
