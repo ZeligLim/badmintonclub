@@ -23,6 +23,20 @@ Closed by `bb6baca` *"chore: regenerate database types and block drift"*
 became available locally during the check, which showed the drift step had been
 failing all along behind `continue-on-error`.
 
+Closed by `experimental/fix-all-tech-debt` (2026-11-05, nine commits from
+`388b783` to `54315ba`): **BC-23** (all three writers call
+`src/features/sessions/api/timetable.ts`), **BC-24** (one union per status, parsed
+at the database boundary in `src/features/sessions/status.ts`), **BC-25** (every
+log line goes through `src/lib/log.ts`; `error.tsx`, `global-error.tsx` and
+`not-found.tsx` exist), **BC-26** (`src/lib/format.ts` and `src/lib/validation.ts`
+replaced the copies and the magic `4`/`8` literals), **BC-27** (no demo module
+reaches the production bundle), **BC-29** (the member page uses the user-scoped
+client and two bulk RPCs), **BC-30** (one round trip, plus
+`session_friend_preferences(session_id, user_id)` and `club_friend_list(friend_user_id, user_id)`
+indexes), **BC-31** (`serverNow` comes from the server and
+`useServerClock` ticks from it), **BC-32** (actions log the database error and
+throw a clean message).
+
 ---
 
 ## P0 — fix before the next session
@@ -246,106 +260,14 @@ non-signed-up friends with an explanation, and finish the a11y states.
 
 ## Tech debt
 
-### BC-23 · P2 · L — One schedule pipeline, not three
-**Problem** Roster + friend-map assembly is still re-implemented in
-`src/features/sessions/api/dashboard.ts:120-235`, `src/features/admin/data.ts:282-321`
-and `src/features/sessions/api/booking-confirmation-email.ts:197-262`; each loads
-its own inputs and can allocate and persist its own row (`allocateCourtSchedule` is
-called at `dashboard.ts:225`, `data.ts:305`, `booking-confirmation-email.ts:252`).
-`fa83bb2` removed the *symptom* — all three now read the same persisted row when one
-exists — but three writers can still create it, and the fallback paths are three
-copies of the same logic.
-**Fix** One `buildSessionSchedule(sessionId)` service that loads inputs once,
-allocates once and persists; every surface reads it.
-**Done when** `grep -rn "allocateCourtSchedule" src` shows exactly the service and
-the tests.
-
-### BC-24 · P2 · S — Statuses are strings, not types
-**Problem** `SessionSignupState.currentUserStatus: string | null`, then
-`status.includes("waitlist")` (`src/features/sessions/components/SessionSignupStatus.tsx:1-60`),
-`SignupOverride` with `string | null`, and `database.types.ts` types
-`player_level` as `string`. Every new status silently renders the wrong badge.
-**Fix** Generate/declare one union per enum, map at the DB boundary, and exhaustively
-switch.
-**Done when** adding a status fails the build until every UI branch handles it.
-
-### BC-25 · P2 · M — 61 `console.*` calls and no error page
-**Problem** No `src/app/error.tsx`, `not-found.tsx` or `global-error.tsx`; uncaught
-server errors fall through to Next's default page. Logs are unstructured (mostly
-`errorType` only), with no request id and no alerting.
-**Fix** Add the three boundaries, a small `logError(scope, error, context)` helper,
-and one sink (Sentry/Logtail). Replace `console.*`.
-**Done when** a thrown server error renders a branded page and produces one
-searchable log line with a request id.
-
-### BC-26 · P2 · S — Duplicated helpers and magic numbers
-**Problem** Four different UUID regexes (member actions, admin player/session/template
-actions, dev actions), four copies of the `@atu.ie` check, fee/date/duration
-formatting inside components (`SessionCard.tsx`, `SessionsHeader.tsx`,
-`CourtScheduleTable.tsx`), `4`/`8` players-per-court literals repeated, and
-`formatDuration` printing "1.5 hours" for 90 minutes.
-**Fix** `src/lib/validation.ts` and `src/lib/format.ts`; one `PLAYERS_PER_COURT`
-constant from the domain, not retyped.
-**Done when** the regex and formatter definitions exist once.
-
-### BC-27 · P2 · S — Demo code ships in the production bundle
-**Problem** `SessionsPage` supports `mode="demo"` but is only ever rendered as
-`<SessionsPage />` (`src/app/page.tsx`), so the demo path is unreachable while
-`demo-data.ts`, `demo-schedule.ts`, `DemoClock`, `DemoSignupCountsControl` and their
-imports stay in the client bundle (`SessionCard.tsx`, `SessionsHeader.tsx`).
-**Fix** Delete the demo path or move it to `/dev` only with a dynamic import.
-**Done when** `next build` output shows no demo module in the `/` chunks.
-
-### BC-28 · P2 · M — The allocator is a 1,480-line black box
-**Problem** `src/features/sessions/court-schedule.ts` is one 1,480-line module with
-greedy selection, scoring, level balancing, validation and an RNG; up to 500
-candidates per call (`:1329`); tuned by a benchmark script rather than a test budget.
-Only `court-schedule.test.ts` covers it. `fa83bb2` added real validation (it now
-throws instead of returning an invalid schedule) and deterministic ordering, which
-makes the module testable — it is still one file doing six jobs.
-**Fix** Split into `roster → candidate → score → validate` modules, add property
-tests (fast-check) for "everyone plays the same number of games ±1" and "no
-double-booking", and set a p95 latency budget in CI.
-**Done when** the invariants are tested, not just examples.
-
-### BC-29 · P2 · M — Every member request loads everyone's data with the service key
-**Problem** `src/features/sessions/api/dashboard.ts:97` uses `createAdminClient()` to
-read all `session_friend_preferences`, all `profiles` and every player's
-`club_friend_list`, computes the full schedule for everyone, then keeps only the
-caller's games. RLS is bypassed and personal data transits every request.
-**Fix** Expose a `get_my_session_games()` RPC (or a view) that computes/returns only
-the caller's schedule, and use the user-scoped client.
-**Done when** the member page load makes no service-role query.
-
-### BC-30 · P2 · M — N+1 queries and thin indexes
-**Problem** One `get_session_roster` and one `get_session_friend_preferences` call
-per session (`dashboard.ts:282-330`), plus per-admin table writes; only six indexes
-exist for the schema (`club_friend_list(friend_user_id)` and
-`session_friend_preferences(user_id)` are unindexed).
-**Fix** Batch the RPCs (arrays or a join view), add the missing indexes, and measure
-with `EXPLAIN` on a seeded 200-member database.
-**Done when** the dashboard issues a constant number of queries regardless of session
-count.
-
-### BC-31 · P2 · S — Member UI trusts the device clock (and reads the dev clock)
-**Problem** `SessionsDashboard` queries `dev_virtual_clock` from the browser on every
-mount, and all time-dependent UI is computed from `useBrowserClock()`
-(`src/features/sessions/use-browser-clock.ts`). A wrong phone clock shows the wrong
-buttons; a writable dev table changes what members see.
-**Fix** Server-render the clock/status, pass `now` down as a prop, and correct with a
-small client offset. Remove the browser read of `dev_virtual_clock`.
-**Done when** the page renders correct open/closed states with JS disabled or the
-device clock wrong by a day.
-
-### BC-32 · P2 · S — Server actions throw strings at the browser
-**Problem** Actions throw `new Error("Could not join this session: " + error.message)`
-(e.g. `src/features/sessions/api/actions.ts:211`), leaking Postgres text to users
-and forcing every caller to parse messages. One cast remains at
-`src/features/admin/template-actions.ts:66` — `as any` became `as never` in
-`fa83bb2`, which silences the compiler without fixing the generated-type drift.
-**Fix** Return a discriminated `{ ok: true } | { ok: false, code, message }`, map
-known DB errors to friendly copy, and regenerate `database.types.ts` in CI.
-**Done when** no user-visible string contains a Postgres error.
+### BC-28 · P2 · M — The allocation search is still one module
+**Problem** The level rules now live in `src/features/sessions/court-schedule.levels.ts`,
+but candidate generation, greedy selection, doubles optimisation, scoring and
+validation are still ~1,400 lines in `src/features/sessions/court-schedule.ts`, and
+the 500-candidate branch (`:1329`) is only exercised by the benchmark.
+**Fix** Extract `candidates`, `score` and `validate` into their own modules, and
+turn the latency check into a p95 budget over repeated runs in CI.
+**Done when** each step is a module with its own tests, not just examples.
 
 ---
 

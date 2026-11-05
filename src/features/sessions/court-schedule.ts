@@ -1,5 +1,11 @@
 import { addMinutesToTime, londonDateTime } from "@/lib/sessions/schedule";
 import type { ClubSession } from "./types";
+import {
+  compareLevelRank,
+  levelSpreadWithin,
+  levelValue,
+} from "./court-schedule.levels";
+import type { PlayerLevel } from "./court-schedule.levels";
 
 const GAME_DURATION_MINUTES = 15;
 const PLAYERS_PER_COURT = 4;
@@ -10,13 +16,7 @@ const MAX_COURTS = 4;
 const TIMETABLE_RELEASE_MINUTES = 30;
 export const COURT_ALLOCATION_VERSION = 9;
 
-export type PlayerLevel = "BEGINNER" | "INTERMEDIATE" | "PROFESSIONAL";
-
-const LEVEL_VALUE: Record<PlayerLevel, number> = {
-  BEGINNER: 1,
-  INTERMEDIATE: 2,
-  PROFESSIONAL: 3,
-};
+export type { PlayerLevel } from "./court-schedule.levels";
 
 export type CourtRosterPlayer = {
   id: string;
@@ -195,34 +195,6 @@ type InternalPlayer = CourtRosterPlayer & {
 
 function comparePlayerIds(a: { id: string }, b: { id: string }): number {
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
-}
-
-function levelValue(level: PlayerLevel | null | undefined): number {
-  // Rows written before the level migration can still carry a value outside
-  // PlayerLevel (for example "ADVANCED"); treat anything unknown as the
-  // default rather than letting NaN leak into every score comparison.
-  return (level ? LEVEL_VALUE[level] : undefined) ?? LEVEL_VALUE.INTERMEDIATE;
-}
-
-/** Higher levels rank first when every fairness and friendship tie is equal. */
-function compareLevelRank(a: InternalPlayer, b: InternalPlayer): number {
-  return levelValue(b.level) - levelValue(a.level);
-}
-
-/**
- * Total level spread inside a group. Courts with a smaller spread keep
- * professionals, intermediates and beginners together where the club can.
- */
-function levelSpreadWithin(
-  players: Array<{ level?: PlayerLevel | null }>,
-): number {
-  let spread = 0;
-  for (let i = 0; i < players.length; i += 1) {
-    for (let j = i + 1; j < players.length; j += 1) {
-      spread += Math.abs(levelValue(players[i]!.level) - levelValue(players[j]!.level));
-    }
-  }
-  return spread;
 }
 
 export type ScheduleTrackingState = {
