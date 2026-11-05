@@ -6,6 +6,18 @@ stable IDs, **P0** = before the next club night, **P1** = this month, **P2** =
 opportunistic. Sizes are rough (`S` ≈ an evening, `M` ≈ a weekend, `L` ≈ a week).
 Every ticket is scoped to fit one PR and names its evidence in this repo.
 
+Ticket IDs are never reused, so a gap means the ticket shipped. Closed by
+`fa83bb2` *"Fix timetable drift and freeze published schedules"* (2026-11-05):
+**BC-02** (one saved timetable for every viewer), **BC-06** (the allocator now
+throws on an invalid schedule instead of returning it) and **BC-14** (level
+matching is implemented in the allocator). Whatever survived those three has been
+folded into the tickets below, mostly BC-09, BC-23 and BC-39.
+
+Closed by `71e7c3c` *"ci: gate production builds on typecheck, lint and tests"*
+(2026-11-05): **BC-33** (CI now exists and `npm run build` refuses to deploy a red
+tree). What BC-33 could not deliver — required checks on `main`, a blocking
+generated-types diff — moved to BC-41 and BC-42.
+
 ---
 
 ## P0 — fix before the next session
@@ -24,28 +36,16 @@ whole thing behind a `dev` schema that is never deployed).
 **Done when** a pgTAP test proves `anon` and `authenticated` cannot select, update,
 or execute any dev-clock object, and production `now()` is `pg_catalog.now()`.
 
-### BC-02 · P0 · M — Members and committee see different timetables
-**Problem** The member dashboard recomputes a schedule on every request
-(`src/features/sessions/api/dashboard.ts:188`) and never reads
-`session_timetables`. The admin page reads the persisted row, but only checks
-`allocationVersion` (`src/features/admin/data.ts:278`), never the roster or friend
-preferences. So a persisted schedule goes stale forever while every member sees a
-fresh one. This is the "Elliot saw a different timetable" incident.
-**Fix** Make the persisted row the single source of truth: store a fingerprint
-(sorted player ids + signup statuses + friend preferences + `allocationVersion` +
-seed), and have both dashboards read that one row. Only regenerate through one
-server path, and recompute the fingerprint whenever an input can change.
-**Done when** a pgTAP/vitest case shows that changing a signup, a friend preference
-or a friend list changes the fingerprint, and both `/` and `/admin` return the same
-`court_schedule` for the same session.
-
 ### BC-03 · P0 · S — "Regenerate" deletes the old timetable before making a new one
 **Problem** `regenerateSessionCourtSchedule` deletes the row
-(`src/features/admin/session-actions.ts:30`), then calls
-`loadAdminData({ allocationSeed: randomUUID() })`, which regenerates **every**
-session whose persisted schedule is stale, not just the target. If the target comes
-back empty it throws — after the delete. A failure leaves the session with no
-timetable and unrelated sessions rewritten.
+(`src/features/admin/session-actions.ts:45`), then calls
+`loadAdminData({ allocationSeed: randomUUID() })`, which refreshes **every**
+unlocked, unconfirmed session whose persisted schedule is missing or stale — not
+just the target. If the target comes back empty it throws — after the delete. A
+failure leaves the session with no timetable and unrelated sessions rewritten.
+`fa83bb2` added a release-lock check before the delete, so a published timetable
+can no longer be destroyed this way, but the delete-then-generate ordering at
+`:45-52` is unchanged.
 **Fix** Generate the new schedule in memory first, validate it, then swap it in one
 `upsert`. Pass the target session id so the action only touches that session.
 **Done when** a forced generation failure leaves the previous row intact.
@@ -64,24 +64,18 @@ then rematch.
 waitlisted member becomes `selected` and appears in the schedule.
 
 ### BC-05 · P0 · S — Cancelling a signup can report an error after it succeeded
-**Problem** `src/features/sessions/api/actions.ts:246` awaits
-`invalidateSessionTimetable()` **after** the RPC has committed. If the cache clear
-fails, the user sees "Could not refresh…" while their place is already cancelled, so
-they retry and get "No open signup request was found".
+**Problem** `src/features/sessions/api/actions.ts:272` awaits
+`invalidateSessionTimetable()` **after** the RPC has committed, and that helper
+still throws `Could not refresh this session's court matching.` (`:82`) when the
+delete fails. The user then sees an error while their place is already cancelled,
+so they retry and get "No open signup request was found". `fa83bb2` made the
+helper return early once the timetable is published and log (instead of throw)
+when the session lookup fails, but the delete-error path is still fatal, and
+`joinConfirmedSession` (`:216`) has the same shape.
 **Fix** Cache invalidation is best-effort: log it, never throw. Same for
 `updateSessionFriendPreferences`.
 **Done when** a failing invalidation still returns success to the client and the
 signup row reflects the cancellation.
-
-### BC-06 · P0 · S — Allocator returns invalid schedules silently
-**Problem** `allocateCourtSchedule` runs `validateSchedule(...)` inside a
-`try/catch` that does nothing (`src/features/sessions/court-schedule.ts:1074-1080`).
-Double-booked players, wrong court sizes or a round with a missing court pass
-straight through to persistence and email.
-**Fix** Let the validation throw (or drop the candidate and try the next), and treat
-"no valid candidate" as a hard error the admin sees.
-**Done when** a fuzz test can inject a broken candidate and the function rejects it
-instead of returning it.
 
 ---
 
@@ -107,12 +101,22 @@ whether members may read other sessions' schedules at all.
 
 ### BC-09 · P1 · S — Friend-list changes do not invalidate the timetable
 **Problem** `addClubFriend` / `removeClubFriend`
-(`src/features/sessions/api/actions.ts:103-125`) never invalidate
+(`src/features/sessions/api/actions.ts:126-152`) never invalidate
 `session_timetables`, and there is no DB trigger. Changing your friend list silently
 leaves every persisted schedule stale.
+`fa83bb2` made this worse in one specific case: `shouldRefreshPersistedCourtSchedule`
+(`src/features/sessions/court-schedule.ts:130`) now returns `false` for any
+**confirmed** session, so after the confirmation draw the admin page will not rebuild
+a timetable even while it is still private. Between `confirmation_at` and the
+30-minute release (up to 17.5 hours for a lottery) late joins invalidate via
+`actions.ts:216`, but friend-list and friend-preference changes only invalidate
+through `updateSessionFriendPreferences` — and `addClubFriend` / `removeClubFriend`
+do not. The only remaining safety net is the confirmation trigger, which runs once.
 **Fix** Invalidate on those RPCs, or better, add a trigger on `club_friend_list` and
-`session_friend_preferences` that bumps a `schedule_revision` on affected sessions.
-**Done when** adding a friend changes the next read's fingerprint.
+`session_friend_preferences` that bumps a `schedule_revision` on affected sessions,
+and let the admin/read path refresh a confirmed-but-unreleased timetable.
+**Done when** adding a friend to a confirmed, unreleased session changes the next
+read's timetable, and a released one is rejected loudly instead of silently ignored.
 
 ### BC-10 · P1 · S — The admin page writes to the database while rendering
 **Problem** `loadAdminData` computes and `upsert`s schedules inside a GET render
@@ -134,40 +138,34 @@ state instead of throwing.
 
 ### BC-12 · P1 · M — Booking emails are slow, duplicated and invisible when they fail
 **Problem** `sendSelectedBookingConfirmationEmails`
-(`src/features/sessions/api/booking-confirmation-email.ts:88-140`) loads recipients
-one auth call at a time, sends one Mailjet request per recipient, recomputes the
-whole court schedule per recipient (`:209`), and emails every `selected` row for
-every due session on each run — there is no per-recipient "already emailed" record.
-Failures log only `stage` and `errorName` (`:84-89`).
-**Fix** Reuse one allocation per session, batch Mailjet sends, add a
+(`src/features/sessions/api/booking-confirmation-email.ts:135-160`) still loads one
+recipient per `admin.auth.admin.getUserById` call and sends one Mailjet request per
+recipient (`:103`), and it still emails every `selected` row for every due session on
+each run — there is no per-recipient "already emailed" record. Failures log only
+`stage` and `errorName`.
+`fa83bb2` removed the worst part (the full schedule is now read from
+`session_timetables` instead of recomputed per recipient, `:244-262`), so the
+per-recipient panel is cheap when a timetable exists, but a confirmed session
+without one still re-allocates per recipient and re-persists it per recipient.
+**Fix** Batch Mailjet sends, add a
 `booking_emails(session_id, user_id, sent_at)` table (or a `confirmation_email_sent_at`
 column) and send only rows that are null.
 **Done when** re-running finalization for an already-confirmed session sends zero
 emails and one run for 40 players makes one allocation and one batched send.
 
 ### BC-13 · P1 · S — README promises behaviour the code does not have
-**Problem** `README.md` says members can cancel "until the session starts" (the UI
-cuts off 30 minutes before, `src/features/sessions/components/SessionsDashboard.tsx:527`,
-and `cancel_session_signup` does the same in SQL), says complete courts "prefer
-compatible levels" (allocator ignores level, see BC-14), and tells you to copy
-`.env.example` (the file does not exist). It also says local email capture is
-disabled while `docs/local-test.md` documents Mailpit.
+**Problem** Two claims in `README.md` are still false. It says members can cancel
+"until the session starts" (`README.md:58`) while the UI cuts off 30 minutes before
+(`src/features/sessions/components/SessionsDashboard.tsx:527`) and
+`cancel_session_signup` does the same in SQL. It also tells you to copy
+`.env.example` (`README.md:21`, `:162`) — the file does not exist. Separately,
+`README.md:34` says local email capture is disabled while `docs/local-test.md`
+documents Mailpit as the way to sign in.
+`fa83bb2` fixed the third claim it used to make: complete courts now really do
+prefer compatible levels (`README.md:76-83`), and the timetable-freeze rule is now
+documented.
 **Fix** Correct the three claims and add `.env.example` (names only, no values).
 **Done when** a fresh clone can follow the README end to end without guessing.
-
-### BC-14 · P1 · M — The three-level system does almost nothing
-**Problem** The allocator's `PlayerLevel` is `"BEGINNER" | "INTERMEDIATE" |
-"ADVANCED"` (`src/features/sessions/court-schedule.ts:7`) while the database and
-`src/types/player.ts` say `"PROFESSIONAL"`; `rosterPlayers` never copies `level`
-(`src/features/sessions/api/dashboard.ts:176-184`), and no scoring function reads
-it. Selection also has no level term
-(`supabase/migrations/20261021180000_optimize_court_slot_allocation.sql:293-300`).
-So "rank the rest by level" and "compatible courts" are both unimplemented.
-**Fix** Pick one union (the DB one), pass `level` into the roster, add a soft
-level-compatibility score after fairness and friendships, and a tie-breaker in the
-draw. Document what level actually controls.
-**Done when** a mixed-level roster produces different courts than a same-level one
-in a fixture test, without changing fairness results.
 
 ### BC-15 · P1 · S — There is no way to make someone a committee admin
 **Problem** `/admin` can toggle committee and Professional access
@@ -243,13 +241,17 @@ non-signed-up friends with an explanation, and finish the a11y states.
 
 ## Tech debt
 
-### BC-23 · P2 · L — One schedule pipeline, not four
-**Problem** The friend-map merge is re-implemented in
-`src/features/sessions/api/dashboard.ts`, `src/features/admin/data.ts` and
-`src/features/sessions/api/booking-confirmation-email.ts`; each does its own
-roster/preference loading and its own allocation call.
+### BC-23 · P2 · L — One schedule pipeline, not three
+**Problem** Roster + friend-map assembly is still re-implemented in
+`src/features/sessions/api/dashboard.ts:120-235`, `src/features/admin/data.ts:282-321`
+and `src/features/sessions/api/booking-confirmation-email.ts:197-262`; each loads
+its own inputs and can allocate and persist its own row (`allocateCourtSchedule` is
+called at `dashboard.ts:225`, `data.ts:305`, `booking-confirmation-email.ts:252`).
+`fa83bb2` removed the *symptom* — all three now read the same persisted row when one
+exists — but three writers can still create it, and the fallback paths are three
+copies of the same logic.
 **Fix** One `buildSessionSchedule(sessionId)` service that loads inputs once,
-allocates once and persists; every surface reads it (depends on BC-02).
+allocates once and persists; every surface reads it.
 **Done when** `grep -rn "allocateCourtSchedule" src` shows exactly the service and
 the tests.
 
@@ -262,7 +264,7 @@ the tests.
 switch.
 **Done when** adding a status fails the build until every UI branch handles it.
 
-### BC-25 · P2 · M — 57 `console.*` calls and no error page
+### BC-25 · P2 · M — 61 `console.*` calls and no error page
 **Problem** No `src/app/error.tsx`, `not-found.tsx` or `global-error.tsx`; uncaught
 server errors fall through to Next's default page. Logs are unstructured (mostly
 `errorType` only), with no request id and no alerting.
@@ -289,11 +291,13 @@ imports stay in the client bundle (`SessionCard.tsx`, `SessionsHeader.tsx`).
 **Fix** Delete the demo path or move it to `/dev` only with a dynamic import.
 **Done when** `next build` output shows no demo module in the `/` chunks.
 
-### BC-28 · P2 · M — The allocator is a 1,300-line black box
-**Problem** `src/features/sessions/court-schedule.ts` is one 1,303-line module with
-greedy selection, scoring, validation and an RNG; up to 500 candidates per call
-(`:1157`); tuned by a benchmark script rather than a test budget. Only
-`court-schedule.test.ts` covers it.
+### BC-28 · P2 · M — The allocator is a 1,480-line black box
+**Problem** `src/features/sessions/court-schedule.ts` is one 1,480-line module with
+greedy selection, scoring, level balancing, validation and an RNG; up to 500
+candidates per call (`:1329`); tuned by a benchmark script rather than a test budget.
+Only `court-schedule.test.ts` covers it. `fa83bb2` added real validation (it now
+throws instead of returning an invalid schedule) and deterministic ordering, which
+makes the module testable — it is still one file doing six jobs.
 **Fix** Split into `roster → candidate → score → validate` modules, add property
 tests (fast-check) for "everyone plays the same number of games ±1" and "no
 double-booking", and set a p95 latency budget in CI.
@@ -330,9 +334,10 @@ device clock wrong by a day.
 
 ### BC-32 · P2 · S — Server actions throw strings at the browser
 **Problem** Actions throw `new Error("Could not join this session: " + error.message)`
-(e.g. `src/features/sessions/api/actions.ts:210-215`), leaking Postgres text to users
-and forcing every caller to parse messages. One `as any` remains at
-`src/features/admin/template-actions.ts:66` because generated types lag the DB.
+(e.g. `src/features/sessions/api/actions.ts:211`), leaking Postgres text to users
+and forcing every caller to parse messages. One cast remains at
+`src/features/admin/template-actions.ts:66` — `as any` became `as never` in
+`fa83bb2`, which silences the compiler without fixing the generated-type drift.
 **Fix** Return a discriminated `{ ok: true } | { ok: false, code, message }`, map
 known DB errors to friendly copy, and regenerate `database.types.ts` in CI.
 **Done when** no user-visible string contains a Postgres error.
@@ -341,17 +346,12 @@ known DB errors to friendly copy, and regenerate `database.types.ts` in CI.
 
 ## Ops / DX
 
-### BC-33 · P2 · S — No CI
-**Problem** No `.github/`, no `typecheck` script, no formatter. `lint` is bare
-`eslint`; migrations and `database.types.ts` can drift unnoticed.
-**Fix** One workflow: `tsc --noEmit`, `eslint`, `vitest run`, `supabase db reset` +
-`supabase test db`, and a generated-types diff check.
-**Done when** a red build blocks merge.
-
 ### BC-34 · P2 · M — Playwright is installed but there are zero E2E tests
-**Problem** Only three vitest files exist (`court-schedule.test.ts`,
-`demo-schedule.test.ts`, `repro.test.ts`); no test covers sign-in, signup, cancel,
-finalization or `/admin`.
+**Problem** Nine vitest files cover the allocator and `session-timing`, but no test
+covers sign-in, signup, cancel, finalization or `/admin`, and the timetable-freeze
+invariants are covered only by unit tests of the pure allocator and its TypeScript
+callers, never by the DB triggers that actually enforce them
+(`20261105120000_freeze_published_timetables.sql`).
 **Fix** Add a seeded E2E happy path (magic link → signup → finalize → timetable) and
 one admin path.
 **Done when** CI runs them against `supabase start` + `next start`.
@@ -389,11 +389,86 @@ loop guard, and add an uptime monitor plus error alerting.
 
 ---
 
+### BC-39 · P1 · M — A wrong published timetable is now permanent
+**Problem** `fa83bb2` makes the saved timetable authoritative and immutable, but
+gives nobody a way to repair it. `shouldRefreshPersistedCourtSchedule`
+(`src/features/sessions/court-schedule.ts:130`) returns `false` once a session is
+locked **or confirmed**, the member dashboard serves any shape-valid row regardless
+of `allocationVersion` (`src/features/sessions/api/dashboard.ts:202`), the admin
+page hides the regenerate button when locked (`CourtScheduleTable.tsx:51`),
+`regenerateSessionCourtSchedule` throws past the release (`session-actions.ts:34`),
+and the DB trigger rejects authenticated updates and deletes for good measure. So a
+timetable saved from a stale preview — which happens whenever the backfill in
+`20261105120000_freeze_published_timetables.sql` runs after a session's release
+time, since that delete is itself gated on `now() < … - interval '30 minutes'` —
+can never be corrected from the app once the session is locked, only with
+service-role SQL.
+**Fix** Add an explicit, audited "repair published timetable" action for committee
+admins (confirmed re-allocation, recorded in `generated_by`, warned as
+member-visible), and a read-side check that flags a row whose
+`allocationVersion` is older than the current one.
+**Done when** a committee admin can rebuild a released timetable from the final
+roster without SQL, and the change is attributable.
+
+### BC-40 · P1 · S — The selection draw ignores playing level
+**Problem** `fa83bb2` implemented level compatibility inside the allocator, but the
+fairness draw that decides *who gets in* still orders by
+`is_committee desc, effective_last_played_at asc nulls first, signed_up_at asc,
+user_id asc` (`supabase/migrations/20261021180000_optimize_court_slot_allocation.sql:293-300`).
+Zelig's stated rule — "pair committee first, the rest rank by the level of playing"
+— is therefore half-implemented: level changes who you play *with*, never whether
+you get a place.
+**Fix** Decide what level should do at selection time (tie-break after freshness,
+or a rating band), add it to the draw, and write the rule down in
+`docs/court-allocation.md`.
+**Done when** a mixed-level roster that is otherwise tied produces a different
+selected set, in a pgTAP test.
+
+---
+
+### BC-41 · P2 · S — Generated database types are trusted without proof
+**Problem** `src/lib/supabase/database.types.ts` is produced by
+`npm run db:types`, which needs a local Supabase (Docker). CI only *warns* when a
+regeneration would change it (`continue-on-error: true` in
+`.github/workflows/ci.yml`), and nothing checks it against a fresh
+`supabase start` in a way that blocks. `fa83bb2` added two migrations and changed
+function signatures; the committed types were not regenerated, so the tree compiles
+only because the changed calls sit behind `as never`/untyped paths.
+**Fix** Regenerate the types against a clean local stack, commit the diff, then make
+the CI step blocking once its output is confirmed stable across runs.
+**Done when** a migration that changes a function signature without a types update
+fails CI.
+
+### BC-42 · P2 · S — A red build blocks *deploying*, not *merging*
+**Problem** Vercel builds every push to `main`, so `npm run build` → `npm run verify`
+stops a red commit from reaching members. But GitHub still merges it: no branch
+protection, no required status checks, and the `checks`/`database` jobs are advisory.
+Two people pushing at once can also land a broken `main` that later commits sit on
+top of.
+**Fix** Enable branch protection on `main` (require `checks`, dismiss stale
+approvals, no force-push), which needs repo-admin rights, plus `main` as a
+protected branch in the Vercel project settings if available on Hobby.
+**Done when** a PR with a failing `checks` job cannot be merged.
+
+### BC-43 · P3 · S — The test gate now sits in the deploy path, untested
+**Problem** Adding `verify` to `build` means a flaky or slow test blocks production
+for everyone, and the `database` CI job (`supabase start`, `db reset`, pgTAP) has
+never executed — it could not run in the agent sandbox (no Docker), so its first
+real run is on GitHub and may fail every push. The regressions sweep alone is ≈12s
+of the ≈13s suite.
+**Fix** Run the workflow once on a throwaway branch, confirm both jobs are green,
+then decide whether `verify` stays in `build` or moves to a required check only.
+**Done when** a push to a scratch branch shows both jobs green, and the suite is
+known-stable on the Node 24 image.
+
+---
+
 ## Suggested first five
 
 1. **BC-01** — the clock backdoor is a one-afternoon security fix.
-2. **BC-02 + BC-09** — kills the "different timetable" class of bug for good.
-3. **BC-04** — the waitlist is currently a dead end.
-4. **BC-35** — stop shipping untested commits to members.
-5. **BC-14** — either implement level matching or delete the claim; right now the
-   only visible effect of the three levels is the Professional toggle.
+2. **BC-39** — the timetable can no longer be repaired; ship the escape hatch before
+   the next release window.
+3. **BC-07** — confirmation still needs a browser open; one missed window means no
+   timetable at all.
+4. **BC-04** — the waitlist is currently a dead end.
+5. **BC-35** — stop shipping untested commits to members.
