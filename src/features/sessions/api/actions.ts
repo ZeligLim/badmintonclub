@@ -160,7 +160,8 @@ export async function updatePlayerLevel(
   });
 
   if (error) {
-    throw new Error(`Could not update your player level: ${error.message}`);
+    logError("Could not update your player level.", error);
+    throw new Error("Could not update your player level.");
   }
 }
 
@@ -171,7 +172,8 @@ export async function updateCommitteeAutoSignup(enabled: boolean): Promise<void>
   });
 
   if (error) {
-    throw new Error(`Could not update automatic signup: ${error.message}`);
+    logError("Could not update automatic signup.", error);
+    throw new Error("Could not update automatic signup.");
   }
 }
 
@@ -186,7 +188,8 @@ export async function updateDisplayName(
   const supabase = await requireAuthenticatedClient();
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError) {
-    throw new Error(`Could not verify your sign-in: ${authError.message}`);
+    logError("Could not verify your sign-in.", authError);
+    throw new Error("Could not verify your sign-in.");
   }
   if (!authData.user) {
     throw new Error("Sign in before updating your name.");
@@ -198,7 +201,8 @@ export async function updateDisplayName(
     .eq("id", authData.user.id);
 
   if (error) {
-    throw new Error(`Could not update your name: ${error.message}`);
+    logError("Could not update your name.", error);
+    throw new Error("Could not update your name.");
   }
 }
 
@@ -210,7 +214,8 @@ export async function joinConfirmedSession(sessionId: string): Promise<void> {
   });
 
   if (error) {
-    throw new Error(`Could not join this session: ${error.message}`);
+    logError("Could not join this session.", error);
+    throw new Error("Could not join this session.");
   }
 
   // The confirmed roster changed, so rebuild the saved timetable while the
@@ -228,7 +233,8 @@ export async function signOut(): Promise<void> {
   const { error } = await supabase.auth.signOut();
 
   if (error) {
-    throw new Error(`Could not sign out: ${error.message}`);
+    logError("Could not sign out.", error);
+    throw new Error("Could not sign out.");
   }
 }
 
@@ -240,7 +246,8 @@ export async function markSessionPlayed(sessionId: string): Promise<void> {
   });
 
   if (error) {
-    throw new Error(`Could not check in to this session: ${error.message}`);
+    logError("Could not check in to this session.", error);
+    throw new Error("Could not check in to this session.");
   }
 }
 
@@ -282,7 +289,8 @@ async function requireAuthenticatedClient() {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getUser();
   if (error && error.name !== "AuthSessionMissingError") {
-    throw new Error(`Could not verify your sign-in: ${error.message}`);
+    logError("Could not verify your sign-in.", error);
+    throw new Error("Could not verify your sign-in.");
   }
   if (!data.user) {
     throw new Error("Sign in before changing a session signup.");

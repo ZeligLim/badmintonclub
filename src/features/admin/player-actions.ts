@@ -4,6 +4,7 @@ import { isUuid } from "@/lib/validation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdminUser } from "./data";
+import { logError } from "@/lib/log";
 
 export async function updateClubCommitteeStatus(
   userId: string,
@@ -27,7 +28,8 @@ export async function updateClubCommitteeStatus(
     p_is_committee: isCommittee,
   });
   if (error) {
-    throw new Error(`Could not update committee status: ${error.message}`);
+    logError("Could not update committee status.", error);
+    throw new Error("Could not update committee status.");
   }
 
   revalidatePath("/admin");
@@ -54,7 +56,8 @@ export async function updateProfessionalChoice(
     p_enabled: enabled,
   });
   if (error) {
-    throw new Error(`Could not update Professional level access: ${error.message}`);
+    logError("Could not update Professional level access.", error);
+    throw new Error("Could not update Professional level access.");
   }
 
   revalidatePath("/admin");

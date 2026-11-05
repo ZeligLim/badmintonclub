@@ -48,13 +48,15 @@ export async function loadDashboardData(): Promise<DashboardData> {
   if (authError?.message?.includes("does not exist")) {
     await supabase.auth.signOut();
   } else if (authError && authError.name !== "AuthSessionMissingError") {
-    throw new Error(`Could not load your sign-in status: ${authError.message}`);
+    logError("Could not load your sign-in status.", authError);
+    throw new Error("Could not load your sign-in status.");
   }
   const user = isClubEmail(authData.user?.email) ? authData.user : null;
 
   const { error: ensureError } = await supabase.rpc("ensure_next_week_sessions");
   if (ensureError) {
-    throw new Error(`Could not prepare upcoming sessions: ${ensureError.message}`);
+    logError("Could not prepare upcoming sessions.", ensureError);
+    throw new Error("Could not prepare upcoming sessions.");
   }
 
   // The window comes from the session templates, so the club week always
@@ -63,7 +65,8 @@ export async function loadDashboardData(): Promise<DashboardData> {
     "get_dashboard_window",
   );
   if (windowError) {
-    throw new Error(`Could not load the club schedule window: ${windowError.message}`);
+    logError("Could not load the club schedule window.", windowError);
+    throw new Error("Could not load the club schedule window.");
   }
   const window = windowRows?.[0];
   if (!window) {
@@ -80,7 +83,8 @@ export async function loadDashboardData(): Promise<DashboardData> {
     },
   );
   if (sessionsError) {
-    throw new Error(`Could not load club sessions: ${sessionsError.message}`);
+    logError("Could not load club sessions.", sessionsError);
+    throw new Error("Could not load club sessions.");
   }
 
   const rosterRows = user
@@ -341,7 +345,8 @@ async function getProfile(
     .maybeSingle();
 
   if (error) {
-    throw new Error(`Could not load your profile: ${error.message}`);
+    logError("Could not load your profile.", error);
+    throw new Error("Could not load your profile.");
   }
 
   return data;
@@ -392,7 +397,8 @@ async function getRosterRows(
 
   for (const roster of rosters) {
     if (roster.error) {
-      throw new Error(`Could not load the confirmed player roster: ${roster.error.message}`);
+      logError("Could not load the confirmed player roster.", roster.error);
+      throw new Error("Could not load the confirmed player roster.");
     }
   }
 

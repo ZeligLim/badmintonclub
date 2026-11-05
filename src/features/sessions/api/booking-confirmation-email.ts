@@ -39,14 +39,16 @@ export async function finalizeDueSessionsAndEmail(
     .lte("confirmation_at", new Date().toISOString());
 
   if (dueSessionsError) {
-    throw new Error(`Could not load sessions awaiting confirmation: ${dueSessionsError.message}`);
+    logError("Could not load sessions awaiting confirmation.", dueSessionsError);
+    throw new Error("Could not load sessions awaiting confirmation.");
   }
 
   const { data: finalizedCount, error: finalizeError } = await supabase.rpc(
     "finalize_due_sessions",
   );
   if (finalizeError) {
-    throw new Error(`Could not finalize due sessions: ${finalizeError.message}`);
+    logError("Could not finalize due sessions.", finalizeError);
+    throw new Error("Could not finalize due sessions.");
   }
 
   const dueSessionIds = (dueSessions ?? []).map(({ id }) => id);

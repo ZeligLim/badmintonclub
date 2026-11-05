@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { SessionAllocationMode } from "@/features/sessions";
 import { requireAdminUser } from "./data";
+import { logError } from "@/lib/log";
 
 export type SessionTemplateInput = {
   templateId: string | null;
@@ -64,7 +65,8 @@ export async function saveSessionTemplate(
     p_valid_until: template.validUntil,
   } as never);
   if (error) {
-    throw new Error(`Could not save the session template: ${error.message}`);
+    logError("Could not save the session template.", error);
+    throw new Error("Could not save the session template.");
   }
 
   revalidatePath("/admin");
@@ -88,7 +90,8 @@ export async function setSessionTemplateActive(
     p_is_active: isActive,
   });
   if (error) {
-    throw new Error(`Could not update the session template: ${error.message}`);
+    logError("Could not update the session template.", error);
+    throw new Error("Could not update the session template.");
   }
 
   revalidatePath("/admin");
@@ -107,7 +110,8 @@ export async function publishScheduledSessions(): Promise<PublishResult> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("admin_publish_scheduled_sessions");
   if (error) {
-    throw new Error(`Could not publish the club sessions: ${error.message}`);
+    logError("Could not publish the club sessions.", error);
+    throw new Error("Could not publish the club sessions.");
   }
 
   const result = data?.[0];

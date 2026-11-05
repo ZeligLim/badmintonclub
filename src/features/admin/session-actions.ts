@@ -10,6 +10,7 @@ import {
   isSessionTimetableLocked,
 } from "@/features/sessions";
 import { loadAdminData, requireAdminUser } from "./data";
+import { logError } from "@/lib/log";
 
 export async function regenerateSessionCourtSchedule(sessionId: string): Promise<void> {
   if (!(await requireAdminUser())) {
@@ -47,7 +48,8 @@ export async function regenerateSessionCourtSchedule(sessionId: string): Promise
     .delete()
     .eq("session_id", sessionId);
   if (deleteError) {
-    throw new Error(`Could not clear the saved court schedule: ${deleteError.message}`);
+    logError("Could not clear the saved court schedule.", deleteError);
+    throw new Error("Could not clear the saved court schedule.");
   }
 
   const sessions = await loadAdminData({ allocationSeed: randomUUID() });
@@ -86,7 +88,8 @@ export async function updateSessionAvailability(
     p_happening: isHappening,
   });
   if (error) {
-    throw new Error(`Could not update session availability: ${error.message}`);
+    logError("Could not update session availability.", error);
+    throw new Error("Could not update session availability.");
   }
 
   revalidatePath("/admin");

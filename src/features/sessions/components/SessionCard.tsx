@@ -23,12 +23,13 @@ import {
 } from "@/features/sessions";
 import Link from "next/link";
 import { useState } from "react";
+import type { SessionSignupStatus as SignupStatus } from "../types";
 import { SessionFriendPicker } from "./SessionFriendPicker";
 import { SessionSignupStatus } from "./SessionSignupStatus";
 
 type SessionSignupState = {
   registeredCount: number;
-  currentUserStatus: string | null;
+  currentUserStatus: Exclude<SignupStatus, "cancelled"> | null;
   currentUserSlot: number | null;
 };
 
@@ -84,8 +85,8 @@ export function SessionCard({
     ).slice(0, 3);
   });
 
-  const signupStatus = signupState.currentUserStatus?.toLowerCase() ?? "";
-  const isWaitlisted = signupStatus.includes("waitlist");
+   const signupStatus = signupState.currentUserStatus ?? "";
+  const isWaitlisted = signupStatus === "waitlisted";
   const isPlayed = signupStatus === "played";
   const isSignedUp = signupStatus.length > 0 && !isPlayed;
   const isConfirmed =

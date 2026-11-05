@@ -1,11 +1,11 @@
 import { getSessionPeriod } from "./session-timing";
-import type { ClubSession } from "./types";
+import type { ClubSession, SessionSignupStatus } from "./types";
 
 export type DemoSessionState = {
   sessionId: string;
   dayName: ClubSession["dayName"];
   registeredCount: number;
-  currentUserStatus: string | null;
+  currentUserStatus: Exclude<SessionSignupStatus, "cancelled"> | null;
   currentUserSlot: number | null;
 };
 
@@ -82,9 +82,7 @@ export function getDemoSignupState(
 export function toggleDemoSignup(
   currentSession: DemoSessionState,
 ): DemoSessionState {
-  const isWaitlisted =
-    currentSession.currentUserStatus?.toLowerCase().includes("waitlist") ??
-    false;
+  const isWaitlisted = currentSession.currentUserStatus === "waitlisted";
   const isRegistered =
     currentSession.currentUserStatus !== null && !isWaitlisted;
 

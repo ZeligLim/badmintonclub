@@ -30,6 +30,7 @@ import {
   isSessionInProgress,
   isSessionViewVisible,
 } from "../session-timing";
+import type { SessionSignupStatus } from "../types";
 import { useServerClock } from "../use-server-clock";
 import { createClient } from "@/lib/supabase/client";import { SessionsHeader } from "./SessionsHeader";
 import { SessionCard } from "./SessionCard";
@@ -49,9 +50,9 @@ type SessionsDashboardProps = {
 };
 
 type SignupOverride = {
-  sourceStatus: string | null;
+  sourceStatus: Exclude<SessionSignupStatus, "cancelled"> | null;
   sourceSlot: number | null;
-  currentUserStatus: string | null;
+  currentUserStatus: Exclude<SessionSignupStatus, "cancelled"> | null;
   currentUserSlot: number | null;
 };
 

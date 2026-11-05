@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabasePublicConfig, hasSupabaseConfig } from "@/lib/supabase/env";
 import type { Database } from "@/lib/supabase/database.types";
+import { logError } from "@/lib/log";
 
 function unreachableSupabaseMessage(url: string): string {
   return `Could not refresh your sign-in: Supabase is not reachable at ${url}. Start the local Supabase stack (Docker must be running, then \`npm run db:start\`) and restart \`npm run dev\`.`;
@@ -102,7 +103,8 @@ export async function proxy(request: NextRequest) {
       !isExpiredSession &&
       !isMissingUser
     ) {
-      throw new Error(`Could not refresh your sign-in: ${error.message}`);
+      logError("Could not refresh your sign-in.", error);
+      throw new Error("Could not refresh your sign-in.");
     }
   }
 

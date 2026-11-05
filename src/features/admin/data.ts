@@ -2,6 +2,11 @@ import "server-only";
 
 import { connection } from "next/server";
 import { formatTimeOfDay } from "@/lib/format";
+import { toSessionStatus, toSignupStatus } from "@/features/sessions/status";
+import type {
+  SessionSignupStatus,
+  SessionStatus,
+} from "@/features/sessions/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/database.types";
@@ -22,7 +27,7 @@ import { logError } from "@/lib/log";
 export type AdminPlayer = {
   userId: string;
   displayName: string;
-  status: string;
+  status: SessionSignupStatus;
   slotNumber: number | null;
   isCommittee?: boolean;
   playerLevel?: PlayerLevel;
@@ -84,7 +89,8 @@ export async function requireAdminUser() {
   if (error?.message?.includes("does not exist")) {
     await supabase.auth.signOut();
   } else if (error && error.name !== "AuthSessionMissingError") {
-    throw new Error(`Could not verify club administrator: ${error.message}`);
+    logError("Could not verify club administrator.", error);
+    throw new Error("Could not verify club administrator.");
   }
   if (!data.user) {
     return null;
@@ -102,7 +108,8 @@ export async function requireAdminUser() {
     .eq("id", data.user.id)
     .maybeSingle();
   if (profileError) {
-    throw new Error(`Could not verify club administrator access: ${profileError.message}`);
+    logError("Could not verify club administrator access.", profileError);
+    throw new Error("Could not verify club administrator access.");
   }
   if (!profile?.is_committee_admin) {
     return null;
@@ -119,7 +126,8 @@ export async function loadClubPlayers(): Promise<AdminClubPlayer[]> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("admin_list_club_players");
   if (error) {
-    throw new Error(`Could not load club players: ${error.message}`);
+    logError("Could not load club players.", error);
+    throw new Error("Could not load club players.");
   }
 
   return data.map((player) => ({
@@ -139,7 +147,8 @@ export async function loadSessionTemplates(): Promise<AdminSessionTemplate[]> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("admin_list_session_templates");
   if (error) {
-    throw new Error(`Could not load session templates: ${error.message}`);
+    logError("Could not load session templates.", error);
+    throw new Error("Could not load session templates.");
   }
 
   return data.map((template) => ({
@@ -273,7 +282,7 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
     const players: AdminPlayer[] = sessionSignups.map((s) => ({
       userId: s.user_id,
       displayName: profileMap.get(s.user_id)?.displayName ?? s.user_id.slice(0, 8),
-      status: s.status,
+      status: toSignupStatus(s.status),
       slotNumber: s.slot_number,
       isCommittee: profileMap.get(s.user_id)?.isCommittee ?? false,
       playerLevel: profileMap.get(s.user_id)?.playerLevel ?? "INTERMEDIATE",
@@ -365,7 +374,7 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
       durationMinutes: session.duration_minutes,
       capacity: session.capacity,
       courtCount,
-      status: session.status,
+      status: toSessionStatus(session.status),
       availabilityCanChange:
         session.event_date > londonNow.date ||
         (session.event_date === londonNow.date &&
