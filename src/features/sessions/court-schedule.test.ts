@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  COURT_ALLOCATION_VERSION,
   allocateCourtSchedule,
   createPlayerGameSchedule,
+  getPlayerGamesFromCourtSchedule,
   isCurrentPersistedCourtSchedule,
+  isPersistedCourtSchedule,
+  isSessionTimetableLocked,
   markCourtScheduleCurrent,
+  shouldRefreshPersistedCourtSchedule,
   type AllocatedCourtGame,
   type CourtRosterPlayer,
 } from "./court-schedule";
@@ -411,6 +416,124 @@ describe("Court Scheduling Algorithm", () => {
     for (let run = 0; run < 25; run++) {
       expect(JSON.stringify(allocateCourtSchedule(session, roster))).toBe(first);
     }
+  });
+
+  // T11b: The same roster must produce the same timetable no matter what
+  // order the database returned the rows in. This is the regression that let
+  // two viewers see different courts for the same session.
+  it("T11b: is independent of roster and friend-list order", () => {
+    const friendPreferences: Record<string, string[]> = {
+      "player-1": ["player-2", "player-3", "player-4"],
+      "player-2": ["player-1", "player-5"],
+      "player-5": ["player-6"],
+      "player-7": ["player-8"],
+    };
+    const forward = makeRoster(12, { friendPreferences });
+    const backward = [...forward].reverse().map((player) => ({
+      ...player,
+      friendIds: [...(player.friendIds ?? [])].reverse(),
+    }));
+    const session = { id: "order", startsAt: "18:00", durationMinutes: 60, courtCount: 2 };
+
+    const first = allocateCourtSchedule(session, forward);
+    const second = allocateCourtSchedule(session, backward);
+
+    expect(JSON.stringify(second)).toBe(JSON.stringify(first));
+  });
+
+  // T11c: Levels are the final ranking rule after fairness and friendship.
+  it("T11c: keeps players of the same level on the same court when nothing else decides", () => {
+    const roster: CourtRosterPlayer[] = Array.from({ length: 8 }, (_, index) => ({
+      id: `player-${index + 1}`,
+      displayName: `Player ${index + 1}`,
+      level: index % 2 === 0 ? "PROFESSIONAL" : "BEGINNER",
+    }));
+    const schedule = allocateCourtSchedule(
+      { id: "levels", startsAt: "18:00", durationMinutes: 15, courtCount: 2 },
+      roster,
+    );
+
+    for (const game of schedule) {
+      expect(new Set(game.players.map((player) => player.level)).size).toBe(1);
+    }
+  });
+
+  it("T11c2: splits doubles teams so their combined levels are close", () => {
+    const roster: CourtRosterPlayer[] = [
+      { id: "beginner-1", displayName: "Beginner 1", level: "BEGINNER" },
+      { id: "beginner-2", displayName: "Beginner 2", level: "BEGINNER" },
+      { id: "professional-1", displayName: "Professional 1", level: "PROFESSIONAL" },
+      { id: "professional-2", displayName: "Professional 2", level: "PROFESSIONAL" },
+    ];
+    const [game] = allocateCourtSchedule(
+      { id: "team-levels", startsAt: "18:00", durationMinutes: 15, courtCount: 1 },
+      roster,
+    );
+
+    for (const team of [game!.teamA!, game!.teamB!]) {
+      const levels = new Set(team.map((player) => player.level));
+      expect(levels).toEqual(new Set(["BEGINNER", "PROFESSIONAL"]));
+    }
+  });
+
+  // T11d: A published timetable is a snapshot, not a live calculation.
+  it("T11d: treats a saved timetable as immutable once it is released", () => {
+    const schedule = allocateCourtSchedule(monday60min, makeRoster(8));
+    const saved = markCourtScheduleCurrent(schedule);
+    const olderSnapshot = saved.map((game) => ({ ...game, allocationVersion: 1 }));
+
+    expect(isPersistedCourtSchedule(olderSnapshot)).toBe(true);
+    // A missing timetable is built even after release; an existing one is
+    // never rewritten after release.
+    expect(
+      shouldRefreshPersistedCourtSchedule(null, { isLocked: true }),
+    ).toBe(true);
+    expect(
+      shouldRefreshPersistedCourtSchedule(olderSnapshot, { isLocked: false }),
+    ).toBe(true);
+    expect(
+      shouldRefreshPersistedCourtSchedule(olderSnapshot, {
+        isLocked: false,
+        isConfirmed: true,
+      }),
+    ).toBe(false);
+    expect(
+      shouldRefreshPersistedCourtSchedule(olderSnapshot, { isLocked: true }),
+    ).toBe(false);
+    expect(
+      shouldRefreshPersistedCourtSchedule(markCourtScheduleCurrent(schedule), {
+        isLocked: false,
+      }),
+    ).toBe(false);
+
+    expect(isSessionTimetableLocked({
+      eventDate: "2026-11-04",
+      startsAt: "19:30",
+    }, new Date("2026-11-04T18:59:59Z"))).toBe(false);
+    expect(isSessionTimetableLocked({
+      eventDate: "2026-11-04",
+      startsAt: "19:30",
+    }, new Date("2026-11-04T19:00:00Z"))).toBe(true);
+  });
+
+  it("T11e: reads a player's games from the saved timetable instead of rebuilding it", () => {
+    const roster = makeRoster(8);
+    const schedule = markCourtScheduleCurrent(allocateCourtSchedule(monday60min, roster));
+    const playerGames = getPlayerGamesFromCourtSchedule(schedule, "player-1");
+    const expected = schedule
+      .filter((game) => game.players.some((player) => player.id === "player-1"))
+      .map((game) => ({
+        courtNumber: game.courtNumber,
+        startAt: game.startAt,
+        endAt: game.endAt,
+        courtPlayers: game.players
+          .filter((player) => player.id !== "player-1")
+          .map((player) => player.displayName),
+      }));
+
+    expect(playerGames).toEqual(expected);
+    expect(playerGames.length).toBeGreaterThan(0);
+    expect(COURT_ALLOCATION_VERSION).toBeGreaterThan(1);
   });
 
   // T12: Randomness Never Breaks the Hard Guarantees (docs/court-allocation.md, sections 6 to 8)

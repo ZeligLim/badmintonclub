@@ -76,7 +76,12 @@ project's Auth settings.
 - Beginner and Intermediate are member-selectable matching preferences.
   Professional is invite-only and can only be assigned by a club administrator.
   Levels never prevent a player from being selected; complete courts prefer
-  compatible levels after fairness and friend-group preferences.
+  compatible levels after fairness and friend-group preferences, and doubles
+  teams are split to keep their combined levels close.
+- The published court timetable is saved once and is the single source of truth
+  for the admin view, every member's games and booking emails. It is frozen 30
+  minutes before the session starts; regeneration and timetable-changing
+  sign-ups are rejected after that point.
 - Members can select up to three club friends for an open-session request.
   Friend selection does not bypass committee priority or longest-since-last-play
   fairness. Friends who do not make an eligible request for that session are

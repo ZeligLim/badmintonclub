@@ -6,8 +6,12 @@ export {
   allocateCourtSchedule,
   createPlayerGameSchedule,
   getCourtCount,
+  getPlayerGamesFromCourtSchedule,
   isCurrentPersistedCourtSchedule,
+  isPersistedCourtSchedule,
+  isSessionTimetableLocked,
   markCourtScheduleCurrent,
+  shouldRefreshPersistedCourtSchedule,
 } from "./court-schedule";
 export type { CourtRosterPlayer } from "./court-schedule";
 export {

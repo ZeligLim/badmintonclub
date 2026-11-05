@@ -1,3 +1,4 @@
+import { isSessionTimetableLocked } from "@/features/sessions/court-schedule";
 import type { AdminSession } from "./data";
 import { SessionAvailabilityToggle } from "./SessionAvailabilityToggle";
 import { RegenerateCourtScheduleButton } from "./RegenerateCourtScheduleButton";
@@ -14,6 +15,10 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
       ? "bg-primary/10 text-primary"
       : "bg-secondary text-secondary-foreground";
   const isCancelled = session.status === "cancelled";
+  const timetableLocked = isSessionTimetableLocked({
+    eventDate: session.date,
+    startsAt: session.startsAt,
+  });
 
   return (
     <section>
@@ -43,7 +48,7 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
             isConfirmed={session.status === "confirmed"}
           />
         )}
-        {!isCancelled && selectedPlayers.length > 0 && (
+        {!isCancelled && !timetableLocked && selectedPlayers.length > 0 && (
           <RegenerateCourtScheduleButton sessionId={session.id} />
         )}
       </div>

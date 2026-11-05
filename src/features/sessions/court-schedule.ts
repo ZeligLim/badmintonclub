@@ -1,11 +1,19 @@
-import { addMinutesToTime } from "@/lib/sessions/schedule";
+import { addMinutesToTime, londonDateTime } from "@/lib/sessions/schedule";
 import type { ClubSession } from "./types";
 
 const GAME_DURATION_MINUTES = 15;
 const PLAYERS_PER_COURT = 4;
-export const COURT_ALLOCATION_VERSION = 8;
+/** Players see the timetable this long before the session starts. */
+const TIMETABLE_RELEASE_MINUTES = 30;
+export const COURT_ALLOCATION_VERSION = 9;
 
-export type PlayerLevel = "BEGINNER" | "INTERMEDIATE" | "ADVANCED";
+export type PlayerLevel = "BEGINNER" | "INTERMEDIATE" | "PROFESSIONAL";
+
+const LEVEL_VALUE: Record<PlayerLevel, number> = {
+  BEGINNER: 1,
+  INTERMEDIATE: 2,
+  PROFESSIONAL: 3,
+};
 
 export type CourtRosterPlayer = {
   id: string;
@@ -56,6 +64,94 @@ export function markCourtScheduleCurrent(
   }));
 }
 
+/**
+ * Structural check for a saved timetable. Unlike
+ * {@link isCurrentPersistedCourtSchedule}, this deliberately ignores the
+ * allocation version: once a timetable is published it must stay readable even
+ * after the allocator changes.
+ */
+export function isPersistedCourtSchedule(
+  value: unknown,
+): value is AllocatedCourtGame[] {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every((game) => {
+      if (typeof game !== "object" || game === null) return false;
+      const candidate = game as Partial<AllocatedCourtGame>;
+      return (
+        typeof candidate.courtNumber === "number" &&
+        typeof candidate.startAt === "string" &&
+        typeof candidate.endAt === "string" &&
+        Array.isArray(candidate.players) &&
+        candidate.players.length > 0 &&
+        candidate.players.every(
+          (player) =>
+            typeof player === "object" &&
+            player !== null &&
+            typeof player.id === "string" &&
+            typeof player.displayName === "string",
+        )
+      );
+    })
+  );
+}
+
+/**
+ * True once players can see the timetable. From this moment the saved
+ * timetable is the single source of truth and must never be regenerated or
+ * deleted.
+ */
+export function isSessionTimetableLocked(
+  session: { eventDate: string; startsAt: string },
+  now: Date = new Date(),
+): boolean {
+  let startAt: number;
+  if (session.startsAt.includes("T")) {
+    startAt = new Date(session.startsAt).getTime();
+  } else {
+    const [hour, minute] = session.startsAt.split(":").map(Number);
+    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return false;
+    const sessionDate = new Date(`${session.eventDate}T12:00:00Z`);
+    startAt = new Date(londonDateTime(sessionDate, hour, minute)).getTime();
+  }
+  if (!Number.isFinite(startAt)) return false;
+  return now.getTime() >= startAt - TIMETABLE_RELEASE_MINUTES * 60_000;
+}
+
+/**
+ * A saved timetable is refreshed only while it is still private. A published
+ * timetable is used exactly as saved, even if it was produced by an older
+ * allocator version.
+ */
+export function shouldRefreshPersistedCourtSchedule(
+  value: unknown,
+  options: { isLocked: boolean; isConfirmed?: boolean },
+): boolean {
+  if (!isPersistedCourtSchedule(value)) return true;
+  // A confirmed timetable has already been announced to players by email or
+  // on the dashboard. Never rewrite it just because the allocator changed.
+  if (options.isLocked || options.isConfirmed) return false;
+  return !isCurrentPersistedCourtSchedule(value);
+}
+
+/** Project a saved timetable into the games one player appears in. */
+export function getPlayerGamesFromCourtSchedule(
+  schedule: AllocatedCourtGame[],
+  playerId: string,
+): PlayerGame[] {
+  return schedule
+    .filter((game) => game.players.some((player) => player.id === playerId))
+    .map(({ courtNumber, startAt, endAt, players }) => ({
+      courtNumber,
+      startAt,
+      endAt,
+      courtPlayers: players
+        .filter((player) => player.id !== playerId)
+        .map((player) => player.displayName),
+    }));
+}
+
 export function getCourtCount(capacity: number): number {
   return Math.min(Math.ceil(capacity / 8), 4);
 }
@@ -87,6 +183,35 @@ type InternalPlayer = CourtRosterPlayer & {
   /** Stable random tie-break value for this schedule generation. */
   randomRank: number;
 };
+
+function comparePlayerIds(a: { id: string }, b: { id: string }): number {
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
+function levelValue(level: PlayerLevel | null | undefined): number {
+  return level ? LEVEL_VALUE[level] : LEVEL_VALUE.INTERMEDIATE;
+}
+
+/** Higher levels rank first when every fairness and friendship tie is equal. */
+function compareLevelRank(a: InternalPlayer, b: InternalPlayer): number {
+  return levelValue(b.level) - levelValue(a.level);
+}
+
+/**
+ * Total level spread inside a group. Courts with a smaller spread keep
+ * professionals, intermediates and beginners together where the club can.
+ */
+function levelSpreadWithin(
+  players: Array<{ level?: PlayerLevel | null }>,
+): number {
+  let spread = 0;
+  for (let i = 0; i < players.length; i += 1) {
+    for (let j = i + 1; j < players.length; j += 1) {
+      spread += Math.abs(levelValue(players[i]!.level) - levelValue(players[j]!.level));
+    }
+  }
+  return spread;
+}
 
 export type ScheduleTrackingState = {
   gamesPlayed: Map<string, number>;
@@ -130,7 +255,11 @@ function compareGameFairness(
   b: InternalPlayer,
   state: ScheduleTrackingState,
 ): number {
-  return compareGameFairnessPriority(a, b, state) || a.rosterIndex - b.rosterIndex;
+  return (
+    compareGameFairnessPriority(a, b, state) ||
+    compareLevelRank(a, b) ||
+    comparePlayerIds(a, b)
+  );
 }
 
 function compareGameFairnessPriority(
@@ -334,7 +463,9 @@ function compareAnchorPriority(a: InternalPlayer, b: InternalPlayer): number {
   return (
     Number(Boolean(b.isCommittee)) - Number(Boolean(a.isCommittee)) ||
     b.normalizedFriendIds.length - a.normalizedFriendIds.length ||
-    a.randomRank - b.randomRank
+    compareLevelRank(a, b) ||
+    a.randomRank - b.randomRank ||
+    comparePlayerIds(a, b)
   );
 }
 
@@ -343,8 +474,9 @@ function toRosterPlayer(player: InternalPlayer): CourtRosterPlayer {
     id: player.id,
     displayName: player.displayName,
     priority: player.priority,
-    friendIds: player.friendIds,
+    friendIds: [...player.normalizedFriendIds],
     level: player.level,
+    isCommittee: player.isCommittee,
   };
 }
 
@@ -423,6 +555,11 @@ function getCommitteeCourtCompanions(
     byId,
   ).sort(
     (a, b) =>
+      // Prefer friends who also requested the committee member: those pairs
+      // create two satisfied requests instead of one. Rotate the remaining
+      // friends so a larger friend group still gets its turn across rounds.
+      Number(b.normalizedFriendIds.includes(committee.id)) -
+        Number(a.normalizedFriendIds.includes(committee.id)) ||
       (state.courtCoPresence.get(committee.id)?.get(a.id) ?? 0) -
         (state.courtCoPresence.get(committee.id)?.get(b.id) ?? 0) ||
       a.randomRank - b.randomRank,
@@ -716,6 +853,7 @@ function buildCourtGroup(args: {
           ) ||
         Number(a.normalizedFriendIds.length > 0) -
           Number(b.normalizedFriendIds.length > 0) ||
+        levelSpreadWithin([...group, a]) - levelSpreadWithin([...group, b]) ||
         compareGameFairness(a, b, state),
     );
 
@@ -736,7 +874,7 @@ function optimizeDoublesMatchup(
   courtPlayers: InternalPlayer[],
   state: ScheduleTrackingState,
 ): DoublesPairing {
-  const sorted = [...courtPlayers].sort((a, b) => a.id.localeCompare(b.id));
+  const sorted = [...courtPlayers].sort(comparePlayerIds);
   const [p0, p1, p2, p3] = sorted;
 
   if (!p0 || !p1 || !p2 || !p3) {
@@ -752,7 +890,7 @@ function optimizeDoublesMatchup(
       { team1: [p0, p3], team2: [p1, p2] },
     ];
 
-  const score = (option: (typeof options)[number]): [number, number] => {
+  const score = (option: (typeof options)[number]): [number, number, number] => {
     const [a, b] = option.team1;
     const [c, d] = option.team2;
 
@@ -766,11 +904,18 @@ function optimizeDoublesMatchup(
       (state.doublesOpponents.get(b.id)?.get(c.id) ?? 0) +
       (state.doublesOpponents.get(b.id)?.get(d.id) ?? 0);
 
-    return [partnerRepeats, opponentRepeats];
+    // After avoiding repeat partnerships and opponents, split the teams so
+    // both sides have a similar playing level.
+    const levelImbalance = Math.abs(
+      levelValue(a.level) + levelValue(b.level) -
+        (levelValue(c.level) + levelValue(d.level)),
+    );
+
+    return [partnerRepeats, opponentRepeats, levelImbalance];
   };
 
-  const compareScores = (a: [number, number], b: [number, number]) =>
-    a[0] - b[0] || a[1] - b[1];
+  const compareScores = (a: number[], b: number[]) =>
+    a[0]! - b[0]! || a[1]! - b[1]! || a[2]! - b[2]!;
 
   let best = options[0]!;
   let bestScore = score(best);
@@ -783,10 +928,10 @@ function optimizeDoublesMatchup(
     }
   }
 
-  const team1 = [...best.team1].sort((a, b) => a.id.localeCompare(b.id));
-  const team2 = [...best.team2].sort((a, b) => a.id.localeCompare(b.id));
+  const team1 = [...best.team1].sort(comparePlayerIds);
+  const team2 = [...best.team2].sort(comparePlayerIds);
 
-  const firstTeamComesFirst = team1[0]!.id.localeCompare(team2[0]!.id) < 0;
+  const firstTeamComesFirst = comparePlayerIds(team1[0]!, team2[0]!) < 0;
   const first = firstTeamComesFirst ? team1 : team2;
   const second = firstTeamComesFirst ? team2 : team1;
 
@@ -825,26 +970,33 @@ function allocateOnce(
     throw new Error("Court allocation roster contains duplicate player IDs.");
   }
 
-  const deterministicRng = createDeterministicRng(
-    `${session.id}|${roster.map((player) => player.id).sort().join(",")}|${seedText}`,
-  );
+  const deterministicSeed = `${
+    session.id
+  }|${roster.map((player) => player.id).sort().join(",")}|${seedText}`;
+  const deterministicRng = createDeterministicRng(deterministicSeed);
 
   // Normalize outgoing requests. Keep requests for absent friends when
   // determining anchor eligibility/ranking; friend selection itself is
   // restricted to confirmed players in the current session. Self-requests
   // and duplicate IDs are ignored.
-  const orderedRoster: InternalPlayer[] = roster
+  //
+  // The roster is canonically ordered by player id and every tie-break value
+  // is derived from the player id, never from the caller's array order. Two
+  // viewers loading the same session therefore build byte-identical
+  // timetables, and a timetable never changes because a query returned its
+  // rows in a different order.
+  const orderedRoster: InternalPlayer[] = [...roster]
+    .sort(comparePlayerIds)
     .map((player, index) => ({
       ...player,
       priority: player.priority ?? 0,
       friendIds: [...(player.friendIds ?? [])],
-      normalizedFriendIds: [
-        ...new Set(player.friendIds ?? []),
-      ].filter((id) => id !== player.id),
+      normalizedFriendIds: [...new Set(player.friendIds ?? [])]
+        .filter((id) => id !== player.id)
+        .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)),
       rosterIndex: index,
-      randomRank: deterministicRng(),
-    }))
-    .sort((a, b) => a.rosterIndex - b.rosterIndex);
+      randomRank: hashText(`${deterministicSeed}|${player.id}`) / 0x100000000,
+    }));
 
   const byId = new Map(orderedRoster.map((player) => [player.id, player]));
   const friendMap = new Map(
@@ -1017,7 +1169,7 @@ function allocateOnce(
     }
   }
 
-  validateSchedule(schedule, courtSizes, roundCount);
+  validateSchedule(schedule, courtSizes, roundCount, uniquePlayerIds);
   return schedule;
 }
 
@@ -1075,9 +1227,12 @@ export function allocateCourtSchedule(
       bestSchedule,
       getCourtSizes(roster.length, session.courtCount),
       Math.ceil(session.durationMinutes / GAME_DURATION_MINUTES),
+      new Set(roster.map((player) => player.id)),
     );
-  } catch {
-    // Keep deterministic allocation even if validation reports an edge case.
+  } catch (error) {
+    throw new Error("Court allocation produced an invalid timetable.", {
+      cause: error,
+    });
   }
 
   return bestSchedule;
@@ -1104,6 +1259,7 @@ function validateSchedule(
   games: AllocatedCourtGame[],
   courtSizes: number[],
   expectedRounds: number,
+  rosterIds?: Set<string>,
 ): void {
   const expectedGameCount = expectedRounds * courtSizes.length;
   if (games.length !== expectedGameCount) {
@@ -1111,6 +1267,8 @@ function validateSchedule(
       `Court allocation produced ${games.length} games; expected ${expectedGameCount}.`,
     );
   }
+
+  const playersByStart = new Map<string, Set<string>>();
 
   for (const game of games) {
     const expectedPerGame = courtSizes[game.courtNumber - 1];
@@ -1125,6 +1283,20 @@ function validateSchedule(
         `Court ${game.courtNumber} at ${game.startAt} contains a duplicate player.`,
       );
     }
+
+    const roundPlayers = playersByStart.get(game.startAt) ?? new Set<string>();
+    for (const player of game.players) {
+      if (rosterIds && !rosterIds.has(player.id)) {
+        throw new Error(`${player.id} is not in the confirmed roster.`);
+      }
+      if (roundPlayers.has(player.id)) {
+        throw new Error(
+          `${player.id} is allocated to more than one court at ${game.startAt}.`,
+        );
+      }
+      roundPlayers.add(player.id);
+    }
+    playersByStart.set(game.startAt, roundPlayers);
   }
 }
 
@@ -1222,12 +1394,16 @@ function scoreAllocation(
   let committeeDirectOccurrences = 0;
   let committeeNestedOccurrences = 0;
   let occurrences = 0;
+  let levelGap = 0;
   const courtPairOccurrences = new Map<string, number>();
   const doublesPairOccurrences = new Map<string, number>();
 
   for (const game of schedule) {
     const playerIdsInGame = game.players.map((player) => player.id);
     const playerSet = new Set(playerIdsInGame);
+    levelGap += levelSpreadWithin(
+      game.players.map((player) => rosterById.get(player.id) ?? player),
+    );
     for (const playerId of playerIdsInGame) {
       for (const friendId of normalizedFriends.get(playerId) ?? []) {
         if (!playerSet.has(friendId)) continue;
@@ -1298,6 +1474,7 @@ function scoreAllocation(
     -committeeNestedOccurrences,
     -uniqueCount,
     -occurrenceCount,
+    levelGap,
     repeatedCourtPairs + repeatedDoubles,
   ];
 }

@@ -4,7 +4,10 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isCurrentPersistedCourtSchedule } from "@/features/sessions";
+import {
+  isCurrentPersistedCourtSchedule,
+  isSessionTimetableLocked,
+} from "@/features/sessions";
 import { loadAdminData, requireAdminUser } from "./data";
 
 export async function regenerateSessionCourtSchedule(sessionId: string): Promise<void> {
@@ -21,11 +24,21 @@ export async function regenerateSessionCourtSchedule(sessionId: string): Promise
   const admin = createAdminClient();
   const { data: session, error: sessionError } = await admin
     .from("sessions")
-    .select("id, status")
+    .select("id, status, event_date, starts_at")
     .eq("id", sessionId)
     .maybeSingle();
   if (sessionError || !session || !["open", "confirmed"].includes(session.status)) {
     throw new Error("This session cannot have its court schedule regenerated.");
+  }
+  if (
+    isSessionTimetableLocked({
+      eventDate: session.event_date,
+      startsAt: session.starts_at,
+    })
+  ) {
+    throw new Error(
+      "The timetable has already been released to players and can no longer be changed.",
+    );
   }
 
   const { error: deleteError } = await admin

@@ -6,7 +6,14 @@ import {
   type MailjetEmail,
 } from "@shared/mailjet";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createPlayerGameSchedule, getCourtCount } from "../court-schedule";
+import {
+  allocateCourtSchedule,
+  getCourtCount,
+  getPlayerGamesFromCourtSchedule,
+  isPersistedCourtSchedule,
+  markCourtScheduleCurrent,
+  type PlayerGame,
+} from "../court-schedule";
 import type { createClient } from "@/lib/supabase/server";
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
@@ -41,10 +48,26 @@ export async function finalizeDueSessionsAndEmail(
     throw new Error(`Could not finalize due sessions: ${finalizeError.message}`);
   }
 
-  await sendSelectedBookingConfirmationEmails(
-    supabase,
-    (dueSessions ?? []).map(({ id }) => id),
-  );
+  const dueSessionIds = (dueSessions ?? []).map(({ id }) => id);
+  if (dueSessionIds.length > 0) {
+    // These sessions were open when the read started, so any saved timetable
+    // is an open-session preview from the previous roster. Finalization may
+    // happen after the 30-minute release if nobody opened the app earlier;
+    // use the trusted backend to discard the preview so the confirmed
+    // timetable is built from the final roster.
+    const admin = createAdminClient();
+    const { error: clearError } = await admin
+      .from("session_timetables")
+      .delete()
+      .in("session_id", dueSessionIds);
+    if (clearError) {
+      console.error("Could not clear preview timetables before confirmation.", {
+        code: clearError.code,
+      });
+    }
+  }
+
+  await sendSelectedBookingConfirmationEmails(supabase, dueSessionIds);
   return finalizedCount;
 }
 
@@ -174,21 +197,30 @@ async function createBookingConfirmationEmail(
   }
 
   const rosterUserIds = roster.map((player) => player.user_id);
-  const [{ data: friendPrefs }, { data: clubFriendPrefs }, { data: profiles }] =
-    await Promise.all([
-      admin
-        .from("session_friend_preferences")
-        .select("user_id, friend_user_id")
-        .eq("session_id", sessionId),
-      admin
-        .from("club_friend_list")
-        .select("user_id, friend_user_id")
-        .in("user_id", rosterUserIds),
-      admin
-        .from("profiles")
-        .select("id, is_committee")
-        .in("id", rosterUserIds),
-    ]);
+  const [
+    { data: friendPrefs },
+    { data: clubFriendPrefs },
+    { data: profiles },
+    { data: timetable },
+  ] = await Promise.all([
+    admin
+      .from("session_friend_preferences")
+      .select("user_id, friend_user_id")
+      .eq("session_id", sessionId),
+    admin
+      .from("club_friend_list")
+      .select("user_id, friend_user_id")
+      .in("user_id", rosterUserIds),
+    admin
+      .from("profiles")
+      .select("id, is_committee, player_level")
+      .in("id", rosterUserIds),
+    admin
+      .from("session_timetables")
+      .select("court_schedule")
+      .eq("session_id", sessionId)
+      .maybeSingle(),
+  ]);
 
   const friendMap = new Map<string, string[]>();
   for (const pref of [...(friendPrefs ?? []), ...(clubFriendPrefs ?? [])]) {
@@ -199,6 +231,12 @@ async function createBookingConfirmationEmail(
   const committeeByUser = new Map(
     (profiles ?? []).map((profile) => [profile.id, profile.is_committee]),
   );
+  const levelByUser = new Map(
+    (profiles ?? []).map((profile) => [
+      profile.id,
+      parsePlayerLevel(profile.player_level),
+    ]),
+  );
 
   const sessionDetails = {
     id: sessionId,
@@ -206,17 +244,36 @@ async function createBookingConfirmationEmail(
     durationMinutes: session.duration_minutes,
     courtCount: getCourtCount(session.capacity),
   };
-  const playerGames = createPlayerGameSchedule(
-    sessionDetails,
-    roster.map((player) => ({
+  const persistedSchedule = timetable?.court_schedule;
+  let playerGames: PlayerGame[];
+  if (isPersistedCourtSchedule(persistedSchedule)) {
+    playerGames = getPlayerGamesFromCourtSchedule(persistedSchedule, userId);
+  } else {
+    const schedule = allocateCourtSchedule(sessionDetails, roster.map((player) => ({
       id: player.user_id,
       displayName: player.display_name,
       priority: player.slot_number,
       friendIds: friendMap.get(player.user_id) ?? [],
       isCommittee: committeeByUser.get(player.user_id) ?? false,
-    })),
-    userId,
-  );
+      level: levelByUser.get(player.user_id) ?? "INTERMEDIATE",
+    })));
+    playerGames = getPlayerGamesFromCourtSchedule(schedule, userId);
+    try {
+      await admin
+        .from("session_timetables")
+        .upsert(
+          {
+            session_id: sessionId,
+            court_schedule: markCourtScheduleCurrent(schedule) as never,
+            generated_by: null,
+            generated_at: new Date().toISOString(),
+          },
+          { onConflict: "session_id" },
+        );
+    } catch (persistError) {
+      console.error("Could not persist the confirmed timetable.", persistError);
+    }
+  }
   const assignedCourts = [
     ...new Set(playerGames.map((game) => game.courtNumber)),
   ];
@@ -270,6 +327,17 @@ function formatSessionDate(date: string): string {
     year: "numeric",
     timeZone: "Europe/Dublin",
   }).format(new Date(`${date}T12:00:00Z`));
+}
+
+function parsePlayerLevel(value: string): "BEGINNER" | "INTERMEDIATE" | "PROFESSIONAL" {
+  if (
+    value === "BEGINNER" ||
+    value === "INTERMEDIATE" ||
+    value === "PROFESSIONAL"
+  ) {
+    return value;
+  }
+  throw new Error("A club member has an unsupported player level.");
 }
 
 function formatCourtAssignment(courtNumbers: number[]): string {

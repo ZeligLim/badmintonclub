@@ -7,8 +7,10 @@ import type { Json } from "@/lib/supabase/database.types";
 import {
   allocateCourtSchedule,
   getCourtCount,
-  isCurrentPersistedCourtSchedule,
+  isPersistedCourtSchedule,
+  isSessionTimetableLocked,
   markCourtScheduleCurrent,
+  shouldRefreshPersistedCourtSchedule,
   type SessionAllocationMode,
 } from "@/features/sessions";
 import { getSessionDayName } from "@/lib/sessions/schedule";
@@ -20,6 +22,7 @@ export type AdminPlayer = {
   status: string;
   slotNumber: number | null;
   isCommittee?: boolean;
+  playerLevel?: PlayerLevel;
 };
 
 export type AdminCourtGame = {
@@ -215,11 +218,14 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
         .in("user_id", userIds)
     : { data: [] };
 
-  const profileMap = new Map<string, { displayName: string; isCommittee: boolean }>();
+  const profileMap = new Map<
+    string,
+    { displayName: string; isCommittee: boolean; playerLevel: PlayerLevel }
+  >();
   if (userIds.length) {
     const { data: profiles, error: profilesErr } = await admin
       .from("profiles")
-      .select("id, display_name, is_committee")
+      .select("id, display_name, is_committee, player_level")
       .in("id", userIds);
 
     if (profilesErr) throw new Error(`Could not load profiles: ${profilesErr.message}`);
@@ -227,6 +233,7 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
       profileMap.set(p.id, {
         displayName: p.display_name,
         isCommittee: p.is_committee,
+        playerLevel: parsePlayerLevel(p.player_level),
       });
     }
   }
@@ -266,6 +273,7 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
       status: s.status,
       slotNumber: s.slot_number,
       isCommittee: profileMap.get(s.user_id)?.isCommittee ?? false,
+      playerLevel: profileMap.get(s.user_id)?.playerLevel ?? "INTERMEDIATE",
     }));
 
     const courtCount = getCourtCount(session.capacity);
@@ -274,35 +282,54 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
       .sort((a, b) => (a.slotNumber ?? 99) - (b.slotNumber ?? 99));
 
     const persistedCourtSchedule = timetableMap.get(session.id);
-    const hasCurrentPersistedCourtSchedule =
-      isCurrentPersistedCourtSchedule(persistedCourtSchedule);
+    const timetableLocked = isSessionTimetableLocked({
+      eventDate: session.event_date,
+      startsAt: session.starts_at,
+    });
+    // Once players can see the timetable it is frozen, including after an
+    // allocator upgrade. Before then a stale or missing timetable may be
+    // rebuilt for the current algorithm.
+    const refreshPersistedCourtSchedule = shouldRefreshPersistedCourtSchedule(
+      persistedCourtSchedule,
+      {
+        isLocked: timetableLocked,
+        isConfirmed: session.status === "confirmed",
+      },
+    );
+    const hasPersistedCourtSchedule =
+      isPersistedCourtSchedule(persistedCourtSchedule) &&
+      !refreshPersistedCourtSchedule;
 
-    const rawAllocation = !hasCurrentPersistedCourtSchedule && selectedPlayers.length
-      ? allocateCourtSchedule(
-          {
-            id: session.id,
-            startsAt: session.starts_at,
-            durationMinutes: session.duration_minutes,
-            courtCount,
-          },
-          selectedPlayers.map((player) => ({
-            id: player.userId,
-            displayName: player.displayName,
-            priority: player.slotNumber ?? 1,
-            friendIds: sessionFriendMap.get(player.userId) ?? [],
-            isCommittee: player.isCommittee,
-          })),
-          options?.allocationSeed ? { seed: options.allocationSeed } : undefined,
-        )
-      : null;
+    const rawAllocation =
+      !hasPersistedCourtSchedule && selectedPlayers.length
+        ? allocateCourtSchedule(
+            {
+              id: session.id,
+              startsAt: session.starts_at,
+              durationMinutes: session.duration_minutes,
+              courtCount,
+            },
+            selectedPlayers.map((player) => ({
+              id: player.userId,
+              displayName: player.displayName,
+              priority: player.slotNumber ?? 1,
+              friendIds: sessionFriendMap.get(player.userId) ?? [],
+              isCommittee: player.isCommittee,
+              level: player.playerLevel,
+            })),
+            options?.allocationSeed
+              ? { seed: options.allocationSeed }
+              : undefined,
+          )
+        : null;
 
-    const rawPersistedOrNew = hasCurrentPersistedCourtSchedule
+    const rawPersistedOrNew = hasPersistedCourtSchedule
       ? persistedCourtSchedule
       : (rawAllocation ?? []);
 
     // Persist the full raw allocation, including player ids, so it is usable
     // as the single source of truth for every viewer.
-    if (!hasCurrentPersistedCourtSchedule && rawAllocation && rawAllocation.length) {
+    if (!hasPersistedCourtSchedule && rawAllocation && rawAllocation.length) {
       try {
         const adminClient = createAdminClient();
         const currentSchedule = markCourtScheduleCurrent(rawAllocation);

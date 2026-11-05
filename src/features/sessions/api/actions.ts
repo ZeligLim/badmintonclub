@@ -7,6 +7,7 @@ import {
   finalizeDueSessionsAndEmail,
   sendBookingConfirmationEmailBestEffort,
 } from "./booking-confirmation-email";
+import { isSessionTimetableLocked } from "../court-schedule";
 import type { FriendCandidate } from "../types";
 
 export async function finalizeDueSessions(): Promise<number> {
@@ -47,6 +48,28 @@ export async function updateSessionFriendPreferences(
 
 async function invalidateSessionTimetable(sessionId: string): Promise<void> {
   const admin = createAdminClient();
+  const { data: session, error: sessionError } = await admin
+    .from("sessions")
+    .select("event_date, starts_at")
+    .eq("id", sessionId)
+    .maybeSingle();
+  if (sessionError || !session) {
+    console.error("Could not check the session timetable lock.", {
+      code: sessionError?.code,
+    });
+    return;
+  }
+  if (
+    isSessionTimetableLocked({
+      eventDate: session.event_date,
+      startsAt: session.starts_at,
+    })
+  ) {
+    // The timetable is public from this point. The database already rejects
+    // signup and preference changes, so keep the saved timetable untouched.
+    return;
+  }
+
   const { error } = await admin
     .from("session_timetables")
     .delete()
@@ -188,6 +211,9 @@ export async function joinConfirmedSession(sessionId: string): Promise<void> {
     throw new Error(`Could not join this session: ${error.message}`);
   }
 
+  // The confirmed roster changed, so rebuild the saved timetable while the
+  // session is still unlocked. After the 30-minute release it is frozen.
+  await invalidateSessionTimetable(sessionId);
   await sendBookingConfirmationEmailBestEffort(supabase, sessionId);
 }
 

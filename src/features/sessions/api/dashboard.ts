@@ -7,7 +7,7 @@ import {
 } from "@/lib/sessions/schedule";
 import { hasSupabaseConfig } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
-import type { Database } from "@/lib/supabase/database.types";
+import type { Database, Json } from "@/lib/supabase/database.types";
 import type {
   ClubSession,
   DashboardData,
@@ -16,7 +16,13 @@ import type {
   SessionSignupStatus,
   SessionStatus,
 } from "../types";
-import { allocateCourtSchedule, getCourtCount } from "../court-schedule";
+import {
+  allocateCourtSchedule,
+  getCourtCount,
+  getPlayerGamesFromCourtSchedule,
+  isPersistedCourtSchedule,
+  markCourtScheduleCurrent,
+} from "../court-schedule";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type DashboardSessionRow =
@@ -128,11 +134,17 @@ export async function loadDashboardData(): Promise<DashboardData> {
       const { data: committeeProfiles } = confirmedRosterUserIds.length
         ? await admin
             .from("profiles")
-            .select("id, is_committee")
+            .select("id, is_committee, player_level")
             .in("id", confirmedRosterUserIds)
         : { data: [] };
       const committeeByUser = new Map(
         (committeeProfiles ?? []).map((row) => [row.id, row.is_committee]),
+      );
+      const levelByUser = new Map(
+        (committeeProfiles ?? []).map((row) => [
+          row.id,
+          parsePlayerLevel(row.player_level),
+        ]),
       );
       const { data: allClubPrefs } =
         confirmedSessionIds.length && confirmedRosterUserIds.length
@@ -141,6 +153,21 @@ export async function loadDashboardData(): Promise<DashboardData> {
               .select("user_id, friend_user_id")
               .in("user_id", confirmedRosterUserIds)
           : { data: [] };
+
+      // Every viewer reads the same saved timetable. Recomputing a personal
+      // timetable here was the source of members seeing different courts.
+      const { data: persistedTimetables } = confirmedSessionIds.length
+        ? await admin
+            .from("session_timetables")
+            .select("session_id, court_schedule")
+            .in("session_id", confirmedSessionIds)
+        : { data: [] };
+      const timetableBySession = new Map(
+        (persistedTimetables ?? []).map((row) => [
+          row.session_id,
+          row.court_schedule,
+        ]),
+      );
 
       const friendRosterBySession = new Map(
         confirmedSessionIds.map((sessionId) => [
@@ -171,6 +198,15 @@ export async function loadDashboardData(): Promise<DashboardData> {
         prefsBySession.set(pref.session_id, sessionMap);
       }
       for (const sessionRow of sessionRows.filter((row) => row.status === "confirmed")) {
+        const persistedSchedule = timetableBySession.get(sessionRow.id);
+        if (isPersistedCourtSchedule(persistedSchedule)) {
+          userPlayerGameSchedules.set(
+            sessionRow.id,
+            getPlayerGamesFromCourtSchedule(persistedSchedule, user.id),
+          );
+          continue;
+        }
+
         const sessionRoster = rosterBySession.get(sessionRow.id) ?? [];
         const sessionPrefs = prefsBySession.get(sessionRow.id) ?? new Map();
         const rosterPlayers = sessionRoster.map((player) => ({
@@ -179,6 +215,7 @@ export async function loadDashboardData(): Promise<DashboardData> {
           priority: player.slot_number ?? 1,
           friendIds: sessionPrefs.get(player.user_id) ?? [],
           isCommittee: committeeByUser.get(player.user_id) ?? false,
+          level: levelByUser.get(player.user_id) ?? "INTERMEDIATE",
         }));
         if (rosterPlayers.length === 0) {
           userPlayerGameSchedules.set(sessionRow.id, []);
@@ -194,17 +231,28 @@ export async function loadDashboardData(): Promise<DashboardData> {
           },
           rosterPlayers,
         );
-        const yourGames = schedule
-          .filter((game) => game.players.some((player) => player.id === user.id))
-          .map((game) => ({
-            courtNumber: game.courtNumber,
-            startAt: game.startAt,
-            endAt: game.endAt,
-            courtPlayers: game.players
-              .filter((player) => player.id !== user.id)
-              .map((player) => player.displayName),
-          }));
-        userPlayerGameSchedules.set(sessionRow.id, yourGames);
+        try {
+          await admin
+            .from("session_timetables")
+            .upsert(
+              {
+                session_id: sessionRow.id,
+                court_schedule: markCourtScheduleCurrent(schedule) as Exclude<
+                  Json,
+                  null
+                >,
+                generated_by: null,
+                generated_at: new Date().toISOString(),
+              },
+              { onConflict: "session_id" },
+            );
+        } catch (persistError) {
+          console.error("Could not persist the session timetable.", persistError);
+        }
+        userPlayerGameSchedules.set(
+          sessionRow.id,
+          getPlayerGamesFromCourtSchedule(schedule, user.id),
+        );
       }
     } catch (error) {
       console.error("Could not build personalized game schedule.", error);
