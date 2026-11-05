@@ -471,6 +471,20 @@ dates when they have no signups.
 **Done when** `supabase db reset` leaves `public.sessions` empty and the pgTAP
 suite passes without the per-file deletes.
 
+### BC-45 · P2 · S — Anonymous `/admin` answers 200 with a shell before redirecting
+**Problem** With the local stack running (`npm run dev`, `curl -s -o /dev/null -w '%{http_code}'
+localhost:3000/admin`), an unauthenticated request returns **200** and 23 KB of HTML
+containing the admin chrome and `Loading club…`; the payload carries `NEXT_REDIRECT`
+markers, so the redirect happens after the shell has been flushed. No club data
+leaks, but the status code is wrong for bots and broken clients, and any failure
+between flush and redirect renders admin chrome to a stranger. The same response
+shape was visible on production (`https://badmintonclub.vercel.app/admin`).
+**Fix** Gate in `src/proxy.ts` (it already reads claims on every request) or move the
+`requireCommitteeAdmin()` check into a layout that resolves before streaming, so the
+response is `307`/`403` instead of `200`.
+**Done when** an unauthenticated `GET /admin` returns a redirect status and no admin
+markup.
+
 ---
 
 ## Suggested first five
