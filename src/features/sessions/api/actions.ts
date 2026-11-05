@@ -1,5 +1,6 @@
 import { isClubEmail, isUuid } from "@/lib/validation";
 import "server-only";
+import { logError } from "@/lib/log";
 
 import { hasSupabaseConfig } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
@@ -38,7 +39,7 @@ export async function updateSessionFriendPreferences(
   });
 
   if (error) {
-    console.error("Could not save session friend preferences.", {
+    logError("Could not save session friend preferences.", {
       code: error.code,
     });
     throw new Error("Could not save your friend choices.");
@@ -55,7 +56,7 @@ async function invalidateSessionTimetable(sessionId: string): Promise<void> {
     .eq("id", sessionId)
     .maybeSingle();
   if (sessionError || !session) {
-    console.error("Could not check the session timetable lock.", {
+    logError("Could not check the session timetable lock.", {
       code: sessionError?.code,
     });
     return;
@@ -77,7 +78,7 @@ async function invalidateSessionTimetable(sessionId: string): Promise<void> {
     .eq("session_id", sessionId);
 
   if (error) {
-    console.error("Could not invalidate session timetable.", {
+    logError("Could not invalidate session timetable.", {
       code: error.code,
     });
     throw new Error("Could not refresh this session’s court matching.");
@@ -99,7 +100,7 @@ export async function searchClubMembers(
   });
 
   if (error) {
-    console.error("Could not search club members.", { code: error.code });
+    logError("Could not search club members.", { code: error.code });
     throw new Error("Could not search club members.");
   }
 
@@ -132,7 +133,7 @@ export async function addClubFriend(friendId: string): Promise<void> {
   });
 
   if (error) {
-    console.error("Could not add a club friend.", { code: error.code });
+    logError("Could not add a club friend.", { code: error.code });
     throw new Error("Could not add this friend.");
   }
 }
@@ -145,7 +146,7 @@ export async function removeClubFriend(friendId: string): Promise<void> {
   });
 
   if (error) {
-    console.error("Could not remove a club friend.", { code: error.code });
+    logError("Could not remove a club friend.", { code: error.code });
     throw new Error("Could not remove this friend.");
   }
 }
@@ -259,7 +260,7 @@ async function updateSignup(
       : await supabase.rpc(functionName, { p_session_id: sessionId });
 
   if (error) {
-    console.error("Could not update session signup.", {
+    logError("Could not update session signup.", {
       operation: functionName,
       code: error.code,
     });

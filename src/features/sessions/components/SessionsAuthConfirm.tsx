@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
+import { logError, logInfo, logWarning } from "@/lib/log";
 
 type SessionsAuthConfirmProps = {
   tokenHash?: string;
@@ -27,7 +28,7 @@ export function SessionsAuthConfirm({
 
   async function confirmSignIn() {
     if (!tokenHash || !isSupportedEmailOtpType(type)) {
-      console.warn("Auth confirmation cannot call verifyOtp.", {
+      logWarning("Auth confirmation cannot call verifyOtp.", {
         tokenHashPresent: Boolean(tokenHash),
         tokenHashLength: tokenHash?.length ?? 0,
         type: getSafeEmailOtpType(type),
@@ -43,7 +44,7 @@ export function SessionsAuthConfirm({
     let verifyOtpCalled = false;
     try {
       const tokenHashFingerprint = await fingerprintTokenHash(tokenHash);
-      console.info("Calling Supabase verifyOtp.", {
+      logInfo("Calling Supabase verifyOtp.", {
         tokenHashPresent: true,
         tokenHashLength: tokenHash.length,
         tokenHashFingerprint,
@@ -61,7 +62,7 @@ export function SessionsAuthConfirm({
 
       if (error) {
         const sessionState = await logSessionState(supabase);
-        console.error("Supabase rejected email token verification.", {
+        logError("Supabase rejected email token verification.", {
           code: error.code,
           message: sanitizeAuthErrorMessage(error.message),
           verifyOtpCalled: true,
@@ -72,13 +73,13 @@ export function SessionsAuthConfirm({
         return;
       }
 
-      console.info("Supabase verifyOtp completed.", {
+      logInfo("Supabase verifyOtp completed.", {
         verifyOtpCalled: true,
         sessionReturned: Boolean(data.session),
       });
 
       if (!data.session) {
-        console.error("Supabase verified the email token without returning a session.", {
+        logError("Supabase verified the email token without returning a session.", {
           verifyOtpCalled: true,
           sessionReturned: false,
         });
@@ -98,7 +99,7 @@ export function SessionsAuthConfirm({
 
       window.location.replace("/");
     } catch (error) {
-      console.error("Email token verification failed unexpectedly.", {
+      logError("Email token verification failed unexpectedly.", {
         errorName: error instanceof Error ? error.name : "UnknownError",
         verifyOtpCalled,
       });
@@ -163,7 +164,7 @@ async function logSessionState(
     getUserSeesUser: Boolean(userResult.data.user),
   };
 
-  console.info("Supabase session checked after email verification.", {
+  logInfo("Supabase session checked after email verification.", {
     ...sessionState,
     getSessionError: sessionResult.error
       ? sanitizeAuthErrorMessage(sessionResult.error.message)
@@ -192,7 +193,7 @@ async function logReceivedTokenHash(
   tokenHash: string | undefined,
   type: string | undefined,
 ): Promise<void> {
-  console.info("Auth confirmation link received.", {
+  logInfo("Auth confirmation link received.", {
     tokenHashPresent: Boolean(tokenHash),
     tokenHashLength: tokenHash?.length ?? 0,
     tokenHashFingerprint: tokenHash
@@ -214,7 +215,7 @@ async function fingerprintTokenHash(tokenHash: string): Promise<string | null> {
       byte.toString(16).padStart(2, "0"),
     ).join("");
   } catch (error) {
-    console.error("Could not fingerprint the confirmation token hash.", {
+    logError("Could not fingerprint the confirmation token hash.", {
       errorName: error instanceof Error ? error.name : "UnknownError",
     });
     return null;

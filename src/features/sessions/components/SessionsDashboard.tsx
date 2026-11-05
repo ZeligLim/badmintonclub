@@ -42,6 +42,7 @@ import type {
   DemoSignupCounts,
   FriendCandidate,
 } from "@/features/sessions";
+import { logError, logWarning } from "@/lib/log";
 
 type SessionsDashboardProps = {
   initialData: DashboardData;
@@ -204,7 +205,7 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
       })
       .catch((error: unknown) => {
         dueSessions.forEach(({ id }) => finalizedSessionIds.current.delete(id));
-        console.error("Could not confirm due club sessions.", error);
+        logError("Could not confirm due club sessions.", error);
         setErrorMessage("We couldn’t confirm players for this session. Please try again.");
       })
       .finally(() => {
@@ -232,7 +233,7 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
           try {
             await saveSessionFriendPreferences(session.id, friendIds);
           } catch (error: unknown) {
-            console.warn("Could not save friend preferences upon joining confirmed session.", {
+            logWarning("Could not save friend preferences upon joining confirmed session.", {
               errorType: error instanceof Error ? error.name : "unknown",
             });
           }
@@ -274,7 +275,7 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
       }
       router.refresh();
     } catch (error: unknown) {
-      console.error("Could not update a session signup.", {
+      logError("Could not update a session signup.", {
         errorType: error instanceof Error ? error.name : "unknown",
       });
       setErrorMessage("We couldn’t update your place. Please try again.");
@@ -296,7 +297,7 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
         router.refresh();
       }
     } catch (error: unknown) {
-      console.error("Could not save session friend choices.", {
+      logError("Could not save session friend choices.", {
         errorType: error instanceof Error ? error.name : "unknown",
       });
       setErrorMessage("We couldn’t save your friend choices. Please try again.");
@@ -313,7 +314,7 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
         await addFriendToList(friend.userId);
       }
     } catch (error: unknown) {
-      console.error("Could not add a friend to the shared list.", {
+      logError("Could not add a friend to the shared list.", {
         errorType: error instanceof Error ? error.name : "unknown",
       });
       throw error;
@@ -337,7 +338,7 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
         currentFriends.filter((friend) => friend.userId !== friendId),
       );
     } catch (error: unknown) {
-      console.error("Could not remove a friend from the shared list.", {
+      logError("Could not remove a friend from the shared list.", {
         errorType: error instanceof Error ? error.name : "unknown",
       });
       setErrorMessage("We couldn’t remove this friend. Please try again.");

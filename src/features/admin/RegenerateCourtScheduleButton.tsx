@@ -4,6 +4,7 @@ import { RefreshCw } from "lucide-react";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { regenerateSessionCourtSchedule } from "./session-actions";
+import { logError } from "@/lib/log";
 
 export function RegenerateCourtScheduleButton({ sessionId }: { sessionId: string }) {
   const [isPending, startTransition] = useTransition();
@@ -15,7 +16,7 @@ export function RegenerateCourtScheduleButton({ sessionId }: { sessionId: string
       try {
         await regenerateSessionCourtSchedule(sessionId);
       } catch (error) {
-        console.error("Could not regenerate the court schedule.", error);
+        logError("Could not regenerate the court schedule.", error);
         setErrorMessage(
           error instanceof Error ? error.message : "Could not regenerate the court schedule.",
         );

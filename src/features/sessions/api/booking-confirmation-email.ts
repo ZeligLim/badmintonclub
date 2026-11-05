@@ -15,6 +15,7 @@ import {
   type PlayerGame,
 } from "../court-schedule";
 import type { createClient } from "@/lib/supabase/server";
+import { logError } from "@/lib/log";
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 type BookingEmailRecipient = {
@@ -61,7 +62,7 @@ export async function finalizeDueSessionsAndEmail(
       .delete()
       .in("session_id", dueSessionIds);
     if (clearError) {
-      console.error("Could not clear preview timetables before confirmation.", {
+      logError("Could not clear preview timetables before confirmation.", {
         code: clearError.code,
       });
     }
@@ -105,7 +106,7 @@ async function sendBookingConfirmationEmailToRecipient(
       throw new Error("Mailjet did not accept the booking confirmation email.");
     }
   } catch (error) {
-    console.error("Booking confirmation email failed.", {
+    logError("Booking confirmation email failed.", {
       stage: failureStage,
       errorName: error instanceof Error ? error.name : "UnknownError",
     });
@@ -126,7 +127,7 @@ async function sendSelectedBookingConfirmationEmails(
     .in("session_id", sessionIds);
 
   if (error) {
-    console.error("Could not load newly confirmed bookings for email.", {
+    logError("Could not load newly confirmed bookings for email.", {
       code: error.code,
     });
     return;
@@ -138,7 +139,7 @@ async function sendSelectedBookingConfirmationEmails(
         signup.user_id,
       );
       if (userError || !data.user?.email) {
-        console.error("Could not load a selected booking email recipient.", {
+        logError("Could not load a selected booking email recipient.", {
           userId: signup.user_id,
         });
         return;
@@ -271,7 +272,7 @@ async function createBookingConfirmationEmail(
           { onConflict: "session_id" },
         );
     } catch (persistError) {
-      console.error("Could not persist the confirmed timetable.", persistError);
+      logError("Could not persist the confirmed timetable.", persistError);
     }
   }
   const assignedCourts = [

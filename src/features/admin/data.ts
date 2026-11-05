@@ -17,6 +17,7 @@ import {
 import { getSessionDayName } from "@/lib/sessions/schedule";
 import type { PlayerLevel } from "@/types/player";
 import { isClubEmail } from "@/lib/validation";
+import { logError } from "@/lib/log";
 
 export type AdminPlayer = {
   userId: string;
@@ -344,7 +345,7 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
             generated_at: new Date().toISOString(),
           }, { onConflict: "session_id" });
       } catch (error) {
-        console.error("Could not persist session timetable.", error);
+        logError("Could not persist session timetable.", error);
       }
     }
 

@@ -5,6 +5,7 @@ import { LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { isClubEmail } from "@/lib/validation";
+import { logError } from "@/lib/log";
 
 export function SessionsSignIn() {
   const [email, setEmail] = useState("");
@@ -40,7 +41,7 @@ export function SessionsSignIn() {
 
       setMessage("Sent");
     } catch (error) {
-      console.error("Could not send the ATU sign-in link.", error);
+      logError("Could not send the ATU sign-in link.", error);
       setErrorMessage("We couldn’t send a sign-in link. Please try again.");
     } finally {
       setIsSendingLink(false);

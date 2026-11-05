@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Switch } from "@/components/ui/switch";
 import { updateSessionAvailability } from "./session-actions";
+import { logError } from "@/lib/log";
 
 type SessionAvailabilityToggleProps = {
   sessionId: string;
@@ -42,7 +43,7 @@ export function SessionAvailabilityToggle({
         setIsHappening(nextIsHappening);
         router.refresh();
       } catch (error) {
-        console.error("Could not update session availability.", error);
+        logError("Could not update session availability.", error);
         setErrorMessage(
           error instanceof Error
             ? error.message

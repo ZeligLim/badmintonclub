@@ -25,6 +25,7 @@ import {
 } from "../court-schedule";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isClubEmail } from "@/lib/validation";
+import { logError } from "@/lib/log";
 
 type DashboardSessionRow =
   Database["public"]["Functions"]["get_dashboard_sessions"]["Returns"][number];
@@ -245,7 +246,7 @@ export async function loadDashboardData(): Promise<DashboardData> {
               { onConflict: "session_id" },
             );
         } catch (persistError) {
-          console.error("Could not persist the session timetable.", persistError);
+          logError("Could not persist the session timetable.", persistError);
         }
         userPlayerGameSchedules.set(
           sessionRow.id,
@@ -253,7 +254,7 @@ export async function loadDashboardData(): Promise<DashboardData> {
         );
       }
     } catch (error) {
-      console.error("Could not build personalized game schedule.", error);
+      logError("Could not build personalized game schedule.", error);
     }
   }
 
@@ -291,7 +292,7 @@ async function getFriendList(
 ): Promise<FriendCandidate[]> {
   const { data, error } = await supabase.rpc("get_my_friend_list");
   if (error) {
-    console.error("Could not load the shared friend list.", {
+    logError("Could not load the shared friend list.", {
       code: error.code,
     });
     throw new Error("Could not load your friend list.");
@@ -338,7 +339,7 @@ async function getFriendPreferences(
         p_session_id: session.id,
       });
       if (error) {
-        console.error("Could not load saved session friend choices.", {
+        logError("Could not load saved session friend choices.", {
           code: error.code,
         });
         throw new Error("Could not load saved friend choices.");

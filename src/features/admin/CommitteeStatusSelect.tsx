@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { updateClubCommitteeStatus } from "./player-actions";
+import { logError } from "@/lib/log";
 
 type CommitteeStatusSelectProps = {
   userId: string;
@@ -37,7 +38,7 @@ export function CommitteeStatusSelect({
         setIsCommittee(nextIsCommittee);
         router.refresh();
       } catch (error) {
-        console.error("Could not update committee status.", error);
+        logError("Could not update committee status.", error);
         setErrorMessage(
           error instanceof Error
             ? error.message

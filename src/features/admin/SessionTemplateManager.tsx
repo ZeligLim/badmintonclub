@@ -13,6 +13,7 @@ import {
   saveSessionTemplate,
   type SessionTemplateInput,
 } from "./template-actions";
+import { logError } from "@/lib/log";
 
 type SessionTemplateManagerProps = {
   templates: AdminSessionTemplate[];
@@ -140,7 +141,7 @@ export function SessionTemplateManager({
         );
         router.refresh();
       } catch (error) {
-        console.error("Could not save the session template.", error);
+        logError("Could not save the session template.", error);
         setErrorMessage(
           error instanceof Error
             ? error.message
@@ -164,7 +165,7 @@ export function SessionTemplateManager({
         );
         router.refresh();
       } catch (error) {
-        console.error("Could not publish the club sessions.", error);
+        logError("Could not publish the club sessions.", error);
         setErrorMessage(
           error instanceof Error
             ? error.message
