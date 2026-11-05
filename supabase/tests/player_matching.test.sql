@@ -425,7 +425,7 @@ select ok(
 select ok(
   has_function_privilege(
     'authenticated',
-    'public.find_club_members(text)',
+    'public.find_club_members(text,uuid)',
     'execute'
   ),
   'authenticated club members can use the protected club-member search'
@@ -433,7 +433,7 @@ select ok(
 select ok(
   not has_function_privilege(
     'anon',
-    'public.find_club_members(text)',
+    'public.find_club_members(text,uuid)',
     'execute'
   ),
   'anonymous users cannot use the club-member search'
