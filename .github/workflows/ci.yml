@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A newer push supersedes a queued run for the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Types, lint and unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+  database:
+    name: Migrations and database tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Start local Supabase
+        run: npx supabase start
+
+      # Replays every migration from an empty database, which is the only thing
+      # that proves a fresh environment can be built from git.
+      - name: Replay migrations
+        run: npx supabase db reset --local
+
+      - name: pgTAP suite
+        run: npx supabase test db --local
+
+      # Advisory for now: the committed file is known to predate the latest
+      # migrations, so a failure here means "regenerate it", not "the build is
+      # broken". Make this blocking once the drift is cleared (BC-41).
+      - name: Generated types drift
+        continue-on-error: true
+        run: |
+          npx supabase gen types typescript --local > /tmp/database.types.ts
+          if ! diff -u src/lib/supabase/database.types.ts /tmp/database.types.ts; then
+            echo "::warning file=src/lib/supabase/database.types.ts::Generated types are stale; run npm run db:types"
+            exit 1
+          fi
+
+      - name: Stop local Supabase
+        if: always()
+        run: npx supabase stop --no-backup
