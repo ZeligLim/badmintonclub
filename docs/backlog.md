@@ -15,8 +15,13 @@ folded into the tickets below, mostly BC-09, BC-23 and BC-39.
 
 Closed by `71e7c3c` *"ci: gate production builds on typecheck, lint and tests"*
 (2026-11-05): **BC-33** (CI now exists and `npm run build` refuses to deploy a red
-tree). What BC-33 could not deliver — required checks on `main`, a blocking
-generated-types diff — moved to BC-41 and BC-42.
+tree). What BC-33 could not deliver — required checks on `main` — moved to BC-42.
+
+Closed by `2bea3d1` *"chore: regenerate database types and block drift"*
+(2026-11-05): **BC-41** (the committed generated types now match a fresh
+`supabase gen types`, and the drift step fails the job instead of warning). Docker
+became available locally during the check, which showed the drift step had been
+failing all along behind `continue-on-error`.
 
 ---
 
@@ -426,17 +431,6 @@ selected set, in a pgTAP test.
 
 ---
 
-### BC-41 · P2 · S — Generated database types are trusted without proof
-**Problem** `src/lib/supabase/database.types.ts` is produced by `npm run db:types`,
-which needs a local Supabase (Docker). CI regenerates it and diffs, but the step is
-`continue-on-error: true` in `.github/workflows/ci.yml`, so a stale file is a warning
-rather than a failure. The first green `database` run shows the committed file
-currently matches a fresh generation, so the risk is future drift, not present drift.
-**Fix** Drop `continue-on-error` now that the step is known to pass on a clean
-`supabase start`, and let a signature change without a types update fail the job.
-**Done when** a migration that changes a function signature without a types update
-fails CI.
-
 ### BC-42 · P2 · S — A red build blocks *deploying*, not *merging*
 **Problem** Vercel builds every push to `main`, so `npm run build` → `npm run verify`
 stops a red commit from reaching members. But GitHub still merges it: no branch
@@ -445,7 +439,9 @@ Two people pushing at once can also land a broken `main` that later commits sit 
 top of.
 **Fix** Enable branch protection on `main` (require `checks`, dismiss stale
 approvals, no force-push), which needs repo-admin rights, plus `main` as a
-protected branch in the Vercel project settings if available on Hobby.
+protected branch in the Vercel project settings if available on Hobby. Also bump
+`actions/checkout@v4` and `actions/setup-node@v4` (the runner forces them onto
+Node 24 and emits a deprecation warning on every run).
 **Done when** a PR with a failing `checks` job cannot be merged.
 
 ### BC-43 · P3 · S — The test gate now sits in the deploy path, untested
