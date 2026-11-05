@@ -234,11 +234,30 @@ select throws_ok(
 );
 reset role;
 
-update public.sessions
-set
-  signup_opens_at = now() - interval '1 day',
-  confirmation_at = now() + interval '1 day'
-where event_date = date_trunc('week', now() at time zone 'Europe/London')::date;
+-- The seeded current-week session has often already started when this suite
+-- runs, and the timetable release lock then rejects sign-ups. Use a dedicated
+-- future session so these behaviours do not depend on the day of the week.
+insert into public.sessions (
+  id,
+  event_date,
+  starts_at,
+  duration_minutes,
+  capacity,
+  signup_opens_at,
+  confirmation_at,
+  status
+)
+values (
+  '10000000-0000-4000-8000-0000000000ff',
+  date_trunc('week', now() at time zone 'Europe/London')::date + 34,
+  time '23:00',
+  60,
+  16,
+  now() - interval '1 day',
+  now() + interval '1 day',
+  'open'
+);
+
 set local role authenticated;
 select set_config(
   'request.jwt.claim.sub',
@@ -246,17 +265,11 @@ select set_config(
   true
 );
 select lives_ok(
-  $$select public.request_session_signup(
-    (select id from public.sessions
-     where event_date = date_trunc('week', now() at time zone 'Europe/London')::date)
-  )$$,
+  $$select public.request_session_signup('10000000-0000-4000-8000-0000000000ff')$$,
   'authenticated users can sign up after opening and before confirmation'
 );
 select lives_ok(
-  $$select public.cancel_session_signup(
-    (select id from public.sessions
-     where event_date = date_trunc('week', now() at time zone 'Europe/London')::date)
-  )$$,
+  $$select public.cancel_session_signup('10000000-0000-4000-8000-0000000000ff')$$,
   'authenticated users can cancel before confirmation'
 );
 reset role;
@@ -265,7 +278,7 @@ update public.sessions
 set
   signup_opens_at = now() - interval '2 days',
   confirmation_at = now() - interval '1 day'
-where event_date = date_trunc('week', now() at time zone 'Europe/London')::date;
+where id = '10000000-0000-4000-8000-0000000000ff';
 set local role authenticated;
 select set_config(
   'request.jwt.claim.sub',
@@ -273,24 +286,35 @@ select set_config(
   true
 );
 select throws_ok(
-  $$select public.request_session_signup(
-    (select id from public.sessions
-     where event_date = date_trunc('week', now() at time zone 'Europe/London')::date)
-  )$$,
+  $$select public.request_session_signup('10000000-0000-4000-8000-0000000000ff')$$,
   'P0001',
   'Sign-ups have closed for this session.',
   'authenticated users cannot sign up after the confirmation deadline'
 );
+
+-- Cancellation closes when the timetable is released, not at confirmation, so
+-- move the session into the past to exercise the cutoff deterministically.
+reset role;
+update public.sessions
+set
+  event_date = date_trunc('week', now() at time zone 'Europe/London')::date - 7,
+  starts_at = time '18:00'
+where id = '10000000-0000-4000-8000-0000000000ff';
+set local role authenticated;
+select set_config(
+  'request.jwt.claim.sub',
+  '10000000-0000-4000-8000-000000000001',
+  true
+);
 select throws_ok(
-  $$select public.cancel_session_signup(
-    (select id from public.sessions
-     where event_date = date_trunc('week', now() at time zone 'Europe/London')::date)
-  )$$,
+  $$select public.cancel_session_signup('10000000-0000-4000-8000-0000000000ff')$$,
   'P0001',
-  'This session can no longer be changed.',
-  'authenticated users cannot cancel after the confirmation deadline'
+  'The cancellation window for this session has passed.',
+  'authenticated users cannot cancel once the timetable has been released'
 );
 reset role;
+
+delete from public.sessions where id = '10000000-0000-4000-8000-0000000000ff';
 
 select is(
   (select count(*) from public.profiles where id::text like '10000000-0000-4000-8000-%'),

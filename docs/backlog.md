@@ -452,14 +452,30 @@ protected branch in the Vercel project settings if available on Hobby.
 
 ### BC-43 · P3 · S — The test gate now sits in the deploy path, untested
 **Problem** Adding `verify` to `build` means a flaky or slow test blocks production
-for everyone, and the `database` CI job (`supabase start`, `db reset`, pgTAP) has
-never executed — it could not run in the agent sandbox (no Docker), so its first
-real run is on GitHub and may fail every push. The regressions sweep alone is ≈12s
-of the ≈13s suite.
-**Fix** Run the workflow once on a throwaway branch, confirm both jobs are green,
-then decide whether `verify` stays in `build` or moves to a required check only.
+for everyone, and the `database` CI job (`supabase start`, `db reset`, pgTAP) had
+never executed — it could not run in the agent sandbox (no Docker). Its first real
+run proved the point: `checks` went green while `database` went red with six files
+aborting on `sessions_event_date_key`. The regressions sweep alone is ≈12s of the
+≈13s suite.
+**Fix** Run the workflow on a throwaway branch once the suite is stable, confirm
+both jobs are green, then decide whether `verify` stays in `build` or moves to a
+required check only.
 **Done when** a push to a scratch branch shows both jobs green, and the suite is
 known-stable on the Node 24 image.
+
+### BC-44 · P1 · S — A migration inserts sessions when it runs
+**Problem** `supabase/migrations/20261015232600_friday_fee_and_saturday_open.sql:86`
+ends with `select public.ensure_next_week_sessions();`, so every `db reset` — and
+any future apply against a fresh database — materialises the current and next club
+week relative to *the moment it runs*. Six pgTAP files delete every session at the
+top of their transaction to avoid colliding with those phantom rows, and a brand-new
+production project would start with sessions nobody scheduled.
+**Fix** Drop the call from the migration (the dashboard already calls
+`ensure_next_week_sessions()` at runtime) and, if the seeded rows must go from
+existing databases, ship a one-off migration that deletes sessions on those two
+dates when they have no signups.
+**Done when** `supabase db reset` leaves `public.sessions` empty and the pgTAP
+suite passes without the per-file deletes.
 
 ---
 

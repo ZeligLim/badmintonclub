@@ -2,6 +2,10 @@ begin;
 
 select plan(49);
 
+-- The migration chain seeds the current and next club week, so start from an
+-- empty schedule to keep these fixtures independent of the reset date.
+delete from public.sessions;
+
 alter table public.sessions drop constraint sessions_capacity_check;
 
 insert into auth.users (

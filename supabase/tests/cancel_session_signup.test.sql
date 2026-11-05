@@ -113,7 +113,7 @@ select is(
 select throws_ok(
   $$select public.cancel_session_signup('98000000-0000-4000-8000-000000000012')$$,
   'P0001',
-  'This session can no longer be changed.',
+  'The cancellation window for this session has passed.',
   'a player cannot cancel after the session starts'
 );
 
