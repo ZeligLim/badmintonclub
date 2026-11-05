@@ -17,7 +17,7 @@ Closed by `71e7c3c` *"ci: gate production builds on typecheck, lint and tests"*
 (2026-11-05): **BC-33** (CI now exists and `npm run build` refuses to deploy a red
 tree). What BC-33 could not deliver — required checks on `main` — moved to BC-42.
 
-Closed by `2bea3d1` *"chore: regenerate database types and block drift"*
+Closed by `4ab3517` *"chore: regenerate database types and block drift"*
 (2026-11-05): **BC-41** (the committed generated types now match a fresh
 `supabase gen types`, and the drift step fails the job instead of warning). Docker
 became available locally during the check, which showed the drift step had been
