@@ -427,15 +427,13 @@ selected set, in a pgTAP test.
 ---
 
 ### BC-41 · P2 · S — Generated database types are trusted without proof
-**Problem** `src/lib/supabase/database.types.ts` is produced by
-`npm run db:types`, which needs a local Supabase (Docker). CI only *warns* when a
-regeneration would change it (`continue-on-error: true` in
-`.github/workflows/ci.yml`), and nothing checks it against a fresh
-`supabase start` in a way that blocks. `fa83bb2` added two migrations and changed
-function signatures; the committed types were not regenerated, so the tree compiles
-only because the changed calls sit behind `as never`/untyped paths.
-**Fix** Regenerate the types against a clean local stack, commit the diff, then make
-the CI step blocking once its output is confirmed stable across runs.
+**Problem** `src/lib/supabase/database.types.ts` is produced by `npm run db:types`,
+which needs a local Supabase (Docker). CI regenerates it and diffs, but the step is
+`continue-on-error: true` in `.github/workflows/ci.yml`, so a stale file is a warning
+rather than a failure. The first green `database` run shows the committed file
+currently matches a fresh generation, so the risk is future drift, not present drift.
+**Fix** Drop `continue-on-error` now that the step is known to pass on a clean
+`supabase start`, and let a signature change without a types update fail the job.
 **Done when** a migration that changes a function signature without a types update
 fails CI.
 
