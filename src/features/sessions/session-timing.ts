@@ -11,6 +11,12 @@ export function getSessionPeriod(
   const sessionEnd = sessionStart + session.durationMinutes * 60_000;
   const currentTimestamp = currentTime.getTime();
 
+  // A session whose start cannot be read is treated as over: otherwise every
+  // comparison is false and a corrupt row looks permanently upcoming (and
+  // therefore signable).
+  if (!Number.isFinite(sessionStart)) {
+    return "over";
+  }
   if (currentTimestamp >= sessionEnd) {
     return "over";
   }
@@ -64,5 +70,14 @@ export function getSessionStartTimestamp(session: ClubSession) {
 
   const [hour, minute] = session.startsAt.split(":").map(Number);
   const sessionDate = new Date(`${session.date}T12:00:00Z`);
+  // `londonDateTime` throws on an invalid date, so callers cannot rely on NaN
+  // alone to detect a corrupt row.
+  if (
+    !Number.isFinite(hour) ||
+    !Number.isFinite(minute) ||
+    !Number.isFinite(sessionDate.getTime())
+  ) {
+    return Number.NaN;
+  }
   return new Date(londonDateTime(sessionDate, hour, minute)).getTime();
 }

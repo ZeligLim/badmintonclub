@@ -111,11 +111,17 @@ export function isSessionTimetableLocked(
     startAt = new Date(session.startsAt).getTime();
   } else {
     const [hour, minute] = session.startsAt.split(":").map(Number);
-    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return false;
     const sessionDate = new Date(`${session.eventDate}T12:00:00Z`);
-    startAt = new Date(londonDateTime(sessionDate, hour, minute)).getTime();
+    startAt =
+      Number.isFinite(hour) &&
+      Number.isFinite(minute) &&
+      Number.isFinite(sessionDate.getTime())
+        ? new Date(londonDateTime(sessionDate, hour, minute)).getTime()
+        : Number.NaN;
   }
-  if (!Number.isFinite(startAt)) return false;
+  // A timestamp we cannot read must not look "not released yet": that would
+  // let a corrupt row be regenerated after players had already seen it.
+  if (!Number.isFinite(startAt)) return true;
   return now.getTime() >= startAt - TIMETABLE_RELEASE_MINUTES * 60_000;
 }
 
@@ -189,7 +195,10 @@ function comparePlayerIds(a: { id: string }, b: { id: string }): number {
 }
 
 function levelValue(level: PlayerLevel | null | undefined): number {
-  return level ? LEVEL_VALUE[level] : LEVEL_VALUE.INTERMEDIATE;
+  // Rows written before the level migration can still carry a value outside
+  // PlayerLevel (for example "ADVANCED"); treat anything unknown as the
+  // default rather than letting NaN leak into every score comparison.
+  return (level ? LEVEL_VALUE[level] : undefined) ?? LEVEL_VALUE.INTERMEDIATE;
 }
 
 /** Higher levels rank first when every fairness and friendship tie is equal. */
