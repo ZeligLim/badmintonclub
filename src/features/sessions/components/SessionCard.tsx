@@ -9,6 +9,13 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
+  formatDuration,
+  formatFee,
+  formatRuleDateTime,
+  formatSessionDate,
+  formatTimeOfDay,
+} from "@/lib/format";
+import {
   createPlayerGameSchedule,
   type CourtRosterPlayer,
   type ClubSession,
@@ -148,7 +155,7 @@ export function SessionCard({
         <div className="min-w-0 flex-1 p-4 sm:p-5">
           <div className="mt-1 grid gap-y-1 sm:flex sm:flex-wrap sm:items-baseline sm:gap-x-3">
             <h3 className="text-lg font-medium tracking-tight">
-              {formatSessionTime(session.startsAt)}
+              {formatTimeOfDay(session.startsAt)}
               <span className="ml-2 text-sm font-normal text-muted-foreground">
                 · {formatDuration(session.durationMinutes)}
               </span>
@@ -313,8 +320,8 @@ export function SessionCard({
                   >
                     <div className="font-semibold text-primary">
                       Court {game.courtNumber} ·{" "}
-                      {formatSessionTime(game.startAt)}–
-                      {formatSessionTime(game.endAt)}
+                      {formatTimeOfDay(game.startAt)}–
+                      {formatTimeOfDay(game.endAt)}
                     </div>
                     {game.courtPlayers.length > 0 && (
                       <p className="mt-1 text-xs text-muted-foreground">
@@ -470,55 +477,3 @@ function createDemoScheduleRoster(
   return roster;
 }
 
-function formatSessionDate(value: string) {
-  const date = parseSessionDate(value);
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
-    month: "short",
-  }).format(date);
-}
-
-function formatRuleDateTime(value: string) {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Europe/London",
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(new Date(value));
-  const partValue = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((part) => part.type === type)?.value ?? "";
-
-  return `${partValue("weekday")} ${partValue("day")} ${partValue("month")} at ${partValue("hour")}:${partValue("minute")}`;
-}
-
-function parseSessionDate(value: string) {
-  return new Date(value.includes("T") ? value : `${value}T12:00:00`);
-}
-
-function formatSessionTime(value: string) {
-  if (/^\d{1,2}:\d{2}/.test(value)) {
-    return value.slice(0, 5);
-  }
-
-  return new Intl.DateTimeFormat("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).format(new Date(value));
-}
-
-function formatDuration(durationMinutes: number) {
-  const hours = durationMinutes / 60;
-  return `${hours} ${hours === 1 ? "hour" : "hours"}`;
-}
-
-function formatFee(feeCents: number) {
-  if (feeCents % 100 === 0) {
-    return `€${feeCents / 100}`;
-  }
-
-  return `€${(feeCents / 100).toFixed(2)}`;
-}

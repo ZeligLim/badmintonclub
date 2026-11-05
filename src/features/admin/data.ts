@@ -1,6 +1,7 @@
 import "server-only";
 
 import { connection } from "next/server";
+import { formatTimeOfDay } from "@/lib/format";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/database.types";
@@ -15,6 +16,7 @@ import {
 } from "@/features/sessions";
 import { getSessionDayName } from "@/lib/sessions/schedule";
 import type { PlayerLevel } from "@/types/player";
+import { isClubEmail } from "@/lib/validation";
 
 export type AdminPlayer = {
   userId: string;
@@ -89,7 +91,7 @@ export async function requireAdminUser() {
 
   const email = data.user?.email ?? "";
 
-  if (!email || !/^[^@\s]+@atu\.ie$/i.test(email)) {
+  if (!isClubEmail(email)) {
     return null;
   }
 
@@ -143,16 +145,16 @@ export async function loadSessionTemplates(): Promise<AdminSessionTemplate[]> {
     id: template.id,
     name: template.name,
     weekday: template.weekday,
-    startsAt: formatTime(template.starts_at),
+    startsAt: formatTimeOfDay(template.starts_at),
     durationMinutes: template.duration_minutes,
     capacity: template.capacity,
     feeCents: template.fee_cents,
     allocationMode: parseAllocationMode(template.allocation_mode),
     committeeAutoSignup: template.committee_auto_signup,
     signupOpensLeadDays: template.signup_opens_lead_days,
-    signupOpensAt: formatTime(template.signup_opens_at),
+    signupOpensAt: formatTimeOfDay(template.signup_opens_at),
     confirmationLeadDays: template.confirmation_lead_days,
-    confirmationAt: formatTime(template.confirmation_at),
+    confirmationAt: formatTimeOfDay(template.confirmation_at),
     isActive: template.is_active,
     validFrom: template.valid_from,
     validUntil: template.valid_until,
@@ -412,6 +414,3 @@ function parseAllocationMode(allocationMode: string): SessionAllocationMode {
   throw new Error("A session template has an unsupported allocation mode.");
 }
 
-function formatTime(value: string): string {
-  return value.slice(0, 5);
-}

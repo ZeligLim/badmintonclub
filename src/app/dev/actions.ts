@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isClubEmail, isUuid } from "@/lib/validation";
 
 function assertDevelopment() {
   if (process.env.NODE_ENV !== "development") {
@@ -18,7 +19,7 @@ export async function createTestAccount(formData: FormData) {
   const email = normalizeEmail(formData.get("email"));
   const displayName = String(formData.get("displayName") ?? "").trim();
   const role = String(formData.get("role") ?? "player");
-  if (!email.endsWith("@atu.ie")) {
+  if (!isClubEmail(email)) {
     throw new Error("Use an @atu.ie email address.");
   }
   const supabase = createAdminClient();
@@ -55,9 +56,7 @@ export async function setTestAccountRole(userId: string, role: string) {
   userId = String(userId ?? "").trim();
   role = String(role ?? "").trim();
   if (
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      userId,
-    )
+    !isUuid(userId)
   ) {
     throw new Error("The account request is invalid.");
   }
@@ -112,7 +111,7 @@ export async function addDevFriend(formData: FormData) {
   assertDevelopment();
   const userEmail = normalizeEmail(formData.get("userEmail"));
   const friendEmail = normalizeEmail(formData.get("friendEmail"));
-  if (!userEmail.endsWith("@atu.ie") || !friendEmail.endsWith("@atu.ie")) {
+  if (!isClubEmail(userEmail) || !isClubEmail(friendEmail)) {
     throw new Error("Both accounts must use @atu.ie email addresses.");
   }
   if (userEmail === friendEmail) {

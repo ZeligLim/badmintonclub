@@ -1,5 +1,6 @@
 "use server";
 
+import { isUuid } from "@/lib/validation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { SessionAllocationMode } from "@/features/sessions";
@@ -33,8 +34,6 @@ export type PublishResult = {
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function saveSessionTemplate(
   input: SessionTemplateInput,
@@ -79,7 +78,7 @@ export async function setSessionTemplateActive(
   if (!(await requireAdminUser())) {
     throw new Error("Only a club administrator can manage session templates.");
   }
-  if (!UUID_PATTERN.test(templateId) || typeof isActive !== "boolean") {
+  if (!isUuid(templateId) || typeof isActive !== "boolean") {
     throw new Error("The session template request is invalid.");
   }
 
@@ -181,7 +180,7 @@ function validateTemplateInput(input: SessionTemplateInput): SessionTemplateInpu
   if (!TIME_PATTERN.test(input.confirmationAt)) {
     throw new Error("Choose the time sign-ups close.");
   }
-  if (input.templateId !== null && !UUID_PATTERN.test(input.templateId)) {
+  if (input.templateId !== null && !isUuid(input.templateId)) {
     throw new Error("The session template request is invalid.");
   }
   if (validFrom !== null && !DATE_PATTERN.test(validFrom)) {

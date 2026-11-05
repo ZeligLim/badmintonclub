@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { SessionsSignIn } from "@/features/sessions";
 import { createClient } from "@/lib/supabase/server";
+import { isClubEmail } from "@/lib/validation";
 
 export const instant = false;
 
@@ -22,7 +23,7 @@ export default async function SignInPage() {
     throw new Error(`Could not check your sign-in status: ${error.message}`);
   }
 
-  if (data.user?.email && /^[^@\s]+@atu\.ie$/i.test(data.user.email)) {
+  if (isClubEmail(data.user?.email)) {
     redirect("/");
   }
 

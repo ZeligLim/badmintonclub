@@ -24,6 +24,7 @@ import {
   markCourtScheduleCurrent,
 } from "../court-schedule";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isClubEmail } from "@/lib/validation";
 
 type DashboardSessionRow =
   Database["public"]["Functions"]["get_dashboard_sessions"]["Returns"][number];
@@ -48,10 +49,7 @@ export async function loadDashboardData(): Promise<DashboardData> {
   } else if (authError && authError.name !== "AuthSessionMissingError") {
     throw new Error(`Could not load your sign-in status: ${authError.message}`);
   }
-  const user =
-    authData.user?.email && /^[^@\s]+@atu\.ie$/i.test(authData.user.email)
-      ? authData.user
-      : null;
+  const user = isClubEmail(authData.user?.email) ? authData.user : null;
 
   const { error: ensureError } = await supabase.rpc("ensure_next_week_sessions");
   if (ensureError) {

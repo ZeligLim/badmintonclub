@@ -1,5 +1,6 @@
 "use server";
 
+import { isUuid } from "@/lib/validation";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -16,7 +17,7 @@ export async function regenerateSessionCourtSchedule(sessionId: string): Promise
   }
   if (
     typeof sessionId !== "string" ||
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionId)
+    !isUuid(sessionId)
   ) {
     throw new Error("The session schedule request is invalid.");
   }
@@ -75,12 +76,7 @@ export async function updateSessionAvailability(
   if (!(await requireAdminUser())) {
     throw new Error("Only a club administrator can change session availability.");
   }
-  if (
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      sessionId,
-    ) ||
-    typeof isHappening !== "boolean"
-  ) {
+  if (!isUuid(sessionId) || typeof isHappening !== "boolean") {
     throw new Error("The session availability request is invalid.");
   }
 

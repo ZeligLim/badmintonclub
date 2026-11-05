@@ -1,4 +1,5 @@
 import { isSessionTimetableLocked } from "@/features/sessions/court-schedule";
+import { formatDuration, formatTimeOfDay } from "@/lib/format";
 import type { AdminSession } from "./data";
 import { SessionAvailabilityToggle } from "./SessionAvailabilityToggle";
 import { RegenerateCourtScheduleButton } from "./RegenerateCourtScheduleButton";
@@ -33,7 +34,7 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
           }).format(new Date(`${session.date}T12:00:00Z`))}
         </h2>
         <span className="text-sm text-muted-foreground">
-          {session.startsAt.slice(0, 5)} · {session.durationMinutes / 60}h ·{" "}
+          {formatTimeOfDay(session.startsAt)} · {formatDuration(session.durationMinutes)} ·{" "}
           {session.courtCount} courts · capacity {session.capacity}
         </span>
         <span

@@ -3,6 +3,9 @@ import type { ClubSession } from "./types";
 
 const GAME_DURATION_MINUTES = 15;
 const PLAYERS_PER_COURT = 4;
+/** Capacity a single court can serve in one session (two 4-player games). */
+const CAPACITY_PER_COURT = PLAYERS_PER_COURT * 2;
+const MAX_COURTS = 4;
 /** Players see the timetable this long before the session starts. */
 const TIMETABLE_RELEASE_MINUTES = 30;
 export const COURT_ALLOCATION_VERSION = 9;
@@ -159,7 +162,7 @@ export function getPlayerGamesFromCourtSchedule(
 }
 
 export function getCourtCount(capacity: number): number {
-  return Math.min(Math.ceil(capacity / 8), 4);
+  return Math.min(Math.ceil(capacity / CAPACITY_PER_COURT), MAX_COURTS);
 }
 
 function getCourtSizes(rosterSize: number, courtCount: number): number[] {

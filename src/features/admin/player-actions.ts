@@ -1,5 +1,6 @@
 "use server";
 
+import { isUuid } from "@/lib/validation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdminUser } from "./data";
@@ -14,9 +15,7 @@ export async function updateClubCommitteeStatus(
 
   if (
     typeof userId !== "string" ||
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      userId,
-    ) ||
+    !isUuid(userId) ||
     typeof isCommittee !== "boolean"
   ) {
     throw new Error("The committee status request is invalid.");
@@ -43,9 +42,7 @@ export async function updateProfessionalChoice(
     throw new Error("Only a club administrator can change Professional level access.");
   }
   if (
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      userId,
-    ) ||
+    !isUuid(userId) ||
     typeof enabled !== "boolean"
   ) {
     throw new Error("The Professional level access request is invalid.");

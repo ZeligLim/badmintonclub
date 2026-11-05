@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
+import { formatDuration, formatFee } from "@/lib/format";
 import { CLUB_SESSION_DAYS } from "@/lib/sessions/schedule";
 import type { SessionAllocationMode } from "@/features/sessions";
 import type { AdminSessionTemplate } from "./data";
@@ -507,18 +508,3 @@ function Field({
   );
 }
 
-function formatFee(feeCents: number) {
-  if (feeCents === 0) {
-    return "Free";
-  }
-  if (feeCents % 100 === 0) {
-    return `€${feeCents / 100}`;
-  }
-
-  return `€${(feeCents / 100).toFixed(2)}`;
-}
-
-function formatDuration(durationMinutes: number) {
-  const hours = durationMinutes / 60;
-  return `${hours} ${hours === 1 ? "hour" : "hours"}`;
-}

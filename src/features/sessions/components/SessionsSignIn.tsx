@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
+import { isClubEmail } from "@/lib/validation";
 
 export function SessionsSignIn() {
   const [email, setEmail] = useState("");
@@ -17,7 +18,7 @@ export function SessionsSignIn() {
     setErrorMessage("");
 
     const normalizedEmail = email.replace(/\s/g, "");
-    if (!/^[^@\s]+@atu\.ie$/i.test(normalizedEmail)) {
+    if (!isClubEmail(normalizedEmail)) {
       setErrorMessage("Use your ATU email address ending in @atu.ie.");
       return;
     }

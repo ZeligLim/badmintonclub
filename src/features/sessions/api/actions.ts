@@ -1,3 +1,4 @@
+import { isClubEmail, isUuid } from "@/lib/validation";
 import "server-only";
 
 import { hasSupabaseConfig } from "@/lib/supabase/env";
@@ -285,7 +286,7 @@ async function requireAuthenticatedClient() {
   if (!data.user) {
     throw new Error("Sign in before changing a session signup.");
   }
-  if (!data.user.email || !/^[^@\s]+@atu\.ie$/i.test(data.user.email)) {
+  if (!isClubEmail(data.user.email)) {
     throw new Error("Only @atu.ie email addresses can use club sessions.");
   }
 
@@ -293,29 +294,20 @@ async function requireAuthenticatedClient() {
 }
 
 function validateSessionId(sessionId: string): void {
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(sessionId)) {
+  if (!isUuid(sessionId)) {
     throw new Error("That session could not be found.");
   }
 }
 
 function validateFriendIds(friendIds: string[]): void {
-  const hasInvalidId = friendIds.some(
-    (friendId) =>
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-        friendId,
-      ),
-  );
+  const hasInvalidId = friendIds.some((friendId) => !isUuid(friendId));
   if (friendIds.length > 3 || hasInvalidId) {
     throw new Error("Select up to three valid club members.");
   }
 }
 
 function validateFriendId(friendId: string): void {
-  if (
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-      friendId,
-    )
-  ) {
+  if (!isUuid(friendId)) {
     throw new Error("Choose a valid club member.");
   }
 }
