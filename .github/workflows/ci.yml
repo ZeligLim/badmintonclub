@@ -60,8 +60,21 @@ jobs:
       - name: Replay migrations
         run: npx supabase db reset --local
 
+      # Job logs need repo-admin rights, so mirror the failing pgTAP lines into
+      # check-run annotations, which are readable by anyone on a public repo.
       - name: pgTAP suite
-        run: npx supabase test db --local
+        run: |
+          set +e
+          npx supabase test db --local 2>&1 | tee /tmp/pgtap.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            grep -E '^(psql:|# |not ok|Failed test|Dubious|Result:)' /tmp/pgtap.log \
+              | tail -n 40 \
+              | while IFS= read -r line; do
+                  echo "::error::${line}"
+                done
+          fi
+          exit "$status"
 
       # Advisory for now: the committed file is known to predate the latest
       # migrations, so a failure here means "regenerate it", not "the build is
