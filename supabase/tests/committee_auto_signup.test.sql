@@ -32,7 +32,8 @@ select
 from generate_series(1, 14) as player_number;
 
 update public.profiles
-set is_committee = right(id::text, 12)::integer in (1, 2, 3, 4, 5, 7, 13, 14);
+set is_committee = right(id::text, 12)::integer in (1, 2, 3, 4, 5, 7, 13, 14)
+where id::text like '22000000-0000-4000-8000-%';
 
 alter table public.sessions drop constraint sessions_capacity_check;
 

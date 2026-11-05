@@ -24,14 +24,17 @@ import {
   ensureSessionTimetable,
   readPersistedTimetables,
 } from "@/features/sessions/api/timetable";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { isClubEmail } from "@/lib/validation";
 import { logError } from "@/lib/log";
 
 type DashboardSessionRow =
   Database["public"]["Functions"]["get_dashboard_sessions"]["Returns"][number];
-type RosterRow =
-  Database["public"]["Functions"]["get_session_roster"]["Returns"][number];
+type ScheduleInputRow =
+  Database["public"]["Functions"]["get_schedule_inputs"]["Returns"][number];
+type RosterRow = Pick<
+  ScheduleInputRow,
+  "session_id" | "user_id" | "display_name" | "slot_number"
+>;
 type FriendCandidateRow =
   Database["public"]["Functions"]["get_session_friend_preferences"]["Returns"][number];
 type FriendListRow =
@@ -88,9 +91,18 @@ export async function loadDashboardData(): Promise<DashboardData> {
     throw new Error("Could not load club sessions.");
   }
 
-  const rosterRows = user
-    ? await getRosterRows(supabase, sessionRows)
+  const scheduleInputs = user
+    ? await getScheduleInputs(
+        supabase,
+        sessionRows.map((row) => row.id),
+      )
     : [];
+  const rosterRows: RosterRow[] = scheduleInputs.map((row) => ({
+    session_id: row.session_id,
+    user_id: row.user_id,
+    display_name: row.display_name,
+    slot_number: row.slot_number,
+  }));
   const friendCandidates: Map<string, FriendCandidate[]> = user
     ? await getFriendPreferences(supabase, sessionRows)
     : new Map();
@@ -104,96 +116,25 @@ export async function loadDashboardData(): Promise<DashboardData> {
   const userPlayerGameSchedules = new Map<string, import("../types").PlayerGame[]>();
   if (user) {
     try {
-      const admin = createAdminClient();
       const confirmedSessionIds = sessionRows
         .filter((row) => row.status === "confirmed")
         .map((row) => row.id);
-
-      const rosterBySession = new Map<string, RosterRow[]>();
-      for (const row of rosterRows) {
-        if (row.session_id) {
-          const list = rosterBySession.get(row.session_id) ?? [];
-          list.push(row);
-          rosterBySession.set(row.session_id, list);
-        }
+      const playersBySession = new Map<string, ScheduleInputRow[]>();
+      for (const row of scheduleInputs) {
+        const list = playersBySession.get(row.session_id) ?? [];
+        list.push(row);
+        playersBySession.set(row.session_id, list);
       }
-
-      const { data: allFriendPrefs } = confirmedSessionIds.length
-        ? await admin
-            .from("session_friend_preferences")
-            .select("session_id, user_id, friend_user_id")
-            .in("session_id", confirmedSessionIds)
-        : { data: [] };
-
-      const confirmedRosterUserIds = Array.from(
-        new Set(
-          rosterRows
-            .filter((row) =>
-              confirmedSessionIds.includes(row.session_id ?? ""),
-            )
-            .map((row) => row.user_id)
-            .filter((value): value is string => typeof value === "string"),
-        ),
-      );
-      const { data: committeeProfiles } = confirmedRosterUserIds.length
-        ? await admin
-            .from("profiles")
-            .select("id, is_committee, player_level")
-            .in("id", confirmedRosterUserIds)
-        : { data: [] };
-      const committeeByUser = new Map(
-        (committeeProfiles ?? []).map((row) => [row.id, row.is_committee]),
-      );
-      const levelByUser = new Map(
-        (committeeProfiles ?? []).map((row) => [
-          row.id,
-          parsePlayerLevel(row.player_level),
-        ]),
-      );
-      const { data: allClubPrefs } =
-        confirmedSessionIds.length && confirmedRosterUserIds.length
-          ? await admin
-              .from("club_friend_list")
-              .select("user_id, friend_user_id")
-              .in("user_id", confirmedRosterUserIds)
-          : { data: [] };
 
       // Every viewer reads the same saved timetable. Recomputing a personal
       // timetable here was the source of members seeing different courts.
-      const timetableBySession = await readPersistedTimetables(confirmedSessionIds);
-
-      const friendRosterBySession = new Map(
-        confirmedSessionIds.map((sessionId) => [
-          sessionId,
-          new Set(
-            (rosterBySession.get(sessionId) ?? []).map((row) => row.user_id),
-          ),
-        ]),
+      const timetableBySession = await readPersistedTimetables(
+        confirmedSessionIds,
       );
-      for (const pref of allClubPrefs ?? []) {
-        if (!pref?.user_id || !pref?.friend_user_id) continue;
-        for (const sessionId of confirmedSessionIds) {
-          const players = friendRosterBySession.get(sessionId);
-          if (!players || !players.has(pref.user_id)) continue;
-          (allFriendPrefs ?? []).push({
-            session_id: sessionId,
-            user_id: pref.user_id,
-            friend_user_id: pref.friend_user_id,
-          });
-        }
-      }
-      const prefsBySession = new Map<string, Map<string, string[]>>();
-      for (const pref of allFriendPrefs ?? []) {
-        const sessionMap = prefsBySession.get(pref.session_id) ?? new Map();
-        const list = sessionMap.get(pref.user_id) ?? [];
-        list.push(pref.friend_user_id);
-        sessionMap.set(pref.user_id, list);
-        prefsBySession.set(pref.session_id, sessionMap);
-      }
-      for (const sessionRow of sessionRows.filter((row) => row.status === "confirmed")) {
-        const sessionRoster = rosterBySession.get(sessionRow.id) ?? [];
-        const sessionPrefs = prefsBySession.get(sessionRow.id) ?? new Map();
 
+      for (const sessionRow of sessionRows.filter(
+        (row) => row.status === "confirmed",
+      )) {
         const timetable = await ensureSessionTimetable({
           session: {
             id: sessionRow.id,
@@ -203,13 +144,13 @@ export async function loadDashboardData(): Promise<DashboardData> {
             capacity: sessionRow.capacity,
             isConfirmed: true,
           },
-          players: sessionRoster.map((player) => ({
+          players: (playersBySession.get(sessionRow.id) ?? []).map((player) => ({
             id: player.user_id,
             displayName: player.display_name,
             priority: player.slot_number ?? 1,
-            friendIds: sessionPrefs.get(player.user_id) ?? [],
-            isCommittee: committeeByUser.get(player.user_id) ?? false,
-            level: levelByUser.get(player.user_id) ?? "INTERMEDIATE",
+            friendIds: player.friend_ids ?? [],
+            isCommittee: player.is_committee,
+            level: parsePlayerLevel(player.player_level),
           })),
           persisted: timetableBySession.get(sessionRow.id),
         });
@@ -318,53 +259,58 @@ async function getFriendPreferences(
   supabase: Awaited<ReturnType<typeof createClient>>,
   sessions: DashboardSessionRow[],
 ): Promise<Map<string, FriendCandidate[]>> {
-  const activeSessions = sessions.filter(
-    (session) => session.status === "open" || session.status === "confirmed",
+  const activeSessionIds = sessions
+    .filter(
+      (session) => session.status === "open" || session.status === "confirmed",
+    )
+    .map((session) => session.id);
+  if (activeSessionIds.length === 0) {
+    return new Map();
+  }
+
+  const { data, error } = await supabase.rpc(
+    "get_session_friend_preferences_bulk",
+    { p_session_ids: activeSessionIds },
   );
-  const candidateRows = await Promise.all(
-    activeSessions.map(async (session) => {
-      const { data, error } = await supabase.rpc("get_session_friend_preferences", {
-        p_session_id: session.id,
-      });
-      if (error) {
-        logError("Could not load saved session friend choices.", {
-          code: error.code,
-        });
-        throw new Error("Could not load saved friend choices.");
-      }
-      return [session.id, data] as const;
-    }),
-  );
+  if (error) {
+    logError("Could not load saved session friend choices.", {
+      code: error.code,
+    });
+    throw new Error("Could not load saved friend choices.");
+  }
+
+  const bySession = new Map<string, FriendCandidateRow[]>();
+  for (const row of data ?? []) {
+    const list = bySession.get(row.session_id) ?? [];
+    list.push(row);
+    bySession.set(row.session_id, list);
+  }
 
   return new Map(
-    candidateRows.map(([sessionId, candidates]) => [
+    activeSessionIds.map((sessionId) => [
       sessionId,
-      candidates.map(mapFriendCandidate),
+      (bySession.get(sessionId) ?? []).map(mapFriendCandidate),
     ]),
   );
 }
 
-async function getRosterRows(
+async function getScheduleInputs(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  sessions: DashboardSessionRow[],
-): Promise<RosterRow[]> {
-  const confirmedSessions = sessions.filter(
-    (session) => session.status === "confirmed",
-  );
-  const rosters = await Promise.all(
-    confirmedSessions.map((session) =>
-      supabase.rpc("get_session_roster", { p_session_id: session.id }),
-    ),
-  );
-
-  for (const roster of rosters) {
-    if (roster.error) {
-      logError("Could not load the confirmed player roster.", roster.error);
-      throw new Error("Could not load the confirmed player roster.");
-    }
+  sessionIds: string[],
+): Promise<ScheduleInputRow[]> {
+  if (sessionIds.length === 0) {
+    return [];
   }
 
-  return rosters.flatMap((roster) => roster.data ?? []);
+  const { data, error } = await supabase.rpc("get_schedule_inputs", {
+    p_session_ids: sessionIds,
+  });
+  if (error) {
+    logError("Could not load the session schedule inputs.", error);
+    throw new Error("Could not load the session schedule inputs.");
+  }
+
+  return data ?? [];
 }
 
 function mapSession(
