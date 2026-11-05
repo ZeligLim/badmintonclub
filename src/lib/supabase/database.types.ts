@@ -310,6 +310,9 @@ isOneToOne: false
 "reset_virtual_now":
 { Args: Record<PropertyKey, never>; Returns: undefined
                            },
+"revert_session_finalizations":
+{ Args: { "p_cutoff": string }; Returns: undefined
+                           },
 "set_my_committee_auto_signup":
 { Args: { "p_enabled": boolean }; Returns: undefined
                            },

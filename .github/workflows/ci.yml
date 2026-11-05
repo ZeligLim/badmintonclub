@@ -76,15 +76,11 @@ jobs:
           fi
           exit "$status"
 
-      # Advisory for now: the committed file is known to predate the latest
-      # migrations, so a failure here means "regenerate it", not "the build is
-      # broken". Make this blocking once the drift is cleared (BC-41).
       - name: Generated types drift
-        continue-on-error: true
         run: |
           npx supabase gen types typescript --local > /tmp/database.types.ts
           if ! diff -u src/lib/supabase/database.types.ts /tmp/database.types.ts; then
-            echo "::warning file=src/lib/supabase/database.types.ts::Generated types are stale; run npm run db:types"
+            echo "::error file=src/lib/supabase/database.types.ts::Generated types are stale; run npm run db:types"
             exit 1
           fi
 
