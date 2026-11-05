@@ -15,12 +15,7 @@ import {
   formatSessionDate,
   formatTimeOfDay,
 } from "@/lib/format";
-import {
-  createPlayerGameSchedule,
-  type CourtRosterPlayer,
-  type ClubSession,
-  type FriendCandidate,
-} from "@/features/sessions";
+import type { ClubSession, FriendCandidate } from "@/features/sessions";
 import Link from "next/link";
 import { useState } from "react";
 import type { SessionSignupStatus as SignupStatus } from "../types";
@@ -43,7 +38,6 @@ type SessionCardProps = {
   signupWindowStatus: "not-open" | "open" | "closed";
   /** True once the clock passes session start − 30 min. The timetable is released at that point and no further changes are accepted. */
   isPastCancellationDeadline: boolean;
-  isDemo: boolean;
   isSignedIn: boolean;
   isPending: boolean;
   friendList: FriendCandidate[];
@@ -54,14 +48,12 @@ type SessionCardProps = {
 
 export function SessionCard({
   session,
-  currentUserId,
   signupState,
   showSessionView,
   isSessionInProgress,
   isSessionOver,
   signupWindowStatus,
   isPastCancellationDeadline,
-  isDemo,
   isSignedIn,
   isPending,
   friendList,
@@ -91,30 +83,8 @@ export function SessionCard({
   const isSignedUp = signupStatus.length > 0 && !isPlayed;
   const isConfirmed =
     session.status === "confirmed" || session.status === "closed";
-  const currentPlayerId = isDemo ? "demo-current-player" : currentUserId;
-  const scheduleRoster: CourtRosterPlayer[] = isDemo
-    ? createDemoScheduleRoster(
-        signupState.registeredCount,
-        session.capacity,
-        signupState.currentUserSlot,
-        selectedFriendIds,
-        friendCandidates,
-      )
-    : [];
   const playerGameSchedule =
-    isDemo
-      ? signupStatus === "selected" &&
-        currentPlayerId &&
-        scheduleRoster.some((player) => player.id === currentPlayerId)
-        ? createPlayerGameSchedule(
-            { ...session, id: session.id },
-            scheduleRoster,
-            currentPlayerId,
-          )
-        : []
-      : signupStatus === "selected"
-        ? session.playerGameSchedule ?? []
-        : [];
+    signupStatus === "selected" ? session.playerGameSchedule ?? [] : [];
   const hasFcfsSpace =
     session.status === "confirmed" &&
     !isPastCancellationDeadline &&
@@ -356,7 +326,6 @@ export function SessionCard({
                 friendCandidates={friendCandidates}
                 friendList={friendList}
                 isAlreadySignedUp={isSignedUp}
-                isDemo={isDemo}
                 isPending={isPending}
                 sessionId={session.id}
                 onAddToFriendList={onAddToFriendList}
@@ -375,7 +344,7 @@ export function SessionCard({
               isSessionInProgress={isSessionInProgress}
               isSessionOver={isSessionOver}
             />
-            {!isDemo && !isSessionOver && (
+            {!isSessionOver && (
               <>
                 {!isSignedIn && session.status !== "cancelled" ? (
                   <Link
@@ -395,7 +364,7 @@ export function SessionCard({
                 disabled={
                   isPending ||
                   (session.status === "open" && !isSignedUp && signupWindowStatus !== "open") ||
-                  (!isDemo && !isSignedIn)
+                  !isSignedIn
                 }
                 onClick={handleSignupClick}
                 size="sm"
@@ -422,59 +391,3 @@ export function SessionCard({
     </article>
   );
 }
-
-function createDemoScheduleRoster(
-  registeredCount: number,
-  capacity: number,
-  currentUserSlot: number | null,
-  selectedFriendIds: string[] = [],
-  friendCandidates: FriendCandidate[] = [],
-): CourtRosterPlayer[] {
-  const count = Math.min(registeredCount, capacity);
-  if (count === 0) {
-    return [];
-  }
-
-  const userSlot = currentUserSlot ?? 1;
-  const roster: CourtRosterPlayer[] = [
-    {
-      id: "demo-current-player",
-      displayName: "You",
-      priority: userSlot,
-      friendIds: selectedFriendIds,
-    },
-  ];
-
-  const candidateMap = new Map(
-    friendCandidates.map((candidate) => [candidate.userId, candidate]),
-  );
-
-  for (const friendId of selectedFriendIds) {
-    if (roster.length >= count) break;
-    const candidate = candidateMap.get(friendId);
-    if (candidate && candidate.isSignedUp !== false) {
-      roster.push({
-        id: candidate.userId,
-        displayName: candidate.displayName,
-        priority: userSlot,
-        friendIds: ["demo-current-player"],
-      });
-    }
-  }
-
-  let playerNum = 1;
-  while (roster.length < count) {
-    const candidateId = `demo-player-${playerNum}`;
-    if (!roster.some((player) => player.id === candidateId)) {
-      roster.push({
-        id: candidateId,
-        displayName: `Demo Player ${playerNum}`,
-        priority: Math.floor(roster.length / 4) + 1,
-      });
-    }
-    playerNum += 1;
-  }
-
-  return roster;
-}
-

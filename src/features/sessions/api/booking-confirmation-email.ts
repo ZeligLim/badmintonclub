@@ -10,10 +10,7 @@ import {
   ensureSessionTimetable,
 } from "@/features/sessions/api/timetable";
 import { createAdminClient } from "@/lib/supabase/admin";
-import {
-  getPlayerGamesFromCourtSchedule,
-  type PlayerGame,
-} from "../court-schedule";
+import { getPlayerGamesFromCourtSchedule } from "../court-schedule";
 import type { createClient } from "@/lib/supabase/server";
 import { logError } from "@/lib/log";
 

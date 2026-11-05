@@ -29,25 +29,21 @@ import {
 import { useRouter } from "next/navigation";
 
 type SessionsHeaderProps = {
-  isDemo: boolean;
   displayName: string | null;
   isCommittee: boolean;
   isCommitteeAdmin: boolean;
   committeeAutoSignup: boolean;
   playerLevel: PlayerLevel;
   canChooseProfessional: boolean;
-  onDemoPlayerLevelChange: (playerLevel: "BEGINNER" | "INTERMEDIATE") => void;
 };
 
 export function SessionsHeader({
-  isDemo,
   displayName,
   isCommittee,
   isCommitteeAdmin,
   committeeAutoSignup: initialCommitteeAutoSignup,
   playerLevel: initialPlayerLevel,
   canChooseProfessional,
-  onDemoPlayerLevelChange,
 }: SessionsHeaderProps) {
   const router = useRouter();
   const [playerLevel, setPlayerLevel] = useState(initialPlayerLevel);
@@ -95,15 +91,6 @@ export function SessionsHeader({
       return;
     }
     if (value === "PROFESSIONAL" && !canChooseProfessional) {
-      return;
-    }
-
-    if (isDemo) {
-      if (value === "PROFESSIONAL") {
-        return;
-      }
-      setPlayerLevel(value);
-      onDemoPlayerLevelChange(value);
       return;
     }
 
@@ -186,26 +173,7 @@ export function SessionsHeader({
           </Link>
         </div>
 
-        {isDemo ? (
-          <div className="flex min-w-0 flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
-            <span className="inline-flex items-center gap-2 rounded-full bg-primary/5 px-3 py-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.13em] text-primary">
-              <span className="size-1.5 rounded-full bg-primary" />
-              Local demo
-            </span>
-            <label className="sr-only" htmlFor="demo-player-level">
-              Demo playing level
-            </label>
-            <select
-              className="h-10 w-full min-w-0 rounded-md border-0 bg-white px-3 text-sm outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-auto sm:max-w-44"
-              id="demo-player-level"
-              onChange={(event) => changePlayerLevel(event.target.value)}
-              value={playerLevel}
-            >
-              <option value="BEGINNER">Your level: Beginner</option>
-              <option value="INTERMEDIATE">Your level: Intermediate</option>
-            </select>
-          </div>
-        ) : displayName ? (
+        {displayName ? (
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-1 sm:gap-2">
               {!isEditingName ? (

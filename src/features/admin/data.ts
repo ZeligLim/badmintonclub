@@ -12,7 +12,6 @@ import type {
 } from "@/features/sessions/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import type { Json } from "@/lib/supabase/database.types";
 import {
   getCourtCount,
   type SessionAllocationMode,

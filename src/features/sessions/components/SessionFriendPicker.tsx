@@ -19,7 +19,6 @@ type SessionFriendPickerProps = {
   friendCandidates: FriendCandidate[];
   friendList: FriendCandidate[];
   isAlreadySignedUp: boolean;
-  isDemo: boolean;
   isPending: boolean;
   sessionId: string;
   onAddToFriendList: (friend: FriendCandidate) => Promise<void>;
@@ -32,7 +31,6 @@ export function SessionFriendPicker({
   friendCandidates,
   friendList = [],
   isAlreadySignedUp,
-  isDemo,
   isPending,
   sessionId,
   onAddToFriendList,
@@ -109,13 +107,7 @@ export function SessionFriendPicker({
       setIsSearching(true);
       setFeedback(null);
       try {
-        const results = isDemo
-          ? friendCandidates.filter((candidate) => {
-              const searchText =
-                `${candidate.displayName} ${candidate.studentId}`.toLowerCase();
-              return searchText.includes(normalizedQuery.toLowerCase());
-            })
-          : await searchClubMembers(normalizedQuery, sessionId);
+        const results = await searchClubMembers(normalizedQuery, sessionId);
 
         if (searchRequestId.current === requestId) {
           setSearchResults(results);
@@ -141,8 +133,7 @@ export function SessionFriendPicker({
     return () => window.clearTimeout(timeoutId);
   }, [
     friendCandidates,
-    isDemo,
-    normalizedQuery,
+      normalizedQuery,
     selectedFriendIds.length,
     sessionId,
   ]);

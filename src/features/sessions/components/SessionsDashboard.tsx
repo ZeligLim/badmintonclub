@@ -11,18 +11,6 @@ import {
   removeFriendFromList,
   signUpForSession,
 } from "@/features/sessions";
-import { londonDateTime } from "@/lib/sessions/schedule";
-import {
-  createDemoDashboardData,
-  DEFAULT_DEMO_SIGNUP_COUNTS,
-} from "../demo-data";
-import {
-  createDemoSessionState,
-  getDemoSignupState,
-  getDemoSessionStatus,
-  toggleDemoSignup,
-  type DemoSessionState,
-} from "../demo-session-state";
 import {
   getSessionPeriod,
   getSignupWindowStatus,
@@ -35,12 +23,9 @@ import { useServerClock } from "../use-server-clock";
 import { SessionsHeader } from "./SessionsHeader";
 import { SessionCard } from "./SessionCard";
 import { FriendListCard } from "./FriendListCard";
-import { DemoClock } from "./DemoClock";
-import { DemoSignupCountsControl } from "./DemoSignupCountsControl";
 import type {
   ClubSession,
   DashboardData,
-  DemoSignupCounts,
   FriendCandidate,
 } from "@/features/sessions";
 import { logError, logWarning } from "@/lib/log";
@@ -59,24 +44,12 @@ type SignupOverride = {
 export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
   const router = useRouter();
   const serverFriendList = initialData.user?.friendList;
-  const [demoSessions, setDemoSessions] = useState<DemoSessionState[]>(() =>
-    initialData.sessions.map((session, index) =>
-      createDemoSessionState(session, index),
-    ),
-  );
   const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
   const [signupOverrides, setSignupOverrides] = useState<
     Record<string, SignupOverride>
   >({});
   const [previousServerSessions, setPreviousServerSessions] = useState(
     initialData.sessions,
-  );
-  const [demoTimeOverride, setDemoTimeOverride] = useState<Date | null>(null);
- const [demoPlayerLevel, setDemoPlayerLevel] = useState<
-    "BEGINNER" | "INTERMEDIATE"
-  >("INTERMEDIATE");
-  const [demoSignupCounts, setDemoSignupCounts] = useState<DemoSignupCounts>(
-    DEFAULT_DEMO_SIGNUP_COUNTS,
   );
   const [friendList, setFriendList] = useState(
     serverFriendList ?? [],
@@ -89,24 +62,15 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
   const isScheduleRefreshPending = useRef(false);
   const [errorMessage, setErrorMessage] = useState("");
   const currentTime = useServerClock(initialData.serverNow);
-  const isDemo = initialData.mode === "demo";
-  const sessionClockTime = demoTimeOverride ?? currentTime;
-  const sessions =
-    isDemo && sessionClockTime
-      ? createDemoDashboardData(sessionClockTime, demoSignupCounts).sessions.map(
-          (session) => ({
-            ...session,
-            status: getDemoSessionStatus(session, sessionClockTime),
-          }),
-        )
-      : initialData.sessions;
+  const sessionClockTime = currentTime;
+  const sessions = initialData.sessions;
 
   if (serverFriendList !== previousServerFriendList) {
     setPreviousServerFriendList(serverFriendList);
     setFriendList(serverFriendList ?? []);
   }
 
-  if (!isDemo && initialData.sessions !== previousServerSessions) {
+  if (initialData.sessions !== previousServerSessions) {
     setPreviousServerSessions(initialData.sessions);
     setSignupOverrides((currentOverrides) => {
       let hasChanged = false;
@@ -129,7 +93,7 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
   }
 
   useEffect(() => {
-    if (isDemo || !sessionClockTime || !initialData.nextScheduleChangeAt) {
+    if (!sessionClockTime || !initialData.nextScheduleChangeAt) {
       return;
     }
 
@@ -149,16 +113,10 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
 
     isScheduleRefreshPending.current = true;
     router.refresh();
-  }, [
-    initialData.nextScheduleChangeAt,
-    isDemo,
-    router,
-    sessionClockTime,
-  ]);
+  }, [initialData.nextScheduleChangeAt, router, sessionClockTime]);
 
   useEffect(() => {
     if (
-      isDemo ||
       !initialData.user ||
       !sessionClockTime ||
       isFinalizationPending.current
@@ -194,18 +152,13 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
       .finally(() => {
         isFinalizationPending.current = false;
       });
-  }, [initialData.user, isDemo, router, sessionClockTime, sessions]);
+  }, [initialData.user, router, sessionClockTime, sessions]);
 
   async function changeSignup(session: ClubSession, friendIds: string[] = []) {
     setErrorMessage("");
     setPendingSessionId(session.id);
 
     try {
-      if (isDemo) {
-        updateDemoSession(session);
-        return;
-      }
-
       const currentUserStatus = getSignupState(session).currentUserStatus;
       const isCancelling = currentUserStatus !== null;
       if (isCancelling) {
@@ -227,7 +180,6 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
 
       const immediateConfirmSignup =
         !isCancelling &&
-        !isDemo &&
         session.status === "open" &&
         (session.allocationMode === "fcfs" || initialData.user?.isCommittee);
 
@@ -275,10 +227,8 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
     setPendingSessionId(session.id);
 
     try {
-      if (!isDemo) {
-        await saveSessionFriendPreferences(session.id, friendIds);
-        router.refresh();
-      }
+      await saveSessionFriendPreferences(session.id, friendIds);
+      router.refresh();
     } catch (error: unknown) {
       logError("Could not save session friend choices.", {
         errorType: error instanceof Error ? error.name : "unknown",
@@ -293,9 +243,7 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
   async function addFriendToSharedList(friend: FriendCandidate): Promise<void> {
     setErrorMessage("");
     try {
-      if (!isDemo) {
-        await addFriendToList(friend.userId);
-      }
+      await addFriendToList(friend.userId);
     } catch (error: unknown) {
       logError("Could not add a friend to the shared list.", {
         errorType: error instanceof Error ? error.name : "unknown",
@@ -314,9 +262,7 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
     setErrorMessage("");
     setPendingFriendId(friendId);
     try {
-      if (!isDemo) {
-        await removeFriendFromList(friendId);
-      }
+      await removeFriendFromList(friendId);
       setFriendList((currentFriends) =>
         currentFriends.filter((friend) => friend.userId !== friendId),
       );
@@ -330,47 +276,7 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
     }
   }
 
-  function updateDemoSession(session: ClubSession) {
-    const storedSession =
-      demoSessions.find(({ sessionId }) => sessionId === session.id) ??
-      createDemoSessionState(session, -1);
-    const updatedSession = toggleDemoSignup(
-      {
-        ...storedSession,
-        registeredCount: demoSignupCounts[session.dayName] ?? 0,
-      },
-    );
-    const hasSessionState = demoSessions.some(
-      ({ sessionId }) => sessionId === session.id,
-    );
-
-    setDemoSessions(
-      hasSessionState
-        ? demoSessions.map((currentSession) =>
-            currentSession.sessionId === session.id
-              ? updatedSession
-              : currentSession,
-          )
-        : [...demoSessions, updatedSession],
-    );
-    setDemoSignupCounts((currentCounts) => ({
-      ...currentCounts,
-      [session.dayName]: updatedSession.registeredCount,
-    }));
-  }
-
   function getSignupState(session: ClubSession) {
-    if (isDemo) {
-      const storedState = demoSessions.find(
-        (demoSession) => demoSession.sessionId === session.id,
-      );
-      return getDemoSignupState(
-        session,
-        storedState,
-        demoSignupCounts[session.dayName] ?? 0,
-      );
-    }
-
     const serverState = {
       registeredCount: session.registeredCount,
       currentUserStatus: session.currentUserStatus,
@@ -393,35 +299,6 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
     };
   }
 
-  function changeDemoSignupCount(
-    dayName: keyof DemoSignupCounts,
-    count: number,
-  ) {
-    setDemoSignupCounts((currentCounts) => ({
-      ...currentCounts,
-      [dayName]: count,
-    }));
-    setDemoSessions((currentSessions) =>
-      currentSessions.map((demoSession) =>
-        demoSession.dayName === dayName
-          ? {
-              ...demoSession,
-              registeredCount: count,
-              currentUserStatus:
-                count === 0 ? null : demoSession.currentUserStatus,
-              currentUserSlot: count === 0 ? null : demoSession.currentUserSlot,
-            }
-          : demoSession,
-      ),
-    );
-  }
-
-  function changeDemoTime(value: string) {
-    setDemoTimeOverride(
-      value ? parseLondonDateTimeInput(value) : null,
-    );
-  }
-
   return (
     <main
       className="min-h-screen px-5 pb-12 pt-3 sm:px-8 sm:pt-5"
@@ -429,47 +306,14 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
     >
       <div className="mx-auto w-full max-w-6xl">
         <SessionsHeader
-          isDemo={isDemo}
           displayName={initialData.user?.displayName ?? null}
           isCommittee={initialData.user?.isCommittee ?? false}
           isCommitteeAdmin={initialData.user?.isCommitteeAdmin ?? false}
           committeeAutoSignup={initialData.user?.committeeAutoSignup ?? false}
-          playerLevel={
-            isDemo
-              ? demoPlayerLevel
-              : initialData.user?.playerLevel ?? "INTERMEDIATE"
-          }
-          canChooseProfessional={
-            !isDemo && (initialData.user?.canChooseProfessional ?? false)
-          }
-          onDemoPlayerLevelChange={setDemoPlayerLevel}
+          playerLevel={initialData.user?.playerLevel ?? "INTERMEDIATE"}
+          canChooseProfessional={initialData.user?.canChooseProfessional ?? false}
         />
         <h1 className="sr-only">ATU Galway Badminton Club</h1>
-
-        {isDemo && (
-          <p className="mb-5 mt-4 text-sm text-muted-foreground">
-            Demo mode · changes stay on this device
-          </p>
-        )}
-
-        {isDemo && (
-          <DemoClock
-            isOverridden={demoTimeOverride !== null}
-            onChange={changeDemoTime}
-            onReset={() => setDemoTimeOverride(null)}
-            value={
-              sessionClockTime
-                ? formatLondonDateTimeInput(sessionClockTime)
-                : ""
-            }
-          />
-        )}
-        {isDemo && (
-          <DemoSignupCountsControl
-            onChange={changeDemoSignupCount}
-            value={demoSignupCounts}
-          />
-        )}
 
         <section aria-label="Club sessions" className="mt-7 sm:mt-10">
           <div className="grid gap-4 lg:grid-cols-2">
@@ -510,8 +354,7 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
                     sessionClockTime.getTime() >=
                       getSessionStartTimestamp(session) - 30 * 60_000
                   }
-                  isDemo={isDemo}
-                  isSignedIn={isDemo || Boolean(initialData.user)}
+                  isSignedIn={Boolean(initialData.user)}
                   isPending={pendingSessionId === session.id}
                   friendList={friendList}
                   onAddToFriendList={addFriendToSharedList}
@@ -523,7 +366,7 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
               );
             })}
           </div>
-          {(isDemo || initialData.user) && (
+          {initialData.user && (
             <FriendListCard
               friends={friendList}
               onRemove={(friendId) => void removeFriendFromSharedList(friendId)}
@@ -545,29 +388,4 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
       </div>
     </main>
   );
-}
-
-function parseLondonDateTimeInput(value: string) {
-  const [date, time] = value.split("T");
-  const [year, month, day] = date.split("-").map(Number);
-  const [hour, minute] = time.split(":").map(Number);
-  const selectedDate = new Date(Date.UTC(year, month - 1, day));
-
-  return new Date(londonDateTime(selectedDate, hour, minute));
-}
-
-function formatLondonDateTimeInput(value: Date) {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Europe/London",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(value);
-  const partValue = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((part) => part.type === type)?.value ?? "";
-
-  return `${partValue("year")}-${partValue("month")}-${partValue("day")}T${partValue("hour")}:${partValue("minute")}`;
 }
