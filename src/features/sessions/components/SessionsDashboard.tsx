@@ -30,7 +30,7 @@ import {
   isSessionInProgress,
   isSessionViewVisible,
 } from "../session-timing";
-import { useBrowserClock } from "../use-browser-clock";
+import { useServerClock } from "../use-server-clock";
 import { createClient } from "@/lib/supabase/client";import { SessionsHeader } from "./SessionsHeader";
 import { SessionCard } from "./SessionCard";
 import { FriendListCard } from "./FriendListCard";
@@ -71,21 +71,7 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
     initialData.sessions,
   );
   const [demoTimeOverride, setDemoTimeOverride] = useState<Date | null>(null);
-  const [virtualOffset, setVirtualOffset] = useState<number | null>(null);
-  useEffect(() => {
-    const supabase = createClient();
-    supabase
-      .from("dev_virtual_clock")
-      .select("virtual_now")
-      .eq("id", 1)
-      .single()
-      .then(({ data, error }) => {
-        if (error || !data?.virtual_now) return;
-        setVirtualOffset(
-          new Date(data.virtual_now).getTime() - Date.now(),
-        );
-      });
-  }, []);  const [demoPlayerLevel, setDemoPlayerLevel] = useState<
+ const [demoPlayerLevel, setDemoPlayerLevel] = useState<
     "BEGINNER" | "INTERMEDIATE"
   >("INTERMEDIATE");
   const [demoSignupCounts, setDemoSignupCounts] = useState<DemoSignupCounts>(
@@ -101,13 +87,9 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
   const isFinalizationPending = useRef(false);
   const isScheduleRefreshPending = useRef(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const currentTime = useBrowserClock();
-  const appCurrentTime =
-    virtualOffset !== null && currentTime !== null
-      ? new Date(currentTime.getTime() + virtualOffset)
-      : currentTime;
+  const currentTime = useServerClock(initialData.serverNow);
   const isDemo = initialData.mode === "demo";
-  const sessionClockTime = demoTimeOverride ?? appCurrentTime;
+  const sessionClockTime = demoTimeOverride ?? currentTime;
   const sessions =
     isDemo && sessionClockTime
       ? createDemoDashboardData(sessionClockTime, demoSignupCounts).sessions.map(
