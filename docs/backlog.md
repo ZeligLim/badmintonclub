@@ -271,6 +271,19 @@ turn the latency check into a p95 budget over repeated runs in CI.
 
 ---
 
+### BC-46 · P2 · S — Test fixtures derive their dates from the wall clock
+**Problem** `supabase/tests/session_templates.test.sql` used the next club week
+(`date_trunc('week', now()) + 8`) for a session that "has not been published yet".
+The template's four-day lead time put its `signup_opens_at` at midnight of the day
+the suite ran, so the test passed before midnight and failed after it — the same
+class of bug as BC-44, hidden until CI ran the suite at 00:05.
+**Fix** Pin `signup_opens_at` into the future inside the scenario, and audit the
+other date-derived fixtures.
+**Done when** the full suite passes at any hour, including the 00:00 and week
+boundaries.
+
+---
+
 ## Ops / DX
 
 ### BC-34 · P2 · M — Playwright is installed but there are zero E2E tests
