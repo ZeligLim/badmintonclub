@@ -277,8 +277,13 @@ turn the latency check into a p95 budget over repeated runs in CI.
 The template's four-day lead time put its `signup_opens_at` at midnight of the day
 the suite ran, so the test passed before midnight and failed after it — the same
 class of bug as BC-44, hidden until CI ran the suite at 00:05.
-**Fix** Pin `signup_opens_at` into the future inside the scenario, and audit the
-other date-derived fixtures.
+**Fix** The scenario pins `signup_opens_at` itself, and
+`scripts/check-session-fixtures.mjs` (run by `npm run verify`) fails when a session
+fixture derives a date from `now()` without setting its own sign-up window.
+Freezing `dev_virtual_clock` for the suite was considered and rejected: nothing in
+the schema calls `public.now()` outside its own migration, so a pinned clock would
+have changed no behaviour while coupling the tests to a table that BC-01 wants
+deleted.
 **Done when** the full suite passes at any hour, including the 00:00 and week
 boundaries.
 
