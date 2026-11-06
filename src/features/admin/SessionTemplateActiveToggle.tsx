@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Switch } from "@/components/ui/switch";
 import { setSessionTemplateActive } from "./template-actions";
+import { logError } from "@/lib/log";
 
 type SessionTemplateActiveToggleProps = {
   templateId: string;
@@ -34,7 +35,7 @@ export function SessionTemplateActiveToggle({
         setIsActive(nextIsActive);
         router.refresh();
       } catch (error) {
-        console.error("Could not update the session template.", error);
+        logError("Could not update the session template.", error);
         setErrorMessage(
           error instanceof Error
             ? error.message

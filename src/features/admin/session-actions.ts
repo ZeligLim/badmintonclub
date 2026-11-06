@@ -1,5 +1,6 @@
 "use server";
 
+import { isUuid } from "@/lib/validation";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -9,6 +10,7 @@ import {
   isSessionTimetableLocked,
 } from "@/features/sessions";
 import { loadAdminData, requireAdminUser } from "./data";
+import { logError } from "@/lib/log";
 
 export async function regenerateSessionCourtSchedule(sessionId: string): Promise<void> {
   if (!(await requireAdminUser())) {
@@ -16,7 +18,7 @@ export async function regenerateSessionCourtSchedule(sessionId: string): Promise
   }
   if (
     typeof sessionId !== "string" ||
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionId)
+    !isUuid(sessionId)
   ) {
     throw new Error("The session schedule request is invalid.");
   }
@@ -46,7 +48,8 @@ export async function regenerateSessionCourtSchedule(sessionId: string): Promise
     .delete()
     .eq("session_id", sessionId);
   if (deleteError) {
-    throw new Error(`Could not clear the saved court schedule: ${deleteError.message}`);
+    logError("Could not clear the saved court schedule.", deleteError);
+    throw new Error("Could not clear the saved court schedule.");
   }
 
   const sessions = await loadAdminData({ allocationSeed: randomUUID() });
@@ -75,12 +78,7 @@ export async function updateSessionAvailability(
   if (!(await requireAdminUser())) {
     throw new Error("Only a club administrator can change session availability.");
   }
-  if (
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      sessionId,
-    ) ||
-    typeof isHappening !== "boolean"
-  ) {
+  if (!isUuid(sessionId) || typeof isHappening !== "boolean") {
     throw new Error("The session availability request is invalid.");
   }
 
@@ -90,7 +88,8 @@ export async function updateSessionAvailability(
     p_happening: isHappening,
   });
   if (error) {
-    throw new Error(`Could not update session availability: ${error.message}`);
+    logError("Could not update session availability.", error);
+    throw new Error("Could not update session availability.");
   }
 
   revalidatePath("/admin");

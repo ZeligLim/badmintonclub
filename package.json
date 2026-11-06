@@ -9,13 +9,14 @@
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
-    "verify": "npm run typecheck && npm run lint && npm test",
+    "verify": "npm run typecheck && npm run lint && npm run check:tests && npm test",
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset --local",
     "db:test": "supabase test db --local",
     "db:types": "supabase gen types typescript --local > src/lib/supabase/database.types.ts",
-    "bench": "RUN_BENCH=1 vitest run src/features/sessions/court-schedule.bench.test.ts"
+    "bench": "RUN_BENCH=1 vitest run src/features/sessions/court-schedule.bench.test.ts",
+    "check:tests": "node scripts/check-session-fixtures.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

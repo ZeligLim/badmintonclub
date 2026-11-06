@@ -75,7 +75,8 @@ set player_level = case
   when right(id::text, 12)::integer between 7 and 8 then 'PROFESSIONAL'
   when right(id::text, 12)::integer between 17 and 20 then 'BEGINNER'
   else 'INTERMEDIATE'
-end;
+end
+where id::text like '20000000-0000-4000-8000-%';
 
 update public.profiles
 set player_level = 'PROFESSIONAL',

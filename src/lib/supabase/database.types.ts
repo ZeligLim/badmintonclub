@@ -274,9 +274,19 @@ isOneToOne: false
               "display_name": string,"player_level": string,"student_id": string,"user_id": string
             }[]
                            },
+"get_schedule_inputs":
+{ Args: { "p_session_ids": (string)[] }; Returns: {
+              "display_name": string,"friend_ids": (string)[],"is_committee": boolean,"player_level": string,"session_id": string,"slot_number": number,"user_id": string
+            }[]
+                           },
 "get_session_friend_preferences":
 { Args: { "p_session_id": string }; Returns: {
               "display_name": string,"is_selected": boolean,"is_signed_up": boolean,"player_level": string,"student_id": string,"user_id": string
+            }[]
+                           },
+"get_session_friend_preferences_bulk":
+{ Args: { "p_session_ids": (string)[] }; Returns: {
+              "display_name": string,"is_selected": boolean,"is_signed_up": boolean,"player_level": string,"session_id": string,"student_id": string,"user_id": string
             }[]
                            },
 "get_session_roster":

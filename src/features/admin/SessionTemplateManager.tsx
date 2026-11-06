@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
+import { formatDuration, formatFee } from "@/lib/format";
 import { CLUB_SESSION_DAYS } from "@/lib/sessions/schedule";
 import type { SessionAllocationMode } from "@/features/sessions";
 import type { AdminSessionTemplate } from "./data";
@@ -12,6 +13,7 @@ import {
   saveSessionTemplate,
   type SessionTemplateInput,
 } from "./template-actions";
+import { logError } from "@/lib/log";
 
 type SessionTemplateManagerProps = {
   templates: AdminSessionTemplate[];
@@ -139,7 +141,7 @@ export function SessionTemplateManager({
         );
         router.refresh();
       } catch (error) {
-        console.error("Could not save the session template.", error);
+        logError("Could not save the session template.", error);
         setErrorMessage(
           error instanceof Error
             ? error.message
@@ -163,7 +165,7 @@ export function SessionTemplateManager({
         );
         router.refresh();
       } catch (error) {
-        console.error("Could not publish the club sessions.", error);
+        logError("Could not publish the club sessions.", error);
         setErrorMessage(
           error instanceof Error
             ? error.message
@@ -507,18 +509,3 @@ function Field({
   );
 }
 
-function formatFee(feeCents: number) {
-  if (feeCents === 0) {
-    return "Free";
-  }
-  if (feeCents % 100 === 0) {
-    return `€${feeCents / 100}`;
-  }
-
-  return `€${(feeCents / 100).toFixed(2)}`;
-}
-
-function formatDuration(durationMinutes: number) {
-  const hours = durationMinutes / 60;
-  return `${hours} ${hours === 1 ? "hour" : "hours"}`;
-}

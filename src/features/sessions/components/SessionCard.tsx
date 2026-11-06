@@ -9,19 +9,22 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  createPlayerGameSchedule,
-  type CourtRosterPlayer,
-  type ClubSession,
-  type FriendCandidate,
-} from "@/features/sessions";
+  formatDuration,
+  formatFee,
+  formatRuleDateTime,
+  formatSessionDate,
+  formatTimeOfDay,
+} from "@/lib/format";
+import type { ClubSession, FriendCandidate } from "@/features/sessions";
 import Link from "next/link";
 import { useState } from "react";
+import type { SessionSignupStatus as SignupStatus } from "../types";
 import { SessionFriendPicker } from "./SessionFriendPicker";
 import { SessionSignupStatus } from "./SessionSignupStatus";
 
 type SessionSignupState = {
   registeredCount: number;
-  currentUserStatus: string | null;
+  currentUserStatus: Exclude<SignupStatus, "cancelled"> | null;
   currentUserSlot: number | null;
 };
 
@@ -35,7 +38,6 @@ type SessionCardProps = {
   signupWindowStatus: "not-open" | "open" | "closed";
   /** True once the clock passes session start − 30 min. The timetable is released at that point and no further changes are accepted. */
   isPastCancellationDeadline: boolean;
-  isDemo: boolean;
   isSignedIn: boolean;
   isPending: boolean;
   friendList: FriendCandidate[];
@@ -46,14 +48,12 @@ type SessionCardProps = {
 
 export function SessionCard({
   session,
-  currentUserId,
   signupState,
   showSessionView,
   isSessionInProgress,
   isSessionOver,
   signupWindowStatus,
   isPastCancellationDeadline,
-  isDemo,
   isSignedIn,
   isPending,
   friendList,
@@ -77,36 +77,14 @@ export function SessionCard({
     ).slice(0, 3);
   });
 
-  const signupStatus = signupState.currentUserStatus?.toLowerCase() ?? "";
-  const isWaitlisted = signupStatus.includes("waitlist");
+   const signupStatus = signupState.currentUserStatus ?? "";
+  const isWaitlisted = signupStatus === "waitlisted";
   const isPlayed = signupStatus === "played";
   const isSignedUp = signupStatus.length > 0 && !isPlayed;
   const isConfirmed =
     session.status === "confirmed" || session.status === "closed";
-  const currentPlayerId = isDemo ? "demo-current-player" : currentUserId;
-  const scheduleRoster: CourtRosterPlayer[] = isDemo
-    ? createDemoScheduleRoster(
-        signupState.registeredCount,
-        session.capacity,
-        signupState.currentUserSlot,
-        selectedFriendIds,
-        friendCandidates,
-      )
-    : [];
   const playerGameSchedule =
-    isDemo
-      ? signupStatus === "selected" &&
-        currentPlayerId &&
-        scheduleRoster.some((player) => player.id === currentPlayerId)
-        ? createPlayerGameSchedule(
-            { ...session, id: session.id },
-            scheduleRoster,
-            currentPlayerId,
-          )
-        : []
-      : signupStatus === "selected"
-        ? session.playerGameSchedule ?? []
-        : [];
+    signupStatus === "selected" ? session.playerGameSchedule ?? [] : [];
   const hasFcfsSpace =
     session.status === "confirmed" &&
     !isPastCancellationDeadline &&
@@ -148,7 +126,7 @@ export function SessionCard({
         <div className="min-w-0 flex-1 p-4 sm:p-5">
           <div className="mt-1 grid gap-y-1 sm:flex sm:flex-wrap sm:items-baseline sm:gap-x-3">
             <h3 className="text-lg font-medium tracking-tight">
-              {formatSessionTime(session.startsAt)}
+              {formatTimeOfDay(session.startsAt)}
               <span className="ml-2 text-sm font-normal text-muted-foreground">
                 · {formatDuration(session.durationMinutes)}
               </span>
@@ -313,8 +291,8 @@ export function SessionCard({
                   >
                     <div className="font-semibold text-primary">
                       Court {game.courtNumber} ·{" "}
-                      {formatSessionTime(game.startAt)}–
-                      {formatSessionTime(game.endAt)}
+                      {formatTimeOfDay(game.startAt)}–
+                      {formatTimeOfDay(game.endAt)}
                     </div>
                     {game.courtPlayers.length > 0 && (
                       <p className="mt-1 text-xs text-muted-foreground">
@@ -348,7 +326,6 @@ export function SessionCard({
                 friendCandidates={friendCandidates}
                 friendList={friendList}
                 isAlreadySignedUp={isSignedUp}
-                isDemo={isDemo}
                 isPending={isPending}
                 sessionId={session.id}
                 onAddToFriendList={onAddToFriendList}
@@ -367,7 +344,7 @@ export function SessionCard({
               isSessionInProgress={isSessionInProgress}
               isSessionOver={isSessionOver}
             />
-            {!isDemo && !isSessionOver && (
+            {!isSessionOver && (
               <>
                 {!isSignedIn && session.status !== "cancelled" ? (
                   <Link
@@ -387,7 +364,7 @@ export function SessionCard({
                 disabled={
                   isPending ||
                   (session.status === "open" && !isSignedUp && signupWindowStatus !== "open") ||
-                  (!isDemo && !isSignedIn)
+                  !isSignedIn
                 }
                 onClick={handleSignupClick}
                 size="sm"
@@ -413,112 +390,4 @@ export function SessionCard({
       </div>
     </article>
   );
-}
-
-function createDemoScheduleRoster(
-  registeredCount: number,
-  capacity: number,
-  currentUserSlot: number | null,
-  selectedFriendIds: string[] = [],
-  friendCandidates: FriendCandidate[] = [],
-): CourtRosterPlayer[] {
-  const count = Math.min(registeredCount, capacity);
-  if (count === 0) {
-    return [];
-  }
-
-  const userSlot = currentUserSlot ?? 1;
-  const roster: CourtRosterPlayer[] = [
-    {
-      id: "demo-current-player",
-      displayName: "You",
-      priority: userSlot,
-      friendIds: selectedFriendIds,
-    },
-  ];
-
-  const candidateMap = new Map(
-    friendCandidates.map((candidate) => [candidate.userId, candidate]),
-  );
-
-  for (const friendId of selectedFriendIds) {
-    if (roster.length >= count) break;
-    const candidate = candidateMap.get(friendId);
-    if (candidate && candidate.isSignedUp !== false) {
-      roster.push({
-        id: candidate.userId,
-        displayName: candidate.displayName,
-        priority: userSlot,
-        friendIds: ["demo-current-player"],
-      });
-    }
-  }
-
-  let playerNum = 1;
-  while (roster.length < count) {
-    const candidateId = `demo-player-${playerNum}`;
-    if (!roster.some((player) => player.id === candidateId)) {
-      roster.push({
-        id: candidateId,
-        displayName: `Demo Player ${playerNum}`,
-        priority: Math.floor(roster.length / 4) + 1,
-      });
-    }
-    playerNum += 1;
-  }
-
-  return roster;
-}
-
-function formatSessionDate(value: string) {
-  const date = parseSessionDate(value);
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
-    month: "short",
-  }).format(date);
-}
-
-function formatRuleDateTime(value: string) {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Europe/London",
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(new Date(value));
-  const partValue = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((part) => part.type === type)?.value ?? "";
-
-  return `${partValue("weekday")} ${partValue("day")} ${partValue("month")} at ${partValue("hour")}:${partValue("minute")}`;
-}
-
-function parseSessionDate(value: string) {
-  return new Date(value.includes("T") ? value : `${value}T12:00:00`);
-}
-
-function formatSessionTime(value: string) {
-  if (/^\d{1,2}:\d{2}/.test(value)) {
-    return value.slice(0, 5);
-  }
-
-  return new Intl.DateTimeFormat("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).format(new Date(value));
-}
-
-function formatDuration(durationMinutes: number) {
-  const hours = durationMinutes / 60;
-  return `${hours} ${hours === 1 ? "hour" : "hours"}`;
-}
-
-function formatFee(feeCents: number) {
-  if (feeCents % 100 === 0) {
-    return `€${feeCents / 100}`;
-  }
-
-  return `€${(feeCents / 100).toFixed(2)}`;
 }

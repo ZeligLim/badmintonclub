@@ -1,17 +1,9 @@
 import { connection } from "next/server";
 import { getDashboardData } from "../api";
-import { createDemoDashboardData } from "../demo-data";
 import { SessionsDashboard } from "./SessionsDashboard";
-import type { DashboardData } from "../types";
-
-type SessionsPageProps = {
-  mode?: DashboardData["mode"];
-};
-
-export async function SessionsPage({ mode = "live" }: SessionsPageProps = {}) {
+export async function SessionsPage() {
   await connection();
-  const dashboardData =
-    mode === "demo" ? createDemoDashboardData() : await getDashboardData();
+  const dashboardData = await getDashboardData();
 
   return <SessionsDashboard initialData={dashboardData} />;
 }

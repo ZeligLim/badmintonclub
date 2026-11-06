@@ -1,5 +1,7 @@
+import type { SessionSignupStatus as SignupStatus } from "../types";
+
 type SessionSignupStatusProps = {
-  status: string;
+  status: SignupStatus | "";
   isCancelled: boolean;
   isConfirmed: boolean;
   isSignedIn: boolean;
@@ -31,7 +33,7 @@ export function SessionSignupStatus({
     );
   }
 
-  if (status.includes("waitlist")) {
+  if (status === "waitlisted") {
     return (
       <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[0.65rem] font-semibold text-amber-900">
         Not confirmed

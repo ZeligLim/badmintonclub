@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Switch } from "@/components/ui/switch";
 import { updateProfessionalChoice } from "./player-actions";
+import { logError } from "@/lib/log";
 
 type ProfessionalChoiceToggleProps = {
   userId: string;
@@ -45,7 +46,7 @@ export function ProfessionalChoiceToggle({
         setEnabled(nextEnabled);
         router.refresh();
       } catch (error) {
-        console.error("Could not update Professional level access.", error);
+        logError("Could not update Professional level access.", error);
         setErrorMessage(
           error instanceof Error
             ? error.message

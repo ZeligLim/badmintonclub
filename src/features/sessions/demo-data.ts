@@ -142,6 +142,7 @@ export function createDemoDashboardData(
 
   return {
     mode: "demo",
+    serverNow: now.toISOString(),
     user: null,
     sessions: schedule.sessions.map(
       ({ date, template, signupOpensAt, confirmationAt }) => {

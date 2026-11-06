@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { SessionsSignIn } from "@/features/sessions";
 import { createClient } from "@/lib/supabase/server";
+import { isClubEmail } from "@/lib/validation";
+import { logError } from "@/lib/log";
 
 export const instant = false;
 
@@ -19,10 +21,11 @@ export default async function SignInPage() {
     error.name !== "AuthSessionMissingError" &&
     error.status !== 401
   ) {
-    throw new Error(`Could not check your sign-in status: ${error.message}`);
+    logError("Could not check your sign-in status.", error);
+    throw new Error("Could not check your sign-in status.");
   }
 
-  if (data.user?.email && /^[^@\s]+@atu\.ie$/i.test(data.user.email)) {
+  if (isClubEmail(data.user?.email)) {
     redirect("/");
   }
 

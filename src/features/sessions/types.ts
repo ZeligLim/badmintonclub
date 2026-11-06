@@ -80,6 +80,11 @@ export type DashboardData = {
   } | null;
   sessions: ClubSession[];
   /**
+   * The club's clock when this page was rendered. The UI counts from this
+   * instead of trusting the visitor's device clock.
+   */
+  serverNow: string;
+  /**
    * When the club week rolls over to the next set of sessions. The dashboard
    * refreshes itself once this moment has passed.
    */

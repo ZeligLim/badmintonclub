@@ -13,12 +13,12 @@ import {
   searchClubMembers,
   type FriendCandidate,
 } from "@/features/sessions";
+import { logError } from "@/lib/log";
 
 type SessionFriendPickerProps = {
   friendCandidates: FriendCandidate[];
   friendList: FriendCandidate[];
   isAlreadySignedUp: boolean;
-  isDemo: boolean;
   isPending: boolean;
   sessionId: string;
   onAddToFriendList: (friend: FriendCandidate) => Promise<void>;
@@ -31,7 +31,6 @@ export function SessionFriendPicker({
   friendCandidates,
   friendList = [],
   isAlreadySignedUp,
-  isDemo,
   isPending,
   sessionId,
   onAddToFriendList,
@@ -108,13 +107,7 @@ export function SessionFriendPicker({
       setIsSearching(true);
       setFeedback(null);
       try {
-        const results = isDemo
-          ? friendCandidates.filter((candidate) => {
-              const searchText =
-                `${candidate.displayName} ${candidate.studentId}`.toLowerCase();
-              return searchText.includes(normalizedQuery.toLowerCase());
-            })
-          : await searchClubMembers(normalizedQuery, sessionId);
+        const results = await searchClubMembers(normalizedQuery, sessionId);
 
         if (searchRequestId.current === requestId) {
           setSearchResults(results);
@@ -124,7 +117,7 @@ export function SessionFriendPicker({
           }
         }
       } catch (error: unknown) {
-        console.error("Could not search club members.", {
+        logError("Could not search club members.", {
           errorType: error instanceof Error ? error.name : "unknown",
         });
         if (searchRequestId.current === requestId) {
@@ -140,8 +133,7 @@ export function SessionFriendPicker({
     return () => window.clearTimeout(timeoutId);
   }, [
     friendCandidates,
-    isDemo,
-    normalizedQuery,
+      normalizedQuery,
     selectedFriendIds.length,
     sessionId,
   ]);
@@ -171,7 +163,7 @@ export function SessionFriendPicker({
       setIsSearching(false);
       setFeedback(`${friend.displayName} added to your friend list.`);
     } catch (error: unknown) {
-      console.error("Could not add this friend.", {
+      logError("Could not add this friend.", {
         errorType: error instanceof Error ? error.name : "unknown",
       });
       setFeedback("Could not add this friend. Please try again.");
@@ -225,7 +217,7 @@ export function SessionFriendPicker({
       setSavedFriendIds(selectedFriendIds);
       setFeedback("Friend choices saved.");
     } catch (error: unknown) {
-      console.error("Could not save friend choices.", {
+      logError("Could not save friend choices.", {
         errorType: error instanceof Error ? error.name : "unknown",
       });
       setFeedback("Could not save your friend choices. Please try again.");

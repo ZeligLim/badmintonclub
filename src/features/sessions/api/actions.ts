@@ -1,4 +1,6 @@
+import { isClubEmail, isUuid } from "@/lib/validation";
 import "server-only";
+import { logError } from "@/lib/log";
 
 import { hasSupabaseConfig } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
@@ -37,7 +39,7 @@ export async function updateSessionFriendPreferences(
   });
 
   if (error) {
-    console.error("Could not save session friend preferences.", {
+    logError("Could not save session friend preferences.", {
       code: error.code,
     });
     throw new Error("Could not save your friend choices.");
@@ -54,7 +56,7 @@ async function invalidateSessionTimetable(sessionId: string): Promise<void> {
     .eq("id", sessionId)
     .maybeSingle();
   if (sessionError || !session) {
-    console.error("Could not check the session timetable lock.", {
+    logError("Could not check the session timetable lock.", {
       code: sessionError?.code,
     });
     return;
@@ -76,7 +78,7 @@ async function invalidateSessionTimetable(sessionId: string): Promise<void> {
     .eq("session_id", sessionId);
 
   if (error) {
-    console.error("Could not invalidate session timetable.", {
+    logError("Could not invalidate session timetable.", {
       code: error.code,
     });
     throw new Error("Could not refresh this session’s court matching.");
@@ -98,7 +100,7 @@ export async function searchClubMembers(
   });
 
   if (error) {
-    console.error("Could not search club members.", { code: error.code });
+    logError("Could not search club members.", { code: error.code });
     throw new Error("Could not search club members.");
   }
 
@@ -131,7 +133,7 @@ export async function addClubFriend(friendId: string): Promise<void> {
   });
 
   if (error) {
-    console.error("Could not add a club friend.", { code: error.code });
+    logError("Could not add a club friend.", { code: error.code });
     throw new Error("Could not add this friend.");
   }
 }
@@ -144,7 +146,7 @@ export async function removeClubFriend(friendId: string): Promise<void> {
   });
 
   if (error) {
-    console.error("Could not remove a club friend.", { code: error.code });
+    logError("Could not remove a club friend.", { code: error.code });
     throw new Error("Could not remove this friend.");
   }
 }
@@ -158,7 +160,8 @@ export async function updatePlayerLevel(
   });
 
   if (error) {
-    throw new Error(`Could not update your player level: ${error.message}`);
+    logError("Could not update your player level.", error);
+    throw new Error("Could not update your player level.");
   }
 }
 
@@ -169,7 +172,8 @@ export async function updateCommitteeAutoSignup(enabled: boolean): Promise<void>
   });
 
   if (error) {
-    throw new Error(`Could not update automatic signup: ${error.message}`);
+    logError("Could not update automatic signup.", error);
+    throw new Error("Could not update automatic signup.");
   }
 }
 
@@ -184,7 +188,8 @@ export async function updateDisplayName(
   const supabase = await requireAuthenticatedClient();
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError) {
-    throw new Error(`Could not verify your sign-in: ${authError.message}`);
+    logError("Could not verify your sign-in.", authError);
+    throw new Error("Could not verify your sign-in.");
   }
   if (!authData.user) {
     throw new Error("Sign in before updating your name.");
@@ -196,7 +201,8 @@ export async function updateDisplayName(
     .eq("id", authData.user.id);
 
   if (error) {
-    throw new Error(`Could not update your name: ${error.message}`);
+    logError("Could not update your name.", error);
+    throw new Error("Could not update your name.");
   }
 }
 
@@ -208,7 +214,8 @@ export async function joinConfirmedSession(sessionId: string): Promise<void> {
   });
 
   if (error) {
-    throw new Error(`Could not join this session: ${error.message}`);
+    logError("Could not join this session.", error);
+    throw new Error("Could not join this session.");
   }
 
   // The confirmed roster changed, so rebuild the saved timetable while the
@@ -226,7 +233,8 @@ export async function signOut(): Promise<void> {
   const { error } = await supabase.auth.signOut();
 
   if (error) {
-    throw new Error(`Could not sign out: ${error.message}`);
+    logError("Could not sign out.", error);
+    throw new Error("Could not sign out.");
   }
 }
 
@@ -238,7 +246,8 @@ export async function markSessionPlayed(sessionId: string): Promise<void> {
   });
 
   if (error) {
-    throw new Error(`Could not check in to this session: ${error.message}`);
+    logError("Could not check in to this session.", error);
+    throw new Error("Could not check in to this session.");
   }
 }
 
@@ -258,7 +267,7 @@ async function updateSignup(
       : await supabase.rpc(functionName, { p_session_id: sessionId });
 
   if (error) {
-    console.error("Could not update session signup.", {
+    logError("Could not update session signup.", {
       operation: functionName,
       code: error.code,
     });
@@ -280,12 +289,13 @@ async function requireAuthenticatedClient() {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getUser();
   if (error && error.name !== "AuthSessionMissingError") {
-    throw new Error(`Could not verify your sign-in: ${error.message}`);
+    logError("Could not verify your sign-in.", error);
+    throw new Error("Could not verify your sign-in.");
   }
   if (!data.user) {
     throw new Error("Sign in before changing a session signup.");
   }
-  if (!data.user.email || !/^[^@\s]+@atu\.ie$/i.test(data.user.email)) {
+  if (!isClubEmail(data.user.email)) {
     throw new Error("Only @atu.ie email addresses can use club sessions.");
   }
 
@@ -293,29 +303,20 @@ async function requireAuthenticatedClient() {
 }
 
 function validateSessionId(sessionId: string): void {
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(sessionId)) {
+  if (!isUuid(sessionId)) {
     throw new Error("That session could not be found.");
   }
 }
 
 function validateFriendIds(friendIds: string[]): void {
-  const hasInvalidId = friendIds.some(
-    (friendId) =>
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-        friendId,
-      ),
-  );
+  const hasInvalidId = friendIds.some((friendId) => !isUuid(friendId));
   if (friendIds.length > 3 || hasInvalidId) {
     throw new Error("Select up to three valid club members.");
   }
 }
 
 function validateFriendId(friendId: string): void {
-  if (
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-      friendId,
-    )
-  ) {
+  if (!isUuid(friendId)) {
     throw new Error("Choose a valid club member.");
   }
 }

@@ -1,25 +1,30 @@
 import "server-only";
 
 import { connection } from "next/server";
+import {
+  ensureSessionTimetable,
+  readPersistedTimetables,
+} from "@/features/sessions/api/timetable";
+import { formatTimeOfDay } from "@/lib/format";
+import { toSessionStatus, toSignupStatus } from "@/features/sessions/status";
+import type {
+  SessionSignupStatus,
+} from "@/features/sessions/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import type { Json } from "@/lib/supabase/database.types";
 import {
-  allocateCourtSchedule,
   getCourtCount,
-  isPersistedCourtSchedule,
-  isSessionTimetableLocked,
-  markCourtScheduleCurrent,
-  shouldRefreshPersistedCourtSchedule,
   type SessionAllocationMode,
 } from "@/features/sessions";
 import { getSessionDayName } from "@/lib/sessions/schedule";
 import type { PlayerLevel } from "@/types/player";
+import { isClubEmail } from "@/lib/validation";
+import { logError } from "@/lib/log";
 
 export type AdminPlayer = {
   userId: string;
   displayName: string;
-  status: string;
+  status: SessionSignupStatus;
   slotNumber: number | null;
   isCommittee?: boolean;
   playerLevel?: PlayerLevel;
@@ -81,7 +86,8 @@ export async function requireAdminUser() {
   if (error?.message?.includes("does not exist")) {
     await supabase.auth.signOut();
   } else if (error && error.name !== "AuthSessionMissingError") {
-    throw new Error(`Could not verify club administrator: ${error.message}`);
+    logError("Could not verify club administrator.", error);
+    throw new Error("Could not verify club administrator.");
   }
   if (!data.user) {
     return null;
@@ -89,7 +95,7 @@ export async function requireAdminUser() {
 
   const email = data.user?.email ?? "";
 
-  if (!email || !/^[^@\s]+@atu\.ie$/i.test(email)) {
+  if (!isClubEmail(email)) {
     return null;
   }
 
@@ -99,7 +105,8 @@ export async function requireAdminUser() {
     .eq("id", data.user.id)
     .maybeSingle();
   if (profileError) {
-    throw new Error(`Could not verify club administrator access: ${profileError.message}`);
+    logError("Could not verify club administrator access.", profileError);
+    throw new Error("Could not verify club administrator access.");
   }
   if (!profile?.is_committee_admin) {
     return null;
@@ -116,7 +123,8 @@ export async function loadClubPlayers(): Promise<AdminClubPlayer[]> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("admin_list_club_players");
   if (error) {
-    throw new Error(`Could not load club players: ${error.message}`);
+    logError("Could not load club players.", error);
+    throw new Error("Could not load club players.");
   }
 
   return data.map((player) => ({
@@ -136,23 +144,24 @@ export async function loadSessionTemplates(): Promise<AdminSessionTemplate[]> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("admin_list_session_templates");
   if (error) {
-    throw new Error(`Could not load session templates: ${error.message}`);
+    logError("Could not load session templates.", error);
+    throw new Error("Could not load session templates.");
   }
 
   return data.map((template) => ({
     id: template.id,
     name: template.name,
     weekday: template.weekday,
-    startsAt: formatTime(template.starts_at),
+    startsAt: formatTimeOfDay(template.starts_at),
     durationMinutes: template.duration_minutes,
     capacity: template.capacity,
     feeCents: template.fee_cents,
     allocationMode: parseAllocationMode(template.allocation_mode),
     committeeAutoSignup: template.committee_auto_signup,
     signupOpensLeadDays: template.signup_opens_lead_days,
-    signupOpensAt: formatTime(template.signup_opens_at),
+    signupOpensAt: formatTimeOfDay(template.signup_opens_at),
     confirmationLeadDays: template.confirmation_lead_days,
-    confirmationAt: formatTime(template.confirmation_at),
+    confirmationAt: formatTimeOfDay(template.confirmation_at),
     isActive: template.is_active,
     validFrom: template.valid_from,
     validUntil: template.valid_until,
@@ -238,13 +247,7 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
     }
   }
 
-  const { data: persistedTimetables } = await admin
-    .from("session_timetables")
-    .select("session_id, court_schedule")
-    .in("session_id", sessionIds);
-  const timetableMap = new Map(
-    (persistedTimetables ?? []).map((row) => [row.session_id, row.court_schedule]),
-  );
+  const timetableMap = await readPersistedTimetables(sessionIds);
 
   return await Promise.all(sessions.map(async (session) => {
     const sessionSignups = (signups ?? []).filter(
@@ -270,7 +273,7 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
     const players: AdminPlayer[] = sessionSignups.map((s) => ({
       userId: s.user_id,
       displayName: profileMap.get(s.user_id)?.displayName ?? s.user_id.slice(0, 8),
-      status: s.status,
+      status: toSignupStatus(s.status),
       slotNumber: s.slot_number,
       isCommittee: profileMap.get(s.user_id)?.isCommittee ?? false,
       playerLevel: profileMap.get(s.user_id)?.playerLevel ?? "INTERMEDIATE",
@@ -281,72 +284,28 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
       .filter((p) => p.status === "selected" || p.status === "played")
       .sort((a, b) => (a.slotNumber ?? 99) - (b.slotNumber ?? 99));
 
-    const persistedCourtSchedule = timetableMap.get(session.id);
-    const timetableLocked = isSessionTimetableLocked({
-      eventDate: session.event_date,
-      startsAt: session.starts_at,
-    });
-    // Once players can see the timetable it is frozen, including after an
-    // allocator upgrade. Before then a stale or missing timetable may be
-    // rebuilt for the current algorithm.
-    const refreshPersistedCourtSchedule = shouldRefreshPersistedCourtSchedule(
-      persistedCourtSchedule,
-      {
-        isLocked: timetableLocked,
+    const courtScheduleGames = await ensureSessionTimetable({
+      session: {
+        id: session.id,
+        date: session.event_date,
+        startsAt: session.starts_at,
+        durationMinutes: session.duration_minutes,
+        capacity: session.capacity,
         isConfirmed: session.status === "confirmed",
       },
-    );
-    const hasPersistedCourtSchedule =
-      isPersistedCourtSchedule(persistedCourtSchedule) &&
-      !refreshPersistedCourtSchedule;
+      players: selectedPlayers.map((player) => ({
+        id: player.userId,
+        displayName: player.displayName,
+        priority: player.slotNumber ?? 1,
+        friendIds: sessionFriendMap.get(player.userId) ?? [],
+        isCommittee: player.isCommittee,
+        level: player.playerLevel,
+      })),
+      persisted: timetableMap.get(session.id),
+      seed: options?.allocationSeed,
+    });
 
-    const rawAllocation =
-      !hasPersistedCourtSchedule && selectedPlayers.length
-        ? allocateCourtSchedule(
-            {
-              id: session.id,
-              startsAt: session.starts_at,
-              durationMinutes: session.duration_minutes,
-              courtCount,
-            },
-            selectedPlayers.map((player) => ({
-              id: player.userId,
-              displayName: player.displayName,
-              priority: player.slotNumber ?? 1,
-              friendIds: sessionFriendMap.get(player.userId) ?? [],
-              isCommittee: player.isCommittee,
-              level: player.playerLevel,
-            })),
-            options?.allocationSeed
-              ? { seed: options.allocationSeed }
-              : undefined,
-          )
-        : null;
-
-    const rawPersistedOrNew = hasPersistedCourtSchedule
-      ? persistedCourtSchedule
-      : (rawAllocation ?? []);
-
-    // Persist the full raw allocation, including player ids, so it is usable
-    // as the single source of truth for every viewer.
-    if (!hasPersistedCourtSchedule && rawAllocation && rawAllocation.length) {
-      try {
-        const adminClient = createAdminClient();
-        const currentSchedule = markCourtScheduleCurrent(rawAllocation);
-        await adminClient
-          .from("session_timetables")
-          .upsert({
-            session_id: session.id,
-            court_schedule: currentSchedule as Exclude<Json, null>,
-            generated_by: null,
-            generated_at: new Date().toISOString(),
-          }, { onConflict: "session_id" });
-      } catch (error) {
-        console.error("Could not persist session timetable.", error);
-      }
-    }
-
-    const courtSchedule = (rawPersistedOrNew ?? []).map((game) => ({
+    const courtSchedule = courtScheduleGames.map((game) => ({
       ...game,
       players: game.players.map((player) =>
         typeof player === "string" ? player : player.displayName,
@@ -362,7 +321,7 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
       durationMinutes: session.duration_minutes,
       capacity: session.capacity,
       courtCount,
-      status: session.status,
+      status: toSessionStatus(session.status),
       availabilityCanChange:
         session.event_date > londonNow.date ||
         (session.event_date === londonNow.date &&
@@ -412,6 +371,3 @@ function parseAllocationMode(allocationMode: string): SessionAllocationMode {
   throw new Error("A session template has an unsupported allocation mode.");
 }
 
-function formatTime(value: string): string {
-  return value.slice(0, 5);
-}

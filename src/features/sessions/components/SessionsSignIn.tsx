@@ -4,6 +4,8 @@ import { useState, type FormEvent } from "react";
 import { LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
+import { isClubEmail } from "@/lib/validation";
+import { logError } from "@/lib/log";
 
 export function SessionsSignIn() {
   const [email, setEmail] = useState("");
@@ -17,7 +19,7 @@ export function SessionsSignIn() {
     setErrorMessage("");
 
     const normalizedEmail = email.replace(/\s/g, "");
-    if (!/^[^@\s]+@atu\.ie$/i.test(normalizedEmail)) {
+    if (!isClubEmail(normalizedEmail)) {
       setErrorMessage("Use your ATU email address ending in @atu.ie.");
       return;
     }
@@ -39,7 +41,7 @@ export function SessionsSignIn() {
 
       setMessage("Sent");
     } catch (error) {
-      console.error("Could not send the ATU sign-in link.", error);
+      logError("Could not send the ATU sign-in link.", error);
       setErrorMessage("We couldn’t send a sign-in link. Please try again.");
     } finally {
       setIsSendingLink(false);

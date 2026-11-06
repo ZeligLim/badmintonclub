@@ -510,6 +510,13 @@ select is(
 );
 
 -- A session that is not published yet is removed when its template is paused.
+-- Pin the sign-up window into the future first: publishing only reconciles
+-- sessions whose sign-ups have not opened yet, and the template's four-day lead
+-- time lands on midnight of the day this suite runs.
+update public.sessions
+set signup_opens_at = now() + interval '1 day'
+where event_date = date_trunc('week', now() at time zone 'Europe/London')::date + 8;
+
 set local role authenticated;
 select set_config(
   'request.jwt.claims',

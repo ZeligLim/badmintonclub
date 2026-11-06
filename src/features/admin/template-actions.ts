@@ -1,9 +1,11 @@
 "use server";
 
+import { isUuid } from "@/lib/validation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { SessionAllocationMode } from "@/features/sessions";
 import { requireAdminUser } from "./data";
+import { logError } from "@/lib/log";
 
 export type SessionTemplateInput = {
   templateId: string | null;
@@ -33,8 +35,6 @@ export type PublishResult = {
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function saveSessionTemplate(
   input: SessionTemplateInput,
@@ -65,7 +65,8 @@ export async function saveSessionTemplate(
     p_valid_until: template.validUntil,
   } as never);
   if (error) {
-    throw new Error(`Could not save the session template: ${error.message}`);
+    logError("Could not save the session template.", error);
+    throw new Error("Could not save the session template.");
   }
 
   revalidatePath("/admin");
@@ -79,7 +80,7 @@ export async function setSessionTemplateActive(
   if (!(await requireAdminUser())) {
     throw new Error("Only a club administrator can manage session templates.");
   }
-  if (!UUID_PATTERN.test(templateId) || typeof isActive !== "boolean") {
+  if (!isUuid(templateId) || typeof isActive !== "boolean") {
     throw new Error("The session template request is invalid.");
   }
 
@@ -89,7 +90,8 @@ export async function setSessionTemplateActive(
     p_is_active: isActive,
   });
   if (error) {
-    throw new Error(`Could not update the session template: ${error.message}`);
+    logError("Could not update the session template.", error);
+    throw new Error("Could not update the session template.");
   }
 
   revalidatePath("/admin");
@@ -108,7 +110,8 @@ export async function publishScheduledSessions(): Promise<PublishResult> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("admin_publish_scheduled_sessions");
   if (error) {
-    throw new Error(`Could not publish the club sessions: ${error.message}`);
+    logError("Could not publish the club sessions.", error);
+    throw new Error("Could not publish the club sessions.");
   }
 
   const result = data?.[0];
@@ -181,7 +184,7 @@ function validateTemplateInput(input: SessionTemplateInput): SessionTemplateInpu
   if (!TIME_PATTERN.test(input.confirmationAt)) {
     throw new Error("Choose the time sign-ups close.");
   }
-  if (input.templateId !== null && !UUID_PATTERN.test(input.templateId)) {
+  if (input.templateId !== null && !isUuid(input.templateId)) {
     throw new Error("The session template request is invalid.");
   }
   if (validFrom !== null && !DATE_PATTERN.test(validFrom)) {
