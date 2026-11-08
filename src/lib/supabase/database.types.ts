@@ -234,6 +234,9 @@ isOneToOne: false
               "allocation_mode": string,"capacity": number,"committee_auto_signup": boolean,"confirmation_at": string,"confirmation_lead_days": number,"created_at": string,"duration_minutes": number,"fee_cents": number,"id": string,"is_active": boolean,"name": string,"signup_opens_at": string,"signup_opens_lead_days": number,"starts_at": string,"updated_at": string,"valid_from": string,"valid_until": string,"weekday": number
             }[]
                            },
+"admin_place_session_player":
+{ Args: { "p_court_number": number,"p_reason"?: string,"p_session_id": string,"p_start_at": string,"p_user_id": string }; Returns: undefined
+                           },
 "admin_promote_from_waitlist":
 { Args: { "p_session_id": string,"p_user_id": string }; Returns: undefined
                            },
@@ -241,6 +244,9 @@ isOneToOne: false
 { Args: Record<PropertyKey, never>; Returns: {
               "created_count": number,"removed_count": number,"updated_count": number
             }[]
+                           },
+"admin_remove_session_player":
+{ Args: { "p_reason"?: string,"p_session_id": string,"p_user_id": string }; Returns: undefined
                            },
 "admin_set_committee_admin":
 { Args: { "p_is_admin": boolean,"p_user_id": string }; Returns: undefined
@@ -262,6 +268,9 @@ isOneToOne: false
                            },
 "admin_swap_session_player":
 { Args: { "p_in_user_id": string,"p_out_user_id": string,"p_reason"?: string,"p_session_id": string }; Returns: undefined
+                           },
+"admin_swap_session_players":
+{ Args: { "p_reason"?: string,"p_session_id": string,"p_user_a_id": string,"p_user_b_id": string }; Returns: undefined
                            },
 "admin_update_player_access":
 { Args: { "p_is_committee": boolean,"p_player_level": string,"p_user_id": string }; Returns: undefined

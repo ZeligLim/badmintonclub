@@ -59,13 +59,16 @@ export async function ensureSessionTimetable({
   players,
   persisted,
   seed,
+  now,
 }: {
   session: TimetableSession;
   players: TimetablePlayer[];
   persisted?: PersistedCourtGame[] | null;
   seed?: string;
+  /** The club's clock. Defaults to the server's clock. */
+  now?: Date;
 }): Promise<PersistedCourtGame[]> {
-  const plan = buildSessionTimetable({ session, players, persisted, seed });
+  const plan = buildSessionTimetable({ session, players, persisted, seed, now });
   const allocation = plan.games;
 
   if (!plan.needsPersisting) {
@@ -79,7 +82,7 @@ export async function ensureSessionTimetable({
         session_id: session.id,
         court_schedule: allocation as Exclude<Json, null>,
         generated_by: null,
-        generated_at: new Date().toISOString(),
+        generated_at: (now ?? new Date()).toISOString(),
       },
       { onConflict: "session_id" },
     );

@@ -19,6 +19,10 @@ export function buildDemoCourtSchedule(
     })),
   ).map((game) => ({
     ...game,
-    players: game.players.map(({ displayName }) => displayName),
+    players: game.players.map((player) =>
+      typeof player === "string"
+        ? { id: player, displayName: player }
+        : { id: player.id, displayName: player.displayName },
+    ),
   }));
 }

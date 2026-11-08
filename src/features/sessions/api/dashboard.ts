@@ -16,6 +16,7 @@ import type {
   SessionSignupStatus,
   SessionStatus,
 } from "../types";
+import { getClubNow } from "@/features/sessions/club-clock";
 import {
   getCourtCount,
   getPlayerGamesFromCourtSchedule,
@@ -204,7 +205,7 @@ export async function loadDashboardData(): Promise<DashboardData> {
 
   return {
     mode: "live",
-    serverNow: await getClubNow(supabase),
+    serverNow: (await getClubNow(supabase)).toISOString(),
     user: user
       ? {
           id: user.id,
@@ -225,25 +226,6 @@ export async function loadDashboardData(): Promise<DashboardData> {
   };
 }
 
-/**
- * The club's clock, not the browser's. In development the virtual clock is read
- * here (server-side) so `npm run dev` can still travel in time.
- */
-async function getClubNow(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-): Promise<string> {
-  if (process.env.NODE_ENV !== "development") {
-    return new Date().toISOString();
-  }
-
-  const { data } = await supabase
-    .from("dev_virtual_clock")
-    .select("virtual_now")
-    .eq("id", 1)
-    .maybeSingle();
-
-  return data?.virtual_now ?? new Date().toISOString();
-}
 
 async function getFriendList(
   supabase: Awaited<ReturnType<typeof createClient>>,

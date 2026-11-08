@@ -5,7 +5,7 @@ import { SessionAvailabilityToggle } from "./SessionAvailabilityToggle";
 import { RegenerateCourtScheduleButton } from "./RegenerateCourtScheduleButton";
 import { PromoteFromWaitlistButton } from "./PromoteFromWaitlistButton";
 import { PaymentStatusSelect } from "./PaymentStatusSelect";
-import { RepairTimetableForm } from "./RepairTimetableForm";
+import { TimetableEditor } from "./TimetableEditor";
 
 export function CourtScheduleTable({ session }: { session: AdminSession }) {
   const selectedPlayers = session.players.filter(
@@ -75,62 +75,7 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
           This session will not take place. Existing sign-ups are retained.
         </p>
       ) : session.courtSchedule.length > 0 ? (
-        <div className="overflow-x-auto">
-          <div className="flex flex-col gap-3">
-            {Array.from(
-              session.courtSchedule.reduce((slots, game) => {
-                const key = `${game.startAt}|${game.endAt}`;
-                if (!slots.has(key)) {
-                  slots.set(key, { startAt: game.startAt, endAt: game.endAt });
-                }
-                return slots;
-              }, new Map<string, { startAt: string; endAt: string }>()),
-            )
-              .sort(([a], [b]) => a.localeCompare(b))
-              .map(([slotKey, slot]) => (
-                <div
-                  key={slotKey}
-                  className="grid grid-cols-[5rem_1fr] items-start gap-3 rounded-xl bg-muted/40 p-3 sm:grid-cols-[6rem_1fr]"
-                >
-                  <div className="whitespace-nowrap tabular-nums text-muted-foreground">
-                    <span className="block text-sm font-medium text-foreground">
-                      {slot.startAt}
-                    </span>
-                    <span className="block text-xs">{slot.endAt}</span>
-                  </div>
-                  <div
-                    className="grid gap-2"
-                    style={{
-                      gridTemplateColumns: `repeat(${session.courtCount}, minmax(0, 1fr))`,
-                    }}
-                  >
-                    {Array.from({ length: session.courtCount }, (_, courtIndex) => {
-                      const courtNumber = courtIndex + 1;
-                      const game = session.courtSchedule.find(
-                        (item) =>
-                          item.startAt === slot.startAt &&
-                          item.endAt === slot.endAt &&
-                          item.courtNumber === courtNumber,
-                      );
-                      return (
-                        <div
-                          key={courtNumber}
-                          className="min-w-0 rounded-lg bg-background p-2"
-                        >
-                          <div className="mb-1 text-xs font-semibold text-muted-foreground">
-                            Court {courtNumber}
-                          </div>
-                          <div className="whitespace-pre-line text-xs text-foreground">
-                            {game?.players.join("\n") ?? "—"}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-          </div>
-        </div>
+        <TimetableEditor session={session} />
       ) : (
         <p className="text-sm text-muted-foreground">
           {session.status === "confirmed"
@@ -138,20 +83,6 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
             : "Players will be assigned after confirmation."}
         </p>
       )}
-      {!isCancelled && (
-        <RepairTimetableForm
-          inTimetable={selectedPlayers.map((player) => ({
-            userId: player.userId,
-            displayName: player.displayName,
-          }))}
-          sessionId={session.id}
-          waiting={[...requestedPlayers, ...waitlistedPlayers].map((player) => ({
-            userId: player.userId,
-            displayName: player.displayName,
-          }))}
-        />
-      )}
-
       {/* Player summary */}
       <div className="mt-4 flex flex-wrap gap-6 text-xs text-muted-foreground">
         <span>
@@ -199,7 +130,7 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
           <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground">
             Full roster ({session.players.length})
           </summary>
-          <div className="mt-2 overflow-x-auto rounded-xl border border-border">
+          <div className="relative mt-2 overflow-x-auto rounded-xl border border-border">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/50">
