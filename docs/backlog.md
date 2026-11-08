@@ -13,6 +13,9 @@ throws on an invalid schedule instead of returning it) and **BC-14** (level
 matching is implemented in the allocator). Whatever survived those three has been
 folded into the tickets below, mostly BC-09, BC-23 and BC-39.
 
+Closed by `af338a4` *"feat: let committee fix a timetable on the app"*
+(2026-11-08): **BC-16** (committee can repair a released timetable in the app).
+
 Closed by `71e7c3c` *"ci: gate production builds on typecheck, lint and tests"*
 (2026-11-05): **BC-33** (CI now exists and `npm run build` refuses to deploy a red
 tree). What BC-33 could not deliver — required checks on `main` — moved to BC-42.
@@ -234,13 +237,31 @@ the member-cannot-self-promote case, promoting a second admin, demoting one of t
 refusing the last, and two audit rows.
 
 ### BC-16 · P1 · M — Committee cannot fix a bad timetable by hand
-**Problem** `CourtScheduleTable` can cancel a session or regenerate everything
-(`src/features/admin/CourtScheduleTable.tsx`), but cannot add/remove a player, move
-someone to another court, promote a waitlister, or lock a court. When the algorithm
-is wrong — which is the reported complaint — the only tool is "roll the dice again".
-**Fix** Add per-session editing (drag or select), a "promote from waitlist" action,
-and an audit entry per change.
-**Done when** a committee member can repair a schedule without touching SQL.
+**Shipped in `af338a4`.** Committee members can now edit a released timetable from
+the app: tap a player, tap another to swap their whole night, tap an empty seat to
+place the selected player, or swap in a waiting member. Every change is audited in
+`public.admin_audit_log` with an optional reason.
+
+**Problem** `CourtScheduleTable` could cancel a session or regenerate everything
+(`src/features/admin/CourtScheduleTable.tsx`), but could not add/remove a player,
+move someone to another court, promote a waitlister, or lock a court. When the
+algorithm was wrong — the reported complaint — the only tool was "roll the dice
+again".
+**Done** `src/features/admin/TimetableEditor.tsx` (44px touch targets, a fixed
+bottom sheet, `Escape` to clear, `aria-live` announcements) drives three
+administrator-only RPCs in `supabase/migrations/20261108200000_admin_timetable_editing.sql`:
+`admin_swap_session_players`, `admin_place_session_player`,
+`admin_remove_session_player`. They set
+`badminton.allow_locked_timetable_write = 'on'` so a released schedule can still be
+repaired, rebuild `teamA`/`teamB` after every edit, and refuse a full court with
+`That court is full. Swap two players instead.` Covered by 17 pgTAP assertions in
+`supabase/tests/admin_timetable_editing.test.sql` and verified end to end at a
+390×844 viewport (screenshots in `artifacts/`).
+
+While verifying on a phone, the admin page was found to be 605px wide at a 390px
+viewport — an `sr-only` span in the templates table escaped its scroll container
+(`src/features/admin/SessionTemplateManager.tsx`). Replaced with an `aria-label` on
+the header cell, so the page now matches the viewport exactly.
 
 ### BC-17 · P1 · M — Fees are decorative
 **Problem** `fee_cents` is displayed ("Pay on arrival") but nothing records payment:

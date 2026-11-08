@@ -57,16 +57,22 @@ export function buildSessionTimetable({
   players,
   persisted,
   seed,
+  now,
 }: {
   session: TimetableSession;
   players: TimetablePlayer[];
   persisted?: PersistedCourtGame[] | null;
   seed?: string;
+  /** The club's clock. Defaults to the server's clock. */
+  now?: Date;
 }): SessionTimetablePlan {
-  const isLocked = isSessionTimetableLocked({
-    eventDate: session.date,
-    startsAt: session.startsAt,
-  });
+  const isLocked = isSessionTimetableLocked(
+    {
+      eventDate: session.date,
+      startsAt: session.startsAt,
+    },
+    now,
+  );
   const needsRebuild = shouldRefreshPersistedCourtSchedule(persisted, {
     isLocked,
     isConfirmed: session.isConfirmed,

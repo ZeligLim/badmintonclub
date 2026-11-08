@@ -244,3 +244,100 @@ export async function updatePaymentStatus(
 
   revalidatePath("/admin");
 }
+
+type TimetableEditArgs = {
+  sessionId: string;
+  reason?: string;
+};
+
+function assertTimetableEdit(admin: boolean, sessionId: string): void {
+  if (!admin) {
+    throw new Error("Only a club administrator can repair a timetable.");
+  }
+  if (typeof sessionId !== "string" || !isUuid(sessionId)) {
+    throw new Error("The timetable request is invalid.");
+  }
+}
+
+function reasonOrNull(reason: string | undefined): string | undefined {
+  const trimmed = reason?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+export async function swapTimetablePlayers(
+  input: TimetableEditArgs & { playerAId: string; playerBId: string },
+): Promise<void> {
+  assertTimetableEdit((await requireAdminUser()) !== null, input.sessionId);
+  if (!isUuid(input.playerAId) || !isUuid(input.playerBId)) {
+    throw new Error("The timetable request is invalid.");
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_swap_session_players", {
+    p_session_id: input.sessionId,
+    p_user_a_id: input.playerAId,
+    p_user_b_id: input.playerBId,
+    p_reason: reasonOrNull(input.reason),
+  });
+  if (error) {
+    logError("Could not swap those players.", error);
+    throw new Error(error.message || "Could not swap those players.");
+  }
+
+  revalidatePath("/admin");
+}
+
+export async function removeTimetablePlayer(
+  input: TimetableEditArgs & { playerId: string },
+): Promise<void> {
+  assertTimetableEdit((await requireAdminUser()) !== null, input.sessionId);
+  if (!isUuid(input.playerId)) {
+    throw new Error("The timetable request is invalid.");
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_remove_session_player", {
+    p_session_id: input.sessionId,
+    p_user_id: input.playerId,
+    p_reason: reasonOrNull(input.reason),
+  });
+  if (error) {
+    logError("Could not take that player out.", error);
+    throw new Error(error.message || "Could not take that player out.");
+  }
+
+  revalidatePath("/admin");
+}
+
+export async function placeTimetablePlayer(
+  input: TimetableEditArgs & {
+    playerId: string;
+    courtNumber: number;
+    startAt: string;
+  },
+): Promise<void> {
+  assertTimetableEdit((await requireAdminUser()) !== null, input.sessionId);
+  if (
+    !isUuid(input.playerId) ||
+    !Number.isInteger(input.courtNumber) ||
+    input.courtNumber < 1 ||
+    typeof input.startAt !== "string"
+  ) {
+    throw new Error("The timetable request is invalid.");
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_place_session_player", {
+    p_session_id: input.sessionId,
+    p_user_id: input.playerId,
+    p_court_number: input.courtNumber,
+    p_start_at: input.startAt,
+    p_reason: reasonOrNull(input.reason),
+  });
+  if (error) {
+    logError("Could not place that player.", error);
+    throw new Error(error.message || "Could not place that player.");
+  }
+
+  revalidatePath("/admin");
+}
