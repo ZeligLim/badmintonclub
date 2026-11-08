@@ -1,10 +1,8 @@
 import "server-only";
 
 import { connection } from "next/server";
-import {
-  ensureSessionTimetable,
-  readPersistedTimetables,
-} from "@/features/sessions/api/timetable";
+import { readPersistedTimetables } from "@/features/sessions/api/timetable";
+import { buildSessionTimetable } from "@/features/sessions/timetable-plan";
 import { formatTimeOfDay } from "@/lib/format";
 import { toSessionStatus, toSignupStatus } from "@/features/sessions/status";
 import type {
@@ -21,6 +19,15 @@ import type { PlayerLevel } from "@/types/player";
 import { isClubEmail } from "@/lib/validation";
 import { logError } from "@/lib/log";
 
+export type PaymentStatus = "unpaid" | "paid" | "waived";
+
+export function toPaymentStatus(value: string): PaymentStatus {
+  if (value === "paid" || value === "waived" || value === "unpaid") {
+    return value;
+  }
+  return "unpaid";
+}
+
 export type AdminPlayer = {
   userId: string;
   displayName: string;
@@ -28,6 +35,7 @@ export type AdminPlayer = {
   slotNumber: number | null;
   isCommittee?: boolean;
   playerLevel?: PlayerLevel;
+  paymentStatus: PaymentStatus;
 };
 
 export type AdminCourtGame = {
@@ -44,11 +52,14 @@ export type AdminSession = {
   startsAt: string;
   durationMinutes: number;
   capacity: number;
+  feeCents: number;
   courtCount: number;
   status: string;
   availabilityCanChange: boolean;
   players: AdminPlayer[];
   courtSchedule: AdminCourtGame[];
+  /** True when the shown schedule exists only in memory and nothing is saved. */
+  timetableNeedsSaving: boolean;
 };
 
 export type AdminClubPlayer = {
@@ -56,7 +67,16 @@ export type AdminClubPlayer = {
   displayName: string;
   playerLevel: PlayerLevel;
   isCommittee: boolean;
+  isCommitteeAdmin: boolean;
   canChooseProfessional: boolean;
+};
+
+export type AdminAuditEntry = {
+  id: number;
+  actorName: string;
+  targetName: string;
+  action: string;
+  createdAt: string;
 };
 
 export type AdminSessionTemplate = {
@@ -132,7 +152,55 @@ export async function loadClubPlayers(): Promise<AdminClubPlayer[]> {
     displayName: player.display_name,
     playerLevel: parsePlayerLevel(player.player_level),
     isCommittee: player.is_committee,
+    isCommitteeAdmin: player.is_committee_admin,
     canChooseProfessional: player.can_choose_professional,
+  }));
+}
+
+export async function loadAdminAuditLog(): Promise<AdminAuditEntry[]> {
+  if (!(await requireAdminUser())) {
+    throw new Error("Only a club administrator can read the audit log.");
+  }
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("admin_audit_log")
+    .select("id, actor_id, target_user_id, action, created_at")
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  if (error) {
+    logError("Could not load the admin audit log.", error);
+    throw new Error("Could not load the admin audit log.");
+  }
+
+  const userIds = [
+    ...new Set(
+      (data ?? []).flatMap((row) => [row.actor_id, row.target_user_id]),
+    ),
+  ].filter((id): id is string => typeof id === "string");
+
+  const names = new Map<string, string>();
+  if (userIds.length > 0) {
+    const { data: profiles, error: profilesError } = await supabase
+      .from("profiles")
+      .select("id, display_name")
+      .in("id", userIds);
+    if (profilesError) {
+      logError("Could not load the names for the admin audit log.", profilesError);
+    }
+    for (const profile of profiles ?? []) {
+      names.set(profile.id, profile.display_name);
+    }
+  }
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    actorName: (row.actor_id && names.get(row.actor_id)) || "Former administrator",
+    targetName:
+      (row.target_user_id && names.get(row.target_user_id)) || "Former member",
+    action: row.action,
+    createdAt: row.created_at,
   }));
 }
 
@@ -195,7 +263,7 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
   // no longer actionable and should not appear on the admin schedule view.
   const { data: sessions, error: sessionsErr } = await admin
     .from("sessions")
-    .select("id, event_date, starts_at, duration_minutes, capacity, status")
+    .select("id, event_date, starts_at, duration_minutes, capacity, fee_cents, status")
     .in("status", ["open", "confirmed", "cancelled"])
     .gte("event_date", londonNow.date)
     .order("event_date");
@@ -207,7 +275,7 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
 
   const { data: signups, error: signupsErr } = await admin
     .from("session_signups")
-    .select("session_id, user_id, status, slot_number")
+    .select("session_id, user_id, status, slot_number, payment_status")
     .in("session_id", sessionIds)
     .in("status", ["requested", "selected", "waitlisted", "played"]);
 
@@ -277,6 +345,7 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
       slotNumber: s.slot_number,
       isCommittee: profileMap.get(s.user_id)?.isCommittee ?? false,
       playerLevel: profileMap.get(s.user_id)?.playerLevel ?? "INTERMEDIATE",
+      paymentStatus: toPaymentStatus(s.payment_status),
     }));
 
     const courtCount = getCourtCount(session.capacity);
@@ -284,7 +353,10 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
       .filter((p) => p.status === "selected" || p.status === "played")
       .sort((a, b) => (a.slotNumber ?? 99) - (b.slotNumber ?? 99));
 
-    const courtScheduleGames = await ensureSessionTimetable({
+    // Reading the admin page must never write. If a timetable is missing or
+    // stale, this plans one for display and flags it so a committee member can
+    // save it deliberately.
+    const timetablePlan = buildSessionTimetable({
       session: {
         id: session.id,
         date: session.event_date,
@@ -304,6 +376,7 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
       persisted: timetableMap.get(session.id),
       seed: options?.allocationSeed,
     });
+    const courtScheduleGames = timetablePlan.games;
 
     const courtSchedule = courtScheduleGames.map((game) => ({
       ...game,
@@ -320,6 +393,7 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
       startsAt: session.starts_at,
       durationMinutes: session.duration_minutes,
       capacity: session.capacity,
+      feeCents: session.fee_cents,
       courtCount,
       status: toSessionStatus(session.status),
       availabilityCanChange:
@@ -328,6 +402,7 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
           session.starts_at.slice(0, 5) > londonNow.time),
       players,
       courtSchedule,
+      timetableNeedsSaving: timetablePlan.needsPersisting,
     };
   }));
 }

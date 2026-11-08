@@ -28,12 +28,14 @@ npm run dev
 ```
 
 The live app is at [http://localhost:3000](http://localhost:3000) and requires
-Supabase environment values. Use [http://localhost:3000/dev](http://localhost:3000/dev)
-for local demo data; demo signups and the adjustable Europe/London demo clock
-stay in browser state. The demo route is available only in development.
-Local Supabase email capture is disabled. To send sign-in links, configure the
-app to use a hosted Supabase project and configure email delivery in that
-project's Auth settings.
+Supabase environment values. [http://localhost:3000/dev](http://localhost:3000/dev)
+holds development-only tools (seeded accounts, virtual clock) and is not available
+outside development.
+
+Local sign-in emails are captured by Mailpit at
+[http://127.0.0.1:54324](http://127.0.0.1:54324) — request a link in the app,
+open the message there and follow it. A hosted deployment needs email delivery
+configured in that project's Supabase Auth settings.
 
 ## Session rules
 
@@ -55,11 +57,11 @@ project's Auth settings.
   the following week's sessions when the next sign-up window opens, which the
   templates decide.
 - Both the signup UI and database enforce the sign-up windows.
-- Members can cancel their own signup, including a confirmed place, until the
-  session starts.
-- The browser clock checks session periods every 60 seconds and uses the
-  browser's current time. Session dates and deadlines remain anchored to
-  Europe/London.
+- Members can cancel their own signup, including a confirmed place, until 30
+  minutes before the session starts.
+- Session periods are computed on the server and sent to the browser, which
+  only counts down from that value, so a wrong device clock cannot change what
+  a member sees. Deadlines remain anchored to Europe/London.
 - When a signed-in member's open dashboard reaches a confirmation deadline, it
   asks an authenticated Supabase function to finalize due sessions. The
   database verifies the caller is an `@atu.ie` account and finalizes only

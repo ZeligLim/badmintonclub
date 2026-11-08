@@ -1,8 +1,11 @@
 import { isSessionTimetableLocked } from "@/features/sessions/court-schedule";
-import { formatDuration, formatTimeOfDay } from "@/lib/format";
+import { formatDuration, formatFee, formatTimeOfDay } from "@/lib/format";
 import type { AdminSession } from "./data";
 import { SessionAvailabilityToggle } from "./SessionAvailabilityToggle";
 import { RegenerateCourtScheduleButton } from "./RegenerateCourtScheduleButton";
+import { PromoteFromWaitlistButton } from "./PromoteFromWaitlistButton";
+import { PaymentStatusSelect } from "./PaymentStatusSelect";
+import { RepairTimetableForm } from "./RepairTimetableForm";
 
 export function CourtScheduleTable({ session }: { session: AdminSession }) {
   const selectedPlayers = session.players.filter(
@@ -10,6 +13,10 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
   );
   const waitlistedPlayers = session.players.filter((p) => p.status === "waitlisted");
   const requestedPlayers = session.players.filter((p) => p.status === "requested");
+
+  const paidCount = selectedPlayers.filter(
+    (player) => player.paymentStatus === "paid",
+  ).length;
 
   const statusBadge =
     session.status === "confirmed"
@@ -53,6 +60,14 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
           <RegenerateCourtScheduleButton sessionId={session.id} />
         )}
       </div>
+
+      {session.timetableNeedsSaving && !isCancelled ? (
+        <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          This schedule exists only on this page. Save it with
+          {" \u201cregenerate\u201d"} before the release time so members see
+          the same courts.
+        </p>
+      ) : null}
 
       {/* Court schedule table */}
       {isCancelled ? (
@@ -123,6 +138,20 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
             : "Players will be assigned after confirmation."}
         </p>
       )}
+      {!isCancelled && (
+        <RepairTimetableForm
+          inTimetable={selectedPlayers.map((player) => ({
+            userId: player.userId,
+            displayName: player.displayName,
+          }))}
+          sessionId={session.id}
+          waiting={[...requestedPlayers, ...waitlistedPlayers].map((player) => ({
+            userId: player.userId,
+            displayName: player.displayName,
+          }))}
+        />
+      )}
+
       {/* Player summary */}
       <div className="mt-4 flex flex-wrap gap-6 text-xs text-muted-foreground">
         <span>
@@ -151,6 +180,19 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
         )}
       </div>
 
+      {session.feeCents > 0 && selectedPlayers.length > 0 && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">
+            {formatFee(session.feeCents * paidCount)}
+          </span>{" "}
+          collected of {formatFee(session.feeCents * selectedPlayers.length)}{" "}
+          expected
+          {selectedPlayers.length - paidCount > 0
+            ? ` · ${selectedPlayers.length - paidCount} outstanding`
+            : " · all settled"}
+        </p>
+      )}
+
       {/* Roster detail */}
       {session.players.length > 0 && (
         <details className="mt-4">
@@ -167,10 +209,13 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
                   <th className="px-4 py-2 text-left font-medium text-muted-foreground">
                     Status
                   </th>
+                  <th className="px-4 py-2 text-left font-medium text-muted-foreground">
+                    Payment
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {session.players
+                {[...session.players]
                   .sort(
                     (a, b) =>
                       statusOrder(a.status) - statusOrder(b.status) ||
@@ -180,7 +225,34 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
                     <tr key={player.userId} className="border-t border-border/50 bg-card">
                       <td className="px-4 py-2">{player.displayName}</td>
                       <td className="px-4 py-2 capitalize text-muted-foreground">
-                        {player.status}
+                        {player.status === "waitlisted" ||
+                        player.status === "requested" ? (
+                          <span className="inline-flex items-center gap-2">
+                            {player.status}
+                            {selectedPlayers.length < session.capacity ? (
+                              <PromoteFromWaitlistButton
+                                displayName={player.displayName}
+                                sessionId={session.id}
+                                userId={player.userId}
+                              />
+                            ) : null}
+                          </span>
+                        ) : (
+                          player.status
+                        )}
+                      </td>
+                      <td className="px-4 py-2">
+                        {session.feeCents > 0 &&
+                        (player.status === "selected" || player.status === "played") ? (
+                          <PaymentStatusSelect
+                            displayName={player.displayName}
+                            paymentStatus={player.paymentStatus}
+                            sessionId={session.id}
+                            userId={player.userId}
+                          />
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </td>
                     </tr>
                   ))}

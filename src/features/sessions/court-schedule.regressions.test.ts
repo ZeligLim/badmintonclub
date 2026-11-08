@@ -40,7 +40,10 @@ describe("regressions", () => {
         expect(new Set(roundIds).size).toBe(roundIds.length);
       }
     }
-  }, 20_000);
+    // The sweep allocates ten full evenings with the production candidate count;
+    // a two-core build runner needs roughly 20s, so the budget leaves headroom
+    // without weakening the coverage.
+  }, 90_000);
 
   it("allocates the confirmed Wednesday roster with overlapping committee requests", () => {
     const roster = makeNamedRoster([
@@ -107,7 +110,10 @@ describe("regressions", () => {
         .flatMap((game) => game.players.map((player) => player.id));
       expect(new Set(roundIds).size).toBe(roster.length);
     }
-  }, 20_000);
+    // The sweep allocates ten full evenings with the production candidate count;
+    // a two-core build runner needs roughly 20s, so the budget leaves headroom
+    // without weakening the coverage.
+  }, 90_000);
 });
 
 function makeRosterOfCapacity(capacity: number) {

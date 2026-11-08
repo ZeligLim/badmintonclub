@@ -62,6 +62,13 @@ export type ClubSession = {
   friendCandidates: FriendCandidate[];
   timeSlots: SessionTimeSlot[];
   playerGameSchedule?: PlayerGame[];
+  /**
+   * Set when the database returned a value this build does not understand.
+   * The session still renders, with a warning badge, instead of 500ing the page.
+   */
+  needsAttention?: boolean;
+  /** A released timetable was built by an older allocator and needs a repair. */
+  timetableOutdated?: boolean;
 };
 
 export type DemoSignupCounts = Partial<Record<ClubSessionDay, number>>;

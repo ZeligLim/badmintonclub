@@ -125,6 +125,18 @@ export function SessionCard({
       <div className="flex items-stretch">
         <div className="min-w-0 flex-1 p-4 sm:p-5">
           <div className="mt-1 grid gap-y-1 sm:flex sm:flex-wrap sm:items-baseline sm:gap-x-3">
+            {session.needsAttention ? (
+              <p className="rounded-md bg-amber-100 px-2 py-1 text-xs font-medium text-amber-900">
+                This session has a value the app does not recognise. Ask a
+                committee member to check it.
+              </p>
+            ) : null}
+            {session.timetableOutdated ? (
+              <p className="rounded-md bg-amber-100 px-2 py-1 text-xs font-medium text-amber-900">
+                This released timetable was built by an older version of the app. A
+                committee member can repair it from the admin page.
+              </p>
+            ) : null}
             <h3 className="text-lg font-medium tracking-tight">
               {formatTimeOfDay(session.startsAt)}
               <span className="ml-2 text-sm font-normal text-muted-foreground">

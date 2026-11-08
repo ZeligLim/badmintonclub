@@ -2,10 +2,6 @@ begin;
 
 select plan(10);
 
--- The migration chain seeds the current and next club week, so start from an
--- empty schedule to keep these fixtures independent of the reset date.
-delete from public.sessions;
-
 insert into auth.users (
   id,
   aud,

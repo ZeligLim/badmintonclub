@@ -37,6 +37,16 @@ indexes), **BC-31** (`serverNow` comes from the server and
 `useServerClock` ticks from it), **BC-32** (actions log the database error and
 throw a clean message).
 
+Closed by `experimental/p1-corrections` (2026-11-08): **BC-13** (README claims
+match the code; `.env.example` exists), **BC-11** (unknown database values are
+logged and fall back instead of 500ing the dashboard), **BC-08** (`anon` can no
+longer read `session_timetables`), **BC-09** (a friend-list change deletes the
+saved timetable while it is still private), **BC-10** (`/admin` renders without
+writing; saving is an explicit action), **BC-40** (playing level is the tie-break
+inside a fairness bucket, by `82e0dee`), **BC-44** (no migration creates
+sessions: `db reset` leaves `public.sessions` empty) and **BC-42**/**BC-43**
+remain open because they need repository-admin rights.
+
 ---
 
 ## P0 — fix before the next session
@@ -105,9 +115,18 @@ signup row reflects the cancellation.
 (`src/features/sessions/components/SessionsDashboard.tsx:175-213`) gated on the
 browser clock. No member online at the deadline means no confirmation, no timetable
 and no email until the next visit; a wrong device clock runs it early or late.
-**Fix** Run `finalize_due_sessions` server-side on a timer: `pg_cron` in Supabase, or
-a Vercel cron hitting an authenticated route. Keep the client call as a fallback.
+**Fix** Shipped in `f6126cc`: `public.finalize_due_sessions_service()` lets the
+service role run `private.finalize_due_sessions()` without a user session
+(`20261108150000_service_finalize_sessions.sql`), and `/api/cron/finalize` calls it
+behind a `CRON_SECRET` bearer check, with `vercel.json` scheduling one run a day.
+The dashboard's client call stays as the fallback for the deadlines between runs.
+`supabase/tests/service_finalize.test.sql` proves a due session confirms with no
+browser attached.
 **Done when** a session is confirmed without any browser being open.
+**Caveats** Hobby plans only run a cron once a day, so a first-come-first-served
+session that closes at 14:30 still depends on somebody opening the app (or on
+pg_cron, the upgrade path); and `CRON_SECRET` has to be set in Vercel before the
+route does anything but return 401.
 
 ### BC-08 · P1 · S — Full timetables are readable by anonymous users
 **Problem** `public.session_timetables` is granted `SELECT` to `anon`
@@ -166,11 +185,18 @@ each run — there is no per-recipient "already emailed" record. Failures log on
 `session_timetables` instead of recomputed per recipient, `:244-262`), so the
 per-recipient panel is cheap when a timetable exists, but a confirmed session
 without one still re-allocates per recipient and re-persists it per recipient.
-**Fix** Batch Mailjet sends, add a
-`booking_emails(session_id, user_id, sent_at)` table (or a `confirmation_email_sent_at`
-column) and send only rows that are null.
+**Fix** Shipped in `5058439`: `session_signups.confirmation_email_sent_at` records
+the receipt, `public.get_booking_email_recipients(uuid[])` returns only the rows
+without one (one auth join instead of a `getUserById` per recipient), the run builds
+every email and makes a single `sendMailjetEmails` call, and each accepted address is
+stamped. Partial acceptance and per-recipient failures are logged with the session,
+user and error message.
 **Done when** re-running finalization for an already-confirmed session sends zero
 emails and one run for 40 players makes one allocation and one batched send.
+**Done** — `supabase/tests/booking_email_recipients.test.sql` covers "only members
+without a receipt are returned" and the service-role-only grant; the batching is
+what `sendSelectedBookingConfirmationEmails` now does, one `sendMailjetEmails` call
+per run.
 
 ### BC-13 · P1 · S — README promises behaviour the code does not have
 **Problem** Two claims in `README.md` are still false. It says members can cancel
@@ -191,10 +217,16 @@ documented.
 (`src/features/admin/player-actions.ts`), but `is_committee_admin` can only be set by
 the hand-written SQL in the README. Adding a second admin, or replacing one who
 leaves, currently needs database access.
-**Fix** Add admin-role management with a "there must always be at least one admin"
-guard, and audit the change.
+**Fix** Shipped in `ec435bf`: `admin_set_committee_admin(uuid, boolean)` enforces
+the caller is an administrator, promotes through `is_committee = true` and refuses to
+demote the last one (`There must always be at least one committee administrator.`).
+Every change lands in `public.admin_audit_log`, shown as "Recent administrator
+changes" under the access table. `/admin` gained an Admin column.
 **Done when** two admins can be managed from `/admin` and the last one cannot be
 removed.
+**Done** — `supabase/tests/committee_admin_management.test.sql` (7 assertions) covers
+the member-cannot-self-promote case, promoting a second admin, demoting one of two,
+refusing the last, and two audit rows.
 
 ### BC-16 · P1 · M — Committee cannot fix a bad timetable by hand
 **Problem** `CourtScheduleTable` can cancel a session or regenerate everything
@@ -209,9 +241,27 @@ and an audit entry per change.
 **Problem** `fee_cents` is displayed ("Pay on arrival") but nothing records payment:
 no paid/unpaid state, no method, no reconciliation. The Friday session charges €3 and
 the committee has no list of who owes it.
-**Fix** Add `session_signups.payment_status` (`unpaid | paid | waived`) plus an admin
-toggle and a per-session total. Stripe can come later; the ledger cannot.
+**Fix** Shipped in `64fb4db`: `session_signups.payment_status`
+(`unpaid | paid | waived`) with a check constraint, `admin_set_payment_status`
+(administrator only, audited with the previous and new state), a Payment column on
+each confirmed roster row, and a per-session "collected of expected · N outstanding"
+line. Stripe can come later; the ledger exists now.
 **Done when** the admin page shows collected vs expected for a paid session.
+**Done** — `supabase/tests/session_payments.test.sql` (6 assertions) covers the
+unpaid default, a member being refused, the administrator update, an unknown state
+being rejected and the audit entry.
+
+### BC-48 · P2 · S — A released timetable from an older allocator is served silently
+**Problem** The member dashboard served any shape-valid persisted row
+(`src/features/sessions/api/dashboard.ts`), so a schedule built by an older
+`COURT_ALLOCATION_VERSION` looked current — and once locked it could not be
+refreshed.
+**Fix** Shipped with `cdd0026`: the dashboard compares the saved row with
+`isCurrentPersistedCourtSchedule`, and when the session is already locked it sets
+`ClubSession.timetableOutdated`; `SessionCard` shows an amber note pointing the
+community at the admin repair tool.
+**Done when** an outdated released timetable is visible as outdated instead of
+being presented as current.
 
 ---
 
@@ -265,9 +315,18 @@ non-signed-up friends with an explanation, and finish the a11y states.
 but candidate generation, greedy selection, doubles optimisation, scoring and
 validation are still ~1,400 lines in `src/features/sessions/court-schedule.ts`, and
 the 500-candidate branch (`:1329`) is only exercised by the benchmark.
-**Fix** Extract `candidates`, `score` and `validate` into their own modules, and
-turn the latency check into a p95 budget over repeated runs in CI.
+**Fix** Shipped in `3b88647`: the pipeline is now `court-schedule.shared.ts`
+(types, constants, RNG and small comparisons), `court-schedule.select.ts` (anchors,
+friend packs, court groups, doubles pairing), `court-schedule.candidates.ts`
+(round-by-round greedy build), `court-schedule.score.ts` (the lexicographic score
+vector), `court-schedule.validate.ts` (court sizes and the finished-timetable
+check) and `court-schedule.levels.ts`. `court-schedule.ts` is 262 lines and only
+keeps the persistence helpers plus the public entry points.
 **Done when** each step is a module with its own tests, not just examples.
+**Done** — `court-schedule.validate.test.ts` covers court sizes, round
+double-booking, roster membership, duplicate players and score ranking, and
+`court-schedule.properties.test.ts` holds a p95 latency budget over ten seeded
+runs of a 40-player, four-court evening.
 
 ---
 
@@ -286,6 +345,11 @@ have changed no behaviour while coupling the tests to a table that BC-01 wants
 deleted.
 **Done when** the full suite passes at any hour, including the 00:00 and week
 boundaries.
+**Done** — the failing scenario was reproduced after midnight, the fixture now
+pins its own window, and `npm run check:tests` (inside `verify` and `build`)
+refuses any session fixture that takes a date from `now()` without pinning
+`signup_opens_at` and `confirmation_at`. The suite has since passed on CI at
+00:05 and locally in the evening.
 
 ---
 
@@ -348,12 +412,15 @@ timetable saved from a stale preview — which happens whenever the backfill in
 time, since that delete is itself gated on `now() < … - interval '30 minutes'` —
 can never be corrected from the app once the session is locked, only with
 service-role SQL.
-**Fix** Add an explicit, audited "repair published timetable" action for committee
-admins (confirmed re-allocation, recorded in `generated_by`, warned as
-member-visible), and a read-side check that flags a row whose
-`allocationVersion` is older than the current one.
+**Fix** Shipped in `cdd0026`: the freeze trigger honours a transaction-local
+`badminton.allow_locked_timetable_write` flag that only `admin_swap_session_player`
+sets, so a released timetable can be edited from `/admin` (pick out, pick in, why),
+`generated_by` records the administrator and `admin_audit_log` records `was_locked`
+plus the reason. Ordinary clients are still frozen.
 **Done when** a committee admin can rebuild a released timetable from the final
 roster without SQL, and the change is attributable.
+**Remaining** the read-side check that flags a saved row whose `allocationVersion`
+is older than `COURT_ALLOCATION_VERSION` — shipped as **BC-48** below.
 
 ### BC-40 · P1 · S — The selection draw ignores playing level
 **Problem** `fa83bb2` implemented level compatibility inside the allocator, but the
@@ -411,6 +478,30 @@ dates when they have no signups.
 **Done when** `supabase db reset` leaves `public.sessions` empty and the pgTAP
 suite passes without the per-file deletes.
 
+### BC-47 · P1 · S — Monday and Wednesday sessions stopped being generated
+**Problem** While making `db reset` start empty (BC-44) the template path was
+exercised on a fresh database for the first time. The seeded Monday and
+Wednesday templates had `signup_opens_lead_days = 0`, `signup_opens_at = 00:00`
+and `confirmation_lead_days = 1`, `confirmation_at = 00:00`, so
+`ensure_scheduled_sessions()` computed sign-up opening *after* confirmation and
+hit the silent `continue` at
+`supabase/migrations/20261022100100_template_driven_sessions.sql:91`. Only the
+Friday template could produce a session. Every Monday/Wednesday row in
+production predates the template migration; once the current window is used up,
+the dashboard will show no evening sessions and nothing will log a warning.
+**Fix** Shipped: `20261108140000_fix_template_signup_windows.sql` opens sign-ups
+on the Thursday before the club week (`signup_opens_lead_days = 4`) for the
+Monday and Wednesday templates, and
+`20261108141000_reject_impossible_template_windows.sql` adds a check constraint
+(backstop, `not valid` so existing rows are untouched) plus a before-trigger that
+raises `Sign-ups must open before they close.` when an admin saves an impossible
+window. `session_templates.test.sql` asserts both the shipped defaults and the
+rejection.
+**Done when** a template with an impossible window is rejected when saved, and a
+fresh database generates every active template's session for two weeks ahead.
+**Done** — verified by `npx supabase db reset --local` (empty `sessions`) followed
+by `npx supabase test db --local` (13 files, 327 tests, PASS).
+
 ### BC-45 · P2 · S — Anonymous `/admin` answers 200 with a shell before redirecting
 **Problem** With the local stack running (`npm run dev`, `curl -s -o /dev/null -w '%{http_code}'
 localhost:3000/admin`), an unauthenticated request returns **200** and 23 KB of HTML
@@ -429,10 +520,10 @@ markup.
 
 ## Suggested first five
 
-1. **BC-01** — the clock backdoor is a one-afternoon security fix.
-2. **BC-39** — the timetable can no longer be repaired; ship the escape hatch before
-   the next release window.
-3. **BC-07** — confirmation still needs a browser open; one missed window means no
-   timetable at all.
-4. **BC-04** — the waitlist is currently a dead end.
-5. **BC-35** — stop shipping untested commits to members.
+1. **BC-01** — the clock backdoor is a one-afternoon security fix, and it is live
+   in production right now.
+2. **BC-04** — the waitlist is still a dead end: cancelling never promotes anybody.
+3. **BC-36** — migrations only reach production by hand; wire them into CI.
+4. **BC-35** — previews are invisible to the committee and would crash without
+   preview-scoped environment variables.
+5. **BC-42** — a red build stops a deploy but not a merge; turn on branch protection.

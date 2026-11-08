@@ -2,6 +2,10 @@ begin;
 
 select plan(48);
 
+-- Sessions exist only at runtime now (BC-44), so create the current and next
+-- club week here instead of relying on a migration having done it.
+select public.ensure_next_week_sessions();
+
 select has_table('public', 'profiles', 'profiles table exists');
 select has_table('public', 'sessions', 'sessions table exists');
 select has_table('public', 'session_signups', 'session signups table exists');

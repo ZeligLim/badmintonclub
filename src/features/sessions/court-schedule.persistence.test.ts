@@ -12,6 +12,7 @@ import {
   shouldRefreshPersistedCourtSchedule,
 } from "./court-schedule";
 import { makeRoster, monday60min } from "./court-schedule.fixtures";
+import { buildSessionTimetable } from "./timetable-plan";
 
 const novemberSession = { eventDate: "2026-11-04", startsAt: "19:30" };
 const julySession = { eventDate: "2026-07-15", startsAt: "19:30" };
@@ -239,5 +240,56 @@ describe("court count", () => {
     for (const [capacity, courts] of expected) {
       expect([capacity, getCourtCount(capacity)]).toEqual([capacity, courts]);
     }
+  });
+});
+
+describe("planning a timetable without writing", () => {
+  const session = {
+    id: monday60min.id,
+    date: "2026-11-09",
+    startsAt: monday60min.startsAt,
+    durationMinutes: monday60min.durationMinutes,
+    capacity: monday60min.courtCount * 8,
+    isConfirmed: true,
+  };
+  const players = makeRoster(8).map((player) => ({
+    id: player.id,
+    displayName: player.displayName,
+    priority: player.priority,
+    friendIds: player.friendIds,
+    isCommittee: player.isCommittee,
+    level: player.level,
+  }));
+
+  it("reuses a saved schedule without flagging a write", () => {
+    const saved = savedSchedule();
+    const plan = buildSessionTimetable({ session, players, persisted: saved });
+
+    expect(plan.games).toEqual(saved);
+    expect(plan.needsPersisting).toBe(false);
+  });
+
+  it("plans a schedule in memory when none is saved", () => {
+    const plan = buildSessionTimetable({ session, players, persisted: null });
+
+    expect(plan.games).toHaveLength(8);
+    expect(plan.needsPersisting).toBe(true);
+  });
+
+  it("plans a replacement for an unlocked schedule built by an older allocator", () => {
+    const stale = savedSchedule().map((game) => ({
+      ...game,
+      allocationVersion: (COURT_ALLOCATION_VERSION - 1) as typeof COURT_ALLOCATION_VERSION,
+    }));
+    const plan = buildSessionTimetable({
+      session: { ...session, date: "2026-12-07", isConfirmed: false },
+      players,
+      persisted: stale,
+    });
+
+    expect(plan.needsPersisting).toBe(true);
+    expect(
+      plan.games.every((game) => game.allocationVersion === COURT_ALLOCATION_VERSION),
+    ).toBe(true);
   });
 });

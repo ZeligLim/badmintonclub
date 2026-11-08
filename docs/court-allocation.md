@@ -32,8 +32,18 @@ higher one.
 5. **Variety.** Avoid repeating the same court group, doubles partnership and
    doubles opponent across rounds.
 
-Level never changes who is selected to play. It only decides how the selected
-players are arranged once fairness and friendship are satisfied.
+When two members are otherwise tied in the draw that decides *who plays*, level
+is the tie-break: a professional place is harder to replace than a beginner one.
+The draw order is therefore:
+
+1. committee members first,
+2. then the friend group that has played least recently (nulls first),
+3. then playing level, `PROFESSIONAL` > `INTERMEDIATE` > `BEGINNER`,
+4. then signup time, then the member id.
+
+Freshness always outranks level, so a beginner who has rested longer still goes
+in ahead of a professional who played last week. Within the session, level keeps
+deciding how the selected players are arranged (section 6).
 
 ## 3. Levels
 

@@ -23,7 +23,33 @@ export type Database = {
           }
         },"public": {
           Tables: {
-            "club_friend_list": {
+            "admin_audit_log": {
+                  Row: {
+                    "action": string,"actor_id": string | null,"created_at": string,"details": Json | null,"id": number,"target_user_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "action": string,"actor_id"?: string | null,"created_at"?: string,"details"?: Json | null,"id"?: never,"target_user_id"?: string | null
+                  }
+                  Update: {
+                    "action"?: string,"actor_id"?: string | null,"created_at"?: string,"details"?: Json | null,"id"?: never,"target_user_id"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "admin_audit_log_actor_id_fkey"
+      columns: ["actor_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "admin_audit_log_target_user_id_fkey"
+      columns: ["target_user_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"club_friend_list": {
                   Row: {
                     "created_at": string,"friend_user_id": string,"user_id": string
                   }
@@ -105,14 +131,14 @@ isOneToOne: false
                   ]
                 },"session_signups": {
                   Row: {
-                    "session_id": string,"signed_up_at": string,"slot_number": number | null,"status": string,"user_id": string
+                    "confirmation_email_sent_at": string | null,"payment_status": string,"session_id": string,"signed_up_at": string,"slot_number": number | null,"status": string,"user_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "session_id": string,"signed_up_at"?: string,"slot_number"?: number | null,"status"?: string,"user_id": string
+                    "confirmation_email_sent_at"?: string | null,"payment_status"?: string,"session_id": string,"signed_up_at"?: string,"slot_number"?: number | null,"status"?: string,"user_id": string
                   }
                   Update: {
-                    "session_id"?: string,"signed_up_at"?: string,"slot_number"?: number | null,"status"?: string,"user_id"?: string
+                    "confirmation_email_sent_at"?: string | null,"payment_status"?: string,"session_id"?: string,"signed_up_at"?: string,"slot_number"?: number | null,"status"?: string,"user_id"?: string
                   }
                   Relationships: [
                     {
@@ -200,7 +226,7 @@ isOneToOne: false
                            },
 "admin_list_club_players":
 { Args: Record<PropertyKey, never>; Returns: {
-              "can_choose_professional": boolean,"display_name": string,"is_committee": boolean,"player_level": string,"user_id": string
+              "can_choose_professional": boolean,"display_name": string,"is_committee": boolean,"is_committee_admin": boolean,"player_level": string,"user_id": string
             }[]
                            },
 "admin_list_session_templates":
@@ -208,13 +234,22 @@ isOneToOne: false
               "allocation_mode": string,"capacity": number,"committee_auto_signup": boolean,"confirmation_at": string,"confirmation_lead_days": number,"created_at": string,"duration_minutes": number,"fee_cents": number,"id": string,"is_active": boolean,"name": string,"signup_opens_at": string,"signup_opens_lead_days": number,"starts_at": string,"updated_at": string,"valid_from": string,"valid_until": string,"weekday": number
             }[]
                            },
+"admin_promote_from_waitlist":
+{ Args: { "p_session_id": string,"p_user_id": string }; Returns: undefined
+                           },
 "admin_publish_scheduled_sessions":
 { Args: Record<PropertyKey, never>; Returns: {
               "created_count": number,"removed_count": number,"updated_count": number
             }[]
                            },
+"admin_set_committee_admin":
+{ Args: { "p_is_admin": boolean,"p_user_id": string }; Returns: undefined
+                           },
 "admin_set_committee_status":
 { Args: { "p_is_committee": boolean,"p_user_id": string }; Returns: undefined
+                           },
+"admin_set_payment_status":
+{ Args: { "p_payment_status": string,"p_session_id": string,"p_user_id": string }; Returns: undefined
                            },
 "admin_set_professional_choice":
 { Args: { "p_enabled": boolean,"p_user_id": string }; Returns: undefined
@@ -224,6 +259,9 @@ isOneToOne: false
                            },
 "admin_set_session_template_active":
 { Args: { "p_is_active": boolean,"p_template_id": string }; Returns: undefined
+                           },
+"admin_swap_session_player":
+{ Args: { "p_in_user_id": string,"p_out_user_id": string,"p_reason"?: string,"p_session_id": string }; Returns: undefined
                            },
 "admin_update_player_access":
 { Args: { "p_is_committee": boolean,"p_player_level": string,"p_user_id": string }; Returns: undefined
@@ -249,6 +287,9 @@ isOneToOne: false
 "finalize_due_sessions":
 { Args: Record<PropertyKey, never>; Returns: number
                            },
+"finalize_due_sessions_service":
+{ Args: Record<PropertyKey, never>; Returns: number
+                           },
 "find_club_member_by_student_id":
 { Args: { "p_student_id": string }; Returns: {
               "display_name": string,"is_selected": boolean,"player_level": string,"student_id": string,"user_id": string
@@ -257,6 +298,11 @@ isOneToOne: false
 "find_club_members":
 { Args: { "p_query": string,"p_session_id"?: string }; Returns: {
               "display_name": string,"is_selected": boolean,"is_signed_up": boolean,"player_level": string,"student_id": string,"user_id": string
+            }[]
+                           },
+"get_booking_email_recipients":
+{ Args: { "p_session_ids": (string)[] }; Returns: {
+              "email": string,"session_id": string,"user_id": string
             }[]
                            },
 "get_dashboard_sessions":

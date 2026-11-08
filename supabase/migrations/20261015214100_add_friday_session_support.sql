@@ -103,30 +103,8 @@ $$;
 revoke all on function public.get_dashboard_sessions(date, date) from public, anon, authenticated;
 grant execute on function public.get_dashboard_sessions(date, date) to anon, authenticated;
 
--- 5. Insert the one-off Friday session.
---    Sign-ups open immediately; close (confirmation_at) 30 minutes before 15:00 = 14:30 London.
---    finalize_due_sessions will run at 14:30 and assign players to courts.
-insert into public.sessions (
-  event_date,
-  starts_at,
-  duration_minutes,
-  capacity,
-  signup_opens_at,
-  confirmation_at
-)
-values (
-  '2026-10-16',
-  time '15:00',
-  180,
-  16,
-  '2026-10-15 00:00:00 Europe/London',
-  '2026-10-16 14:30:00 Europe/London'
-)
-on conflict (event_date) do update set
-  starts_at = excluded.starts_at,
-  duration_minutes = excluded.duration_minutes,
-  capacity = excluded.capacity,
-  signup_opens_at = excluded.signup_opens_at,
-  confirmation_at = excluded.confirmation_at;
+-- 5. No one-off session is inserted here. A migration must not create club
+--    data: the Friday template and `ensure_next_week_sessions()` own that, and a
+--    fresh database has to start with an empty `public.sessions` (BC-44).
 
 select private.auto_signup_committee_members(null, true);
