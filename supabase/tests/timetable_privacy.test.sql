@@ -4,10 +4,6 @@ create extension if not exists pgtap with schema extensions;
 
 select plan(8);
 
--- A migration seeds sessions for the current and next club week when it runs,
--- so start from an empty schedule before inserting fixtures.
-delete from public.sessions;
-
 -- Two members: one with a signup and saved friendship, used for the privacy and
 -- invalidation checks.
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)

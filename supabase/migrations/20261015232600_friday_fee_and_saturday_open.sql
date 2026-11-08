@@ -82,5 +82,6 @@ $$;
 revoke all on function public.ensure_next_week_sessions() from public, anon, authenticated;
 grant execute on function public.ensure_next_week_sessions() to anon, authenticated;
 
--- Run ensure_next_week_sessions to generate next week's Friday session (opens on Saturday).
-select public.ensure_next_week_sessions();
+-- Deliberately no call to public.ensure_next_week_sessions() here. Sessions are
+-- created at runtime by the dashboard and by the scheduled job, so applying
+-- migrations to a fresh database must leave public.sessions empty (BC-44).

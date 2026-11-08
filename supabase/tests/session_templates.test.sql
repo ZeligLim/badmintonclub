@@ -2,6 +2,10 @@ begin;
 
 select no_plan();
 
+-- Sessions exist only at runtime now (BC-44), so create the current and next
+-- club week here instead of relying on a migration having done it.
+select public.ensure_next_week_sessions();
+
 -- A committee administrator, a regular member and a committee member.
 insert into auth.users (
   id,

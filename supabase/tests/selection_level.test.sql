@@ -4,8 +4,6 @@ create extension if not exists pgtap with schema extensions;
 
 select plan(3);
 
-delete from public.sessions;
-
 -- Five members with identical attendance history, so freshness cannot settle
 -- the draw and only level (then signup time) can.
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
