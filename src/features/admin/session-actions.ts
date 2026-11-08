@@ -211,3 +211,36 @@ export async function promoteFromWaitlist(
   revalidatePath("/admin");
   revalidatePath("/");
 }
+
+export async function updatePaymentStatus(
+  sessionId: string,
+  userId: string,
+  paymentStatus: "unpaid" | "paid" | "waived",
+): Promise<void> {
+  if (!(await requireAdminUser())) {
+    throw new Error("Only a club administrator can record a payment.");
+  }
+  if (!isUuid(sessionId) || !isUuid(userId)) {
+    throw new Error("The payment request is invalid.");
+  }
+  if (!["unpaid", "paid", "waived"].includes(paymentStatus)) {
+    throw new Error("Choose unpaid, paid or waived.");
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_set_payment_status", {
+    p_session_id: sessionId,
+    p_user_id: userId,
+    p_payment_status: paymentStatus,
+  });
+  if (error) {
+    logError("Could not record a payment.", error);
+    throw new Error(
+      error.message === "That member is not signed up for this session."
+        ? error.message
+        : "Could not record a payment.",
+    );
+  }
+
+  revalidatePath("/admin");
+}

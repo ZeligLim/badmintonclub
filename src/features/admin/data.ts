@@ -19,6 +19,15 @@ import type { PlayerLevel } from "@/types/player";
 import { isClubEmail } from "@/lib/validation";
 import { logError } from "@/lib/log";
 
+export type PaymentStatus = "unpaid" | "paid" | "waived";
+
+export function toPaymentStatus(value: string): PaymentStatus {
+  if (value === "paid" || value === "waived" || value === "unpaid") {
+    return value;
+  }
+  return "unpaid";
+}
+
 export type AdminPlayer = {
   userId: string;
   displayName: string;
@@ -26,6 +35,7 @@ export type AdminPlayer = {
   slotNumber: number | null;
   isCommittee?: boolean;
   playerLevel?: PlayerLevel;
+  paymentStatus: PaymentStatus;
 };
 
 export type AdminCourtGame = {
@@ -42,6 +52,7 @@ export type AdminSession = {
   startsAt: string;
   durationMinutes: number;
   capacity: number;
+  feeCents: number;
   courtCount: number;
   status: string;
   availabilityCanChange: boolean;
@@ -252,7 +263,7 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
   // no longer actionable and should not appear on the admin schedule view.
   const { data: sessions, error: sessionsErr } = await admin
     .from("sessions")
-    .select("id, event_date, starts_at, duration_minutes, capacity, status")
+    .select("id, event_date, starts_at, duration_minutes, capacity, fee_cents, status")
     .in("status", ["open", "confirmed", "cancelled"])
     .gte("event_date", londonNow.date)
     .order("event_date");
@@ -264,7 +275,7 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
 
   const { data: signups, error: signupsErr } = await admin
     .from("session_signups")
-    .select("session_id, user_id, status, slot_number")
+    .select("session_id, user_id, status, slot_number, payment_status")
     .in("session_id", sessionIds)
     .in("status", ["requested", "selected", "waitlisted", "played"]);
 
@@ -334,6 +345,7 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
       slotNumber: s.slot_number,
       isCommittee: profileMap.get(s.user_id)?.isCommittee ?? false,
       playerLevel: profileMap.get(s.user_id)?.playerLevel ?? "INTERMEDIATE",
+      paymentStatus: toPaymentStatus(s.payment_status),
     }));
 
     const courtCount = getCourtCount(session.capacity);
@@ -381,6 +393,7 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
       startsAt: session.starts_at,
       durationMinutes: session.duration_minutes,
       capacity: session.capacity,
+      feeCents: session.fee_cents,
       courtCount,
       status: toSessionStatus(session.status),
       availabilityCanChange:

@@ -131,14 +131,14 @@ isOneToOne: false
                   ]
                 },"session_signups": {
                   Row: {
-                    "confirmation_email_sent_at": string | null,"session_id": string,"signed_up_at": string,"slot_number": number | null,"status": string,"user_id": string
+                    "confirmation_email_sent_at": string | null,"payment_status": string,"session_id": string,"signed_up_at": string,"slot_number": number | null,"status": string,"user_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "confirmation_email_sent_at"?: string | null,"session_id": string,"signed_up_at"?: string,"slot_number"?: number | null,"status"?: string,"user_id": string
+                    "confirmation_email_sent_at"?: string | null,"payment_status"?: string,"session_id": string,"signed_up_at"?: string,"slot_number"?: number | null,"status"?: string,"user_id": string
                   }
                   Update: {
-                    "confirmation_email_sent_at"?: string | null,"session_id"?: string,"signed_up_at"?: string,"slot_number"?: number | null,"status"?: string,"user_id"?: string
+                    "confirmation_email_sent_at"?: string | null,"payment_status"?: string,"session_id"?: string,"signed_up_at"?: string,"slot_number"?: number | null,"status"?: string,"user_id"?: string
                   }
                   Relationships: [
                     {
@@ -247,6 +247,9 @@ isOneToOne: false
                            },
 "admin_set_committee_status":
 { Args: { "p_is_committee": boolean,"p_user_id": string }; Returns: undefined
+                           },
+"admin_set_payment_status":
+{ Args: { "p_payment_status": string,"p_session_id": string,"p_user_id": string }; Returns: undefined
                            },
 "admin_set_professional_choice":
 { Args: { "p_enabled": boolean,"p_user_id": string }; Returns: undefined

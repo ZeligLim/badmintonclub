@@ -1,9 +1,10 @@
 import { isSessionTimetableLocked } from "@/features/sessions/court-schedule";
-import { formatDuration, formatTimeOfDay } from "@/lib/format";
+import { formatDuration, formatFee, formatTimeOfDay } from "@/lib/format";
 import type { AdminSession } from "./data";
 import { SessionAvailabilityToggle } from "./SessionAvailabilityToggle";
 import { RegenerateCourtScheduleButton } from "./RegenerateCourtScheduleButton";
 import { PromoteFromWaitlistButton } from "./PromoteFromWaitlistButton";
+import { PaymentStatusSelect } from "./PaymentStatusSelect";
 import { RepairTimetableForm } from "./RepairTimetableForm";
 
 export function CourtScheduleTable({ session }: { session: AdminSession }) {
@@ -12,6 +13,10 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
   );
   const waitlistedPlayers = session.players.filter((p) => p.status === "waitlisted");
   const requestedPlayers = session.players.filter((p) => p.status === "requested");
+
+  const paidCount = selectedPlayers.filter(
+    (player) => player.paymentStatus === "paid",
+  ).length;
 
   const statusBadge =
     session.status === "confirmed"
@@ -175,6 +180,19 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
         )}
       </div>
 
+      {session.feeCents > 0 && selectedPlayers.length > 0 && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">
+            {formatFee(session.feeCents * paidCount)}
+          </span>{" "}
+          collected of {formatFee(session.feeCents * selectedPlayers.length)}{" "}
+          expected
+          {selectedPlayers.length - paidCount > 0
+            ? ` · ${selectedPlayers.length - paidCount} outstanding`
+            : " · all settled"}
+        </p>
+      )}
+
       {/* Roster detail */}
       {session.players.length > 0 && (
         <details className="mt-4">
@@ -190,6 +208,9 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
                   </th>
                   <th className="px-4 py-2 text-left font-medium text-muted-foreground">
                     Status
+                  </th>
+                  <th className="px-4 py-2 text-left font-medium text-muted-foreground">
+                    Payment
                   </th>
                 </tr>
               </thead>
@@ -218,6 +239,19 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
                           </span>
                         ) : (
                           player.status
+                        )}
+                      </td>
+                      <td className="px-4 py-2">
+                        {session.feeCents > 0 &&
+                        (player.status === "selected" || player.status === "played") ? (
+                          <PaymentStatusSelect
+                            displayName={player.displayName}
+                            paymentStatus={player.paymentStatus}
+                            sessionId={session.id}
+                            userId={player.userId}
+                          />
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
                         )}
                       </td>
                     </tr>
