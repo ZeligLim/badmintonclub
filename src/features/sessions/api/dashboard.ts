@@ -25,7 +25,7 @@ import {
   readPersistedTimetables,
 } from "@/features/sessions/api/timetable";
 import { isClubEmail } from "@/lib/validation";
-import { logError } from "@/lib/log";
+import { logError, logWarning } from "@/lib/log";
 
 type DashboardSessionRow =
   Database["public"]["Functions"]["get_dashboard_sessions"]["Returns"][number];
@@ -165,6 +165,25 @@ export async function loadDashboardData(): Promise<DashboardData> {
     }
   }
 
+  const sessions: ClubSession[] = [];
+  for (const row of sessionRows) {
+    try {
+      sessions.push(
+        mapSession(
+          row,
+          rosterRows,
+          friendCandidates.get(row.id) ?? [],
+          userPlayerGameSchedules.get(row.id) ?? [],
+        ),
+      );
+    } catch (error) {
+      // One malformed row must not take the whole club night off the screen.
+      logError("Skipped a session with unexpected data.", error, {
+        sessionId: row.id,
+      });
+    }
+  }
+
   return {
     mode: "live",
     serverNow: await getClubNow(supabase),
@@ -183,14 +202,7 @@ export async function loadDashboardData(): Promise<DashboardData> {
           friendList,
         }
       : null,
-    sessions: sessionRows.map((row) =>
-      mapSession(
-        row,
-        rosterRows,
-        friendCandidates.get(row.id) ?? [],
-        userPlayerGameSchedules.get(row.id) ?? [],
-      ),
-    ),
+    sessions,
     nextScheduleChangeAt: window.next_change_at,
   };
 }
@@ -319,8 +331,12 @@ function mapSession(
   friendCandidates: FriendCandidate[],
   playerGameSchedule: import("../types").PlayerGame[] = [],
 ): ClubSession {
-  const dayName = getDayName(row.day_name);
+  const dayName = getDayName(row.day_name, row.event_date);
   const status = getSessionStatus(row.status);
+  const needsAttention =
+    !CLUB_SESSION_DAYS.includes(row.day_name as ClubSessionDay) ||
+    !["open", "confirmed", "closed", "cancelled"].includes(row.status) ||
+    !["lottery", "fcfs"].includes(row.allocation_mode);
   const sessionRoster = rosterRows.filter((player) => player.session_id === row.id);
   const timeSlots =
     status === "confirmed"
@@ -364,6 +380,7 @@ function mapSession(
     friendCandidates,
     timeSlots,
     playerGameSchedule,
+    needsAttention,
   };
 }
 
@@ -378,7 +395,10 @@ function mapFriendCandidate(row: FriendCandidateRow): FriendCandidate {
   };
 }
 
-function parsePlayerLevel(playerLevel: string): FriendCandidate["playerLevel"] {
+function parsePlayerLevel(
+  playerLevel: string,
+  context?: { userId?: string },
+): FriendCandidate["playerLevel"] {
   if (
     playerLevel === "BEGINNER" ||
     playerLevel === "INTERMEDIATE" ||
@@ -387,15 +407,33 @@ function parsePlayerLevel(playerLevel: string): FriendCandidate["playerLevel"] {
     return playerLevel;
   }
 
-  throw new Error("A club member has an unsupported player level.");
+  // A value written by a newer build (or a hand-edited row) must not take the
+  // whole dashboard down; treat it as the club default and say so in the log.
+  logWarning("A club member has an unsupported player level.", {
+    playerLevel,
+    ...context,
+  });
+  return "INTERMEDIATE";
 }
 
-function getDayName(value: string): ClubSessionDay {
+function getDayName(value: string, eventDate: string): ClubSessionDay {
   if (CLUB_SESSION_DAYS.includes(value as ClubSessionDay)) {
     return value as ClubSessionDay;
   }
 
-  throw new Error("The session schedule returned an unsupported weekday.");
+  // Fall back to the date the row already carries rather than dropping the
+  // session from the page.
+  const derived = new Intl.DateTimeFormat("en-GB", {
+    weekday: "long",
+    timeZone: "Europe/London",
+  }).format(new Date(`${eventDate}T12:00:00Z`));
+  logWarning("The session schedule returned an unsupported weekday.", {
+    value,
+    eventDate,
+  });
+  return CLUB_SESSION_DAYS.includes(derived as ClubSessionDay)
+    ? (derived as ClubSessionDay)
+    : "Monday";
 }
 
 function getAllocationMode(value: string): SessionAllocationMode {
@@ -403,7 +441,10 @@ function getAllocationMode(value: string): SessionAllocationMode {
     return value;
   }
 
-  throw new Error("The session schedule returned an unsupported allocation mode.");
+  logWarning("The session schedule returned an unsupported allocation mode.", {
+    value,
+  });
+  return "lottery";
 }
 
 function getSessionStatus(value: string): SessionStatus {
@@ -416,7 +457,9 @@ function getSessionStatus(value: string): SessionStatus {
     return value;
   }
 
-  throw new Error("The session schedule returned an unsupported status.");
+  // Closed is the safe default: it renders and blocks sign-ups.
+  logWarning("The session schedule returned an unsupported status.", { value });
+  return "closed";
 }
 
 function getSignupStatus(
@@ -434,5 +477,6 @@ function getSignupStatus(
     return value;
   }
 
-  throw new Error("Your session signup returned an unsupported status.");
+  logWarning("A session signup returned an unsupported status.", { value });
+  return null;
 }

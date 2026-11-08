@@ -62,6 +62,11 @@ export type ClubSession = {
   friendCandidates: FriendCandidate[];
   timeSlots: SessionTimeSlot[];
   playerGameSchedule?: PlayerGame[];
+  /**
+   * Set when the database returned a value this build does not understand.
+   * The session still renders, with a warning badge, instead of 500ing the page.
+   */
+  needsAttention?: boolean;
 };
 
 export type DemoSignupCounts = Partial<Record<ClubSessionDay, number>>;
