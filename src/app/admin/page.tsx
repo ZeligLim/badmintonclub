@@ -7,6 +7,7 @@ import {
   CourtScheduleTable,
   loadAdminAccountCount,
   loadAdminData,
+  loadAdminAuditLog,
   loadClubPlayers,
   loadSessionTemplates,
   requireAdminUser,
@@ -19,12 +20,14 @@ export default async function AdminPage() {
   const user = await requireAdminUser();
   if (!user) redirect("/sign-in");
 
-  const [sessions, players, accountCount, templates] = await Promise.all([
-    loadAdminData(),
-    loadClubPlayers(),
-    loadAdminAccountCount(),
-    loadSessionTemplates(),
-  ]);
+  const [sessions, players, accountCount, templates, auditLog] =
+    await Promise.all([
+      loadAdminData(),
+      loadClubPlayers(),
+      loadAdminAccountCount(),
+      loadSessionTemplates(),
+      loadAdminAuditLog(),
+    ]);
 
   return (
     <main className="min-h-screen bg-background px-4 pb-16 pt-6 sm:px-8">
@@ -62,7 +65,7 @@ export default async function AdminPage() {
         </div>
 
         <div className="mt-16">
-          <ClubPlayerAccessTable players={players} />
+          <ClubPlayerAccessTable auditLog={auditLog} players={players} />
         </div>
       </div>
     </main>

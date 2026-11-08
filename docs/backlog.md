@@ -185,11 +185,18 @@ each run — there is no per-recipient "already emailed" record. Failures log on
 `session_timetables` instead of recomputed per recipient, `:244-262`), so the
 per-recipient panel is cheap when a timetable exists, but a confirmed session
 without one still re-allocates per recipient and re-persists it per recipient.
-**Fix** Batch Mailjet sends, add a
-`booking_emails(session_id, user_id, sent_at)` table (or a `confirmation_email_sent_at`
-column) and send only rows that are null.
+**Fix** Shipped in `5058439`: `session_signups.confirmation_email_sent_at` records
+the receipt, `public.get_booking_email_recipients(uuid[])` returns only the rows
+without one (one auth join instead of a `getUserById` per recipient), the run builds
+every email and makes a single `sendMailjetEmails` call, and each accepted address is
+stamped. Partial acceptance and per-recipient failures are logged with the session,
+user and error message.
 **Done when** re-running finalization for an already-confirmed session sends zero
 emails and one run for 40 players makes one allocation and one batched send.
+**Done** — `supabase/tests/booking_email_recipients.test.sql` covers "only members
+without a receipt are returned" and the service-role-only grant; the batching is
+what `sendSelectedBookingConfirmationEmails` now does, one `sendMailjetEmails` call
+per run.
 
 ### BC-13 · P1 · S — README promises behaviour the code does not have
 **Problem** Two claims in `README.md` are still false. It says members can cancel

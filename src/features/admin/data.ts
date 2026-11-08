@@ -56,7 +56,16 @@ export type AdminClubPlayer = {
   displayName: string;
   playerLevel: PlayerLevel;
   isCommittee: boolean;
+  isCommitteeAdmin: boolean;
   canChooseProfessional: boolean;
+};
+
+export type AdminAuditEntry = {
+  id: number;
+  actorName: string;
+  targetName: string;
+  action: string;
+  createdAt: string;
 };
 
 export type AdminSessionTemplate = {
@@ -132,7 +141,55 @@ export async function loadClubPlayers(): Promise<AdminClubPlayer[]> {
     displayName: player.display_name,
     playerLevel: parsePlayerLevel(player.player_level),
     isCommittee: player.is_committee,
+    isCommitteeAdmin: player.is_committee_admin,
     canChooseProfessional: player.can_choose_professional,
+  }));
+}
+
+export async function loadAdminAuditLog(): Promise<AdminAuditEntry[]> {
+  if (!(await requireAdminUser())) {
+    throw new Error("Only a club administrator can read the audit log.");
+  }
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("admin_audit_log")
+    .select("id, actor_id, target_user_id, action, created_at")
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  if (error) {
+    logError("Could not load the admin audit log.", error);
+    throw new Error("Could not load the admin audit log.");
+  }
+
+  const userIds = [
+    ...new Set(
+      (data ?? []).flatMap((row) => [row.actor_id, row.target_user_id]),
+    ),
+  ].filter((id): id is string => typeof id === "string");
+
+  const names = new Map<string, string>();
+  if (userIds.length > 0) {
+    const { data: profiles, error: profilesError } = await supabase
+      .from("profiles")
+      .select("id, display_name")
+      .in("id", userIds);
+    if (profilesError) {
+      logError("Could not load the names for the admin audit log.", profilesError);
+    }
+    for (const profile of profiles ?? []) {
+      names.set(profile.id, profile.display_name);
+    }
+  }
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    actorName: (row.actor_id && names.get(row.actor_id)) || "Former administrator",
+    targetName:
+      (row.target_user_id && names.get(row.target_user_id)) || "Former member",
+    action: row.action,
+    createdAt: row.created_at,
   }));
 }
 

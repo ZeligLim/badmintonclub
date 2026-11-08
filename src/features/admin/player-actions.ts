@@ -63,3 +63,33 @@ export async function updateProfessionalChoice(
   revalidatePath("/admin");
   revalidatePath("/");
 }
+
+export async function updateCommitteeAdminStatus(
+  userId: string,
+  isAdmin: boolean,
+): Promise<void> {
+  if (!(await requireAdminUser())) {
+    throw new Error("Only a club administrator can manage administrator access.");
+  }
+  if (!isUuid(userId) || typeof isAdmin !== "boolean") {
+    throw new Error("The administrator access request is invalid.");
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_set_committee_admin", {
+    p_user_id: userId,
+    p_is_admin: isAdmin,
+  });
+  if (error) {
+    logError("Could not update administrator access.", error);
+    throw new Error(
+      error.message ===
+        "There must always be at least one committee administrator."
+        ? "There must always be at least one committee administrator."
+        : "Could not update administrator access.",
+    );
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/");
+}

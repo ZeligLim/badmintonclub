@@ -23,7 +23,33 @@ export type Database = {
           }
         },"public": {
           Tables: {
-            "club_friend_list": {
+            "admin_audit_log": {
+                  Row: {
+                    "action": string,"actor_id": string | null,"created_at": string,"id": number,"target_user_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "action": string,"actor_id"?: string | null,"created_at"?: string,"id"?: never,"target_user_id"?: string | null
+                  }
+                  Update: {
+                    "action"?: string,"actor_id"?: string | null,"created_at"?: string,"id"?: never,"target_user_id"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "admin_audit_log_actor_id_fkey"
+      columns: ["actor_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "admin_audit_log_target_user_id_fkey"
+      columns: ["target_user_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"club_friend_list": {
                   Row: {
                     "created_at": string,"friend_user_id": string,"user_id": string
                   }
@@ -200,7 +226,7 @@ isOneToOne: false
                            },
 "admin_list_club_players":
 { Args: Record<PropertyKey, never>; Returns: {
-              "can_choose_professional": boolean,"display_name": string,"is_committee": boolean,"player_level": string,"user_id": string
+              "can_choose_professional": boolean,"display_name": string,"is_committee": boolean,"is_committee_admin": boolean,"player_level": string,"user_id": string
             }[]
                            },
 "admin_list_session_templates":
@@ -212,6 +238,9 @@ isOneToOne: false
 { Args: Record<PropertyKey, never>; Returns: {
               "created_count": number,"removed_count": number,"updated_count": number
             }[]
+                           },
+"admin_set_committee_admin":
+{ Args: { "p_is_admin": boolean,"p_user_id": string }; Returns: undefined
                            },
 "admin_set_committee_status":
 { Args: { "p_is_committee": boolean,"p_user_id": string }; Returns: undefined

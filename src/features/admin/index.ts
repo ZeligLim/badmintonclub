@@ -1,5 +1,6 @@
 export { ClubPlayerAccessTable } from "./ClubPlayerAccessTable";
 export {
+  loadAdminAuditLog,
   loadAdminData,
   loadAdminAccountCount,
   loadClubPlayers,
@@ -7,12 +8,14 @@ export {
   requireAdminUser,
 } from "./data";
 export type {
+  AdminAuditEntry,
   AdminClubPlayer,
   AdminSession,
   AdminSessionTemplate,
 } from "./data";
 export {
   updateClubCommitteeStatus,
+  updateCommitteeAdminStatus,
   updateProfessionalChoice,
 } from "./player-actions";
 export { updateSessionAvailability } from "./session-actions";
