@@ -8,6 +8,10 @@ function unreachableSupabaseMessage(url: string): string {
   return `Could not refresh your sign-in: Supabase is not reachable at ${url}. Start the local Supabase stack (Docker must be running, then \`npm run db:start\`) and restart \`npm run dev\`.`;
 }
 
+function isAdminPath(pathname: string): boolean {
+  return pathname === "/admin" || pathname.startsWith("/admin/");
+}
+
 function isNetworkFailure(error: unknown): boolean {
   const name = error instanceof Error ? error.name : "";
   const message = error instanceof Error ? error.message : String(error);
@@ -106,6 +110,15 @@ export async function proxy(request: NextRequest) {
       logError("Could not refresh your sign-in.", error);
       throw new Error("Could not refresh your sign-in.");
     }
+  }
+
+  // Redirect unknown visitors before the admin page starts streaming its shell:
+  // a page-level redirect arrives after the first byte, so the browser sees a 200.
+  if (!claimsResult.data?.claims && isAdminPath(request.nextUrl.pathname)) {
+    const signInUrl = request.nextUrl.clone();
+    signInUrl.pathname = "/sign-in";
+    signInUrl.search = "";
+    return NextResponse.redirect(signInUrl);
   }
 
   return response;
