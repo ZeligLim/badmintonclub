@@ -245,6 +245,18 @@ the committee has no list of who owes it.
 toggle and a per-session total. Stripe can come later; the ledger cannot.
 **Done when** the admin page shows collected vs expected for a paid session.
 
+### BC-48 · P2 · S — A released timetable from an older allocator is served silently
+**Problem** The member dashboard served any shape-valid persisted row
+(`src/features/sessions/api/dashboard.ts`), so a schedule built by an older
+`COURT_ALLOCATION_VERSION` looked current — and once locked it could not be
+refreshed.
+**Fix** Shipped with `cdd0026`: the dashboard compares the saved row with
+`isCurrentPersistedCourtSchedule`, and when the session is already locked it sets
+`ClubSession.timetableOutdated`; `SessionCard` shows an amber note pointing the
+community at the admin repair tool.
+**Done when** an outdated released timetable is visible as outdated instead of
+being presented as current.
+
 ---
 
 ## P2 — missing product
@@ -380,12 +392,15 @@ timetable saved from a stale preview — which happens whenever the backfill in
 time, since that delete is itself gated on `now() < … - interval '30 minutes'` —
 can never be corrected from the app once the session is locked, only with
 service-role SQL.
-**Fix** Add an explicit, audited "repair published timetable" action for committee
-admins (confirmed re-allocation, recorded in `generated_by`, warned as
-member-visible), and a read-side check that flags a row whose
-`allocationVersion` is older than the current one.
+**Fix** Shipped in `cdd0026`: the freeze trigger honours a transaction-local
+`badminton.allow_locked_timetable_write` flag that only `admin_swap_session_player`
+sets, so a released timetable can be edited from `/admin` (pick out, pick in, why),
+`generated_by` records the administrator and `admin_audit_log` records `was_locked`
+plus the reason. Ordinary clients are still frozen.
 **Done when** a committee admin can rebuild a released timetable from the final
 roster without SQL, and the change is attributable.
+**Remaining** the read-side check that flags a saved row whose `allocationVersion`
+is older than `COURT_ALLOCATION_VERSION` — shipped as **BC-48** below.
 
 ### BC-40 · P1 · S — The selection draw ignores playing level
 **Problem** `fa83bb2` implemented level compatibility inside the allocator, but the

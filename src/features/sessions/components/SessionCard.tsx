@@ -131,6 +131,12 @@ export function SessionCard({
                 committee member to check it.
               </p>
             ) : null}
+            {session.timetableOutdated ? (
+              <p className="rounded-md bg-amber-100 px-2 py-1 text-xs font-medium text-amber-900">
+                This released timetable was built by an older version of the app. A
+                committee member can repair it from the admin page.
+              </p>
+            ) : null}
             <h3 className="text-lg font-medium tracking-tight">
               {formatTimeOfDay(session.startsAt)}
               <span className="ml-2 text-sm font-normal text-muted-foreground">

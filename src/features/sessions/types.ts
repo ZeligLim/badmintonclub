@@ -67,6 +67,8 @@ export type ClubSession = {
    * The session still renders, with a warning badge, instead of 500ing the page.
    */
   needsAttention?: boolean;
+  /** A released timetable was built by an older allocator and needs a repair. */
+  timetableOutdated?: boolean;
 };
 
 export type DemoSignupCounts = Partial<Record<ClubSessionDay, number>>;

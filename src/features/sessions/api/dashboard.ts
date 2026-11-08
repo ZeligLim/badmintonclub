@@ -19,6 +19,8 @@ import type {
 import {
   getCourtCount,
   getPlayerGamesFromCourtSchedule,
+  isCurrentPersistedCourtSchedule,
+  isSessionTimetableLocked,
 } from "../court-schedule";
 import {
   ensureSessionTimetable,
@@ -114,6 +116,7 @@ export async function loadDashboardData(): Promise<DashboardData> {
     : [];
 
   const userPlayerGameSchedules = new Map<string, import("../types").PlayerGame[]>();
+  const outdatedTimetimeables = new Set<string>();
   if (user) {
     try {
       const confirmedSessionIds = sessionRows
@@ -159,6 +162,20 @@ export async function loadDashboardData(): Promise<DashboardData> {
           sessionRow.id,
           getPlayerGamesFromCourtSchedule(timetable, user.id),
         );
+
+        const persisted = timetableBySession.get(sessionRow.id);
+        if (
+          persisted &&
+          isSessionTimetableLocked({
+            eventDate: sessionRow.event_date,
+            startsAt: sessionRow.starts_at,
+          }) &&
+          !isCurrentPersistedCourtSchedule(persisted)
+        ) {
+          // A released timetable built by an older allocator cannot be refreshed
+          // automatically; flag it so the committee can repair it by hand.
+          outdatedTimetimeables.add(sessionRow.id);
+        }
       }
     } catch (error) {
       logError("Could not build personalized game schedule.", error);
@@ -174,6 +191,7 @@ export async function loadDashboardData(): Promise<DashboardData> {
           rosterRows,
           friendCandidates.get(row.id) ?? [],
           userPlayerGameSchedules.get(row.id) ?? [],
+          outdatedTimetimeables.has(row.id),
         ),
       );
     } catch (error) {
@@ -330,6 +348,7 @@ function mapSession(
   rosterRows: RosterRow[],
   friendCandidates: FriendCandidate[],
   playerGameSchedule: import("../types").PlayerGame[] = [],
+  timetableOutdated = false,
 ): ClubSession {
   const dayName = getDayName(row.day_name, row.event_date);
   const status = getSessionStatus(row.status);
@@ -381,6 +400,7 @@ function mapSession(
     timeSlots,
     playerGameSchedule,
     needsAttention,
+    timetableOutdated,
   };
 }
 
