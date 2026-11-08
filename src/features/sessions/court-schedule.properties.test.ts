@@ -128,4 +128,25 @@ describe("allocation latency", () => {
     // budget leaves room for a slow shared runner without hiding a regression.
     expect(elapsed).toBeLessThan(5000);
   });
+
+  it("keeps the 95th percentile inside the budget across repeated runs", () => {
+    const roster = makeRoster(40);
+    const session = makeSession({
+      id: "latency-p95",
+      durationMinutes: 120,
+      courtCount: 4,
+    });
+
+    const samples: number[] = [];
+    for (let run = 0; run < 10; run += 1) {
+      const startedAt = performance.now();
+      allocateCourtSchedule(session, roster, { seed: `run-${run}` });
+      samples.push(performance.now() - startedAt);
+    }
+
+    samples.sort((a, b) => a - b);
+    const p95 = samples[Math.min(samples.length - 1, Math.ceil(0.95 * samples.length) - 1)];
+
+    expect(p95).toBeLessThan(4000);
+  }, 30_000);
 });

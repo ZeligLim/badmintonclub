@@ -241,9 +241,15 @@ and an audit entry per change.
 **Problem** `fee_cents` is displayed ("Pay on arrival") but nothing records payment:
 no paid/unpaid state, no method, no reconciliation. The Friday session charges €3 and
 the committee has no list of who owes it.
-**Fix** Add `session_signups.payment_status` (`unpaid | paid | waived`) plus an admin
-toggle and a per-session total. Stripe can come later; the ledger cannot.
+**Fix** Shipped in `64fb4db`: `session_signups.payment_status`
+(`unpaid | paid | waived`) with a check constraint, `admin_set_payment_status`
+(administrator only, audited with the previous and new state), a Payment column on
+each confirmed roster row, and a per-session "collected of expected · N outstanding"
+line. Stripe can come later; the ledger exists now.
 **Done when** the admin page shows collected vs expected for a paid session.
+**Done** — `supabase/tests/session_payments.test.sql` (6 assertions) covers the
+unpaid default, a member being refused, the administrator update, an unknown state
+being rejected and the audit entry.
 
 ### BC-48 · P2 · S — A released timetable from an older allocator is served silently
 **Problem** The member dashboard served any shape-valid persisted row
