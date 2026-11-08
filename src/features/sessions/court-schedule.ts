@@ -1,11 +1,5 @@
-import { addMinutesToTime, londonDateTime } from "@/lib/sessions/schedule";
+import { londonDateTime } from "@/lib/sessions/schedule";
 import type { ClubSession } from "./types";
-import {
-  compareLevelRank,
-  levelSpreadWithin,
-  levelValue,
-} from "./court-schedule.levels";
-import type { PlayerLevel } from "./court-schedule.levels";
 
 import {
   CAPACITY_PER_COURT,
@@ -15,7 +9,6 @@ import {
   GAME_DURATION_MINUTES,
   type AllocatedCourtGame,
   type CourtRosterPlayer,
-  type InternalPlayer,
   type PlayerGame,
 } from "./court-schedule.shared";
 import { allocateOnce } from "./court-schedule.candidates";

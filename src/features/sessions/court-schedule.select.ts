@@ -9,15 +9,13 @@ import {
   compareGameFairnessPriority,
   comparePlayerIds,
   countFriendEdgesBetween,
-  hashText,
-  incrementPairCount,
   shuffle,
   toRosterPlayer,
   type InternalPlayer,
   type ScheduleTrackingState,
   type CourtRosterPlayer,
 } from "./court-schedule.shared";
-import { compareLevelRank, levelSpreadWithin, levelValue } from "./court-schedule.levels";
+import { levelSpreadWithin, levelValue } from "./court-schedule.levels";
 
 export type AnchorCycle = {
   eligibleAnchorIds: Set<string>;

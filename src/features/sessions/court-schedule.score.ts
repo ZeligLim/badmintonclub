@@ -4,15 +4,10 @@
 import type { ClubSession } from "./types";
 import {
   GAME_DURATION_MINUTES,
-  compareGameFairness,
-  type CourtRosterPlayer,
-  compareGameFairnessPriority,
-  countFriendEdgesBetween,
   type AllocatedCourtGame,
-  type InternalPlayer,
-  type ScheduleTrackingState,
+  type CourtRosterPlayer,
 } from "./court-schedule.shared";
-import { compareLevelRank, levelSpreadWithin } from "./court-schedule.levels";
+import { levelSpreadWithin } from "./court-schedule.levels";
 import { getCourtSizes } from "./court-schedule.validate";
 
 export function compareScore(a: number[], b: number[]): number {

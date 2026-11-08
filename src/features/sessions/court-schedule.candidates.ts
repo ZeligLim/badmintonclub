@@ -5,13 +5,10 @@
 import {
   GAME_DURATION_MINUTES,
   PLAYERS_PER_COURT,
-  compareGameFairness,
-  compareGameFairnessPriority,
   comparePlayerIds,
   createDeterministicRng,
   hashText,
   incrementPairCount,
-  shuffle,
   toRosterPlayer,
   type AllocatedCourtGame,
   type CourtRosterPlayer,
@@ -23,12 +20,9 @@ import { addMinutesToTime } from "@/lib/sessions/schedule";
 import type { AnchorCycle } from "./court-schedule.select";
 import {
   buildCourtGroup,
-  getNextAnchor,
   optimizeDoublesMatchup,
-  resetAnchorCycleIfComplete,
   selectActivePlayers,
 } from "./court-schedule.select";
-import { compareScore, scoreAllocation } from "./court-schedule.score";
 import { getCourtSizes, validateSchedule } from "./court-schedule.validate";
 
 export function allocateOnce(
