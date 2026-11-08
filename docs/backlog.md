@@ -432,13 +432,18 @@ hit the silent `continue` at
 Friday template could produce a session. Every Monday/Wednesday row in
 production predates the template migration; once the current window is used up,
 the dashboard will show no evening sessions and nothing will log a warning.
-**Fix** Shipped in `1aa50e4`: `20261108140000_fix_template_signup_windows.sql`
-opens sign-ups on the Thursday before the club week (`signup_opens_lead_days = 4`)
-for those two templates. Still needed: reject a template whose window cannot open
-(sign-up opening at or after confirmation) in `save_session_template` instead of
-skipping it at generation time, and log a warning when a template is skipped.
+**Fix** Shipped: `20261108140000_fix_template_signup_windows.sql` opens sign-ups
+on the Thursday before the club week (`signup_opens_lead_days = 4`) for the
+Monday and Wednesday templates, and
+`20261108141000_reject_impossible_template_windows.sql` adds a check constraint
+(backstop, `not valid` so existing rows are untouched) plus a before-trigger that
+raises `Sign-ups must open before they close.` when an admin saves an impossible
+window. `session_templates.test.sql` asserts both the shipped defaults and the
+rejection.
 **Done when** a template with an impossible window is rejected when saved, and a
 fresh database generates every active template's session for two weeks ahead.
+**Done** — verified by `npx supabase db reset --local` (empty `sessions`) followed
+by `npx supabase test db --local` (13 files, 327 tests, PASS).
 
 ### BC-45 · P2 · S — Anonymous `/admin` answers 200 with a shell before redirecting
 **Problem** With the local stack running (`npm run dev`, `curl -s -o /dev/null -w '%{http_code}'

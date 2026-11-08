@@ -249,6 +249,9 @@ isOneToOne: false
 "finalize_due_sessions":
 { Args: Record<PropertyKey, never>; Returns: number
                            },
+"finalize_due_sessions_service":
+{ Args: Record<PropertyKey, never>; Returns: number
+                           },
 "find_club_member_by_student_id":
 { Args: { "p_student_id": string }; Returns: {
               "display_name": string,"is_selected": boolean,"player_level": string,"student_id": string,"user_id": string

@@ -28,6 +28,7 @@ const BOOKING_CONFIRMATION_SENDER_NAME = "ATU Badminton Club";
 
 export async function finalizeDueSessionsAndEmail(
   supabase: SupabaseServerClient,
+  options: { readonly asService?: boolean } = {},
 ): Promise<number> {
   const { data: dueSessions, error: dueSessionsError } = await supabase
     .from("sessions")
@@ -41,7 +42,9 @@ export async function finalizeDueSessionsAndEmail(
   }
 
   const { data: finalizedCount, error: finalizeError } = await supabase.rpc(
-    "finalize_due_sessions",
+    options.asService
+      ? "finalize_due_sessions_service"
+      : "finalize_due_sessions",
   );
   if (finalizeError) {
     logError("Could not finalize due sessions.", finalizeError);
