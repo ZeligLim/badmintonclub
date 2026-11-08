@@ -107,6 +107,9 @@ async function sendBookingConfirmationEmailToRecipient(
     if (!sent) {
       throw new Error("Mailjet did not accept the booking confirmation email.");
     }
+    await markBookingEmailsSent([
+      { sessionId: recipient.sessionId, userId: recipient.userId },
+    ]);
   } catch (error) {
     logError("Booking confirmation email failed.", {
       stage: failureStage,
@@ -122,41 +125,111 @@ async function sendSelectedBookingConfirmationEmails(
   if (sessionIds.length === 0) return;
 
   const admin = createAdminClient();
-  const { data: signups, error } = await admin
-    .from("session_signups")
-    .select("session_id, user_id")
-    .eq("status", "selected")
-    .in("session_id", sessionIds);
+  const { data: recipients, error } = await admin.rpc(
+    "get_booking_email_recipients",
+    { p_session_ids: sessionIds },
+  );
 
   if (error) {
-    logError("Could not load newly confirmed bookings for email.", {
-      code: error.code,
+    logError(
+      "Could not load the members waiting for a booking confirmation email.",
+      { code: error.code, message: error.message },
+    );
+    return;
+  }
+  if (!recipients || recipients.length === 0) return;
+
+  // Build every email first so the whole run makes one Mailjet request and at
+  // most one allocation per session (the first recipient persists the timetable).
+  const prepared = await Promise.all(
+    recipients.map(async (recipient) => {
+      try {
+        const email = await createBookingConfirmationEmail(supabase, {
+          sessionId: recipient.session_id,
+          userId: recipient.user_id,
+          emailAddress: recipient.email,
+        });
+        return { recipient, email };
+      } catch (error) {
+        logError("Booking confirmation email failed.", {
+          stage: "booking-details",
+          sessionId: recipient.session_id,
+          userId: recipient.user_id,
+          errorName: error instanceof Error ? error.name : "UnknownError",
+          errorMessage: error instanceof Error ? error.message : null,
+        });
+        return null;
+      }
+    }),
+  );
+
+  const deliverable = prepared.flatMap((entry) => (entry === null ? [] : [entry]));
+  if (deliverable.length === 0) return;
+
+  let accepted: boolean[];
+  try {
+    accepted = await sendMailjetEmails(
+      getMailjetConfig(),
+      deliverable.map((entry) => entry.email),
+    );
+  } catch (error) {
+    logError("Booking confirmation emails failed.", {
+      stage: "mailjet-send",
+      recipientCount: deliverable.length,
+      errorName: error instanceof Error ? error.name : "UnknownError",
+      errorMessage: error instanceof Error ? error.message : null,
     });
     return;
   }
 
-  await Promise.all(
-    (signups ?? []).map(async (signup) => {
-      const { data, error: userError } = await admin.auth.admin.getUserById(
-        signup.user_id,
-      );
-      if (userError || !data.user?.email) {
-        logError("Could not load a selected booking email recipient.", {
-          userId: signup.user_id,
-        });
-        return;
-      }
+  const sent = deliverable.filter((_, index) => accepted[index]);
+  if (sent.length < deliverable.length) {
+    logError("Mailjet accepted only some booking confirmation emails.", {
+      stage: "mailjet-send",
+      requested: deliverable.length,
+      accepted: sent.length,
+    });
+  }
 
-      await sendBookingConfirmationEmailToRecipient(
-        supabase,
-        {
-          sessionId: signup.session_id,
-          userId: signup.user_id,
-          emailAddress: data.user.email,
-        },
-      );
-    }),
+  await markBookingEmailsSent(
+    sent.map((entry) => ({
+      sessionId: entry.recipient.session_id,
+      userId: entry.recipient.user_id,
+    })),
   );
+}
+
+/**
+ * Records the receipts so a repeat finalization does not email anybody twice.
+ * One update per session keeps the round trips down.
+ */
+async function markBookingEmailsSent(
+  entries: Array<{ sessionId: string; userId: string }>,
+): Promise<void> {
+  if (entries.length === 0) return;
+
+  const admin = createAdminClient();
+  const bySession = new Map<string, string[]>();
+  for (const entry of entries) {
+    const userIds = bySession.get(entry.sessionId) ?? [];
+    userIds.push(entry.userId);
+    bySession.set(entry.sessionId, userIds);
+  }
+
+  for (const [sessionId, userIds] of bySession) {
+    const { error } = await admin
+      .from("session_signups")
+      .update({ confirmation_email_sent_at: new Date().toISOString() })
+      .eq("session_id", sessionId)
+      .in("user_id", userIds);
+    if (error) {
+      logError("Could not record a sent booking confirmation email.", {
+        sessionId,
+        code: error.code,
+        message: error.message,
+      });
+    }
+  }
 }
 
 async function createBookingConfirmationEmail(

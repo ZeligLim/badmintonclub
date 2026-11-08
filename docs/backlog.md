@@ -115,9 +115,18 @@ signup row reflects the cancellation.
 (`src/features/sessions/components/SessionsDashboard.tsx:175-213`) gated on the
 browser clock. No member online at the deadline means no confirmation, no timetable
 and no email until the next visit; a wrong device clock runs it early or late.
-**Fix** Run `finalize_due_sessions` server-side on a timer: `pg_cron` in Supabase, or
-a Vercel cron hitting an authenticated route. Keep the client call as a fallback.
+**Fix** Shipped in `f6126cc`: `public.finalize_due_sessions_service()` lets the
+service role run `private.finalize_due_sessions()` without a user session
+(`20261108150000_service_finalize_sessions.sql`), and `/api/cron/finalize` calls it
+behind a `CRON_SECRET` bearer check, with `vercel.json` scheduling one run a day.
+The dashboard's client call stays as the fallback for the deadlines between runs.
+`supabase/tests/service_finalize.test.sql` proves a due session confirms with no
+browser attached.
 **Done when** a session is confirmed without any browser being open.
+**Caveats** Hobby plans only run a cron once a day, so a first-come-first-served
+session that closes at 14:30 still depends on somebody opening the app (or on
+pg_cron, the upgrade path); and `CRON_SECRET` has to be set in Vercel before the
+route does anything but return 401.
 
 ### BC-08 · P1 · S — Full timetables are readable by anonymous users
 **Problem** `public.session_timetables` is granted `SELECT` to `anon`

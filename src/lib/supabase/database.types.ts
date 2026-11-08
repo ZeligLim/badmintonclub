@@ -105,14 +105,14 @@ isOneToOne: false
                   ]
                 },"session_signups": {
                   Row: {
-                    "session_id": string,"signed_up_at": string,"slot_number": number | null,"status": string,"user_id": string
+                    "confirmation_email_sent_at": string | null,"session_id": string,"signed_up_at": string,"slot_number": number | null,"status": string,"user_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "session_id": string,"signed_up_at"?: string,"slot_number"?: number | null,"status"?: string,"user_id": string
+                    "confirmation_email_sent_at"?: string | null,"session_id": string,"signed_up_at"?: string,"slot_number"?: number | null,"status"?: string,"user_id": string
                   }
                   Update: {
-                    "session_id"?: string,"signed_up_at"?: string,"slot_number"?: number | null,"status"?: string,"user_id"?: string
+                    "confirmation_email_sent_at"?: string | null,"session_id"?: string,"signed_up_at"?: string,"slot_number"?: number | null,"status"?: string,"user_id"?: string
                   }
                   Relationships: [
                     {
@@ -260,6 +260,11 @@ isOneToOne: false
 "find_club_members":
 { Args: { "p_query": string,"p_session_id"?: string }; Returns: {
               "display_name": string,"is_selected": boolean,"is_signed_up": boolean,"player_level": string,"student_id": string,"user_id": string
+            }[]
+                           },
+"get_booking_email_recipients":
+{ Args: { "p_session_ids": (string)[] }; Returns: {
+              "email": string,"session_id": string,"user_id": string
             }[]
                            },
 "get_dashboard_sessions":
