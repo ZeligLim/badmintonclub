@@ -47,6 +47,11 @@ inside a fairness bucket, by `82e0dee`), **BC-44** (no migration creates
 sessions: `db reset` leaves `public.sessions` empty) and **BC-42**/**BC-43**
 remain open because they need repository-admin rights.
 
+Closed by `96d792a` *"fix: redirect anonymous visitors before the admin page
+streams"* (2026-11-08): **BC-45** (`src/proxy.ts` now answers `307` to
+`/sign-in` for an unknown visitor before the admin page starts streaming, so no
+admin chrome reaches a stranger; signed-in administrators still get `200`).
+
 ---
 
 ## P0 — fix before the next session
@@ -515,6 +520,11 @@ shape was visible on production (`https://badmintonclub.vercel.app/admin`).
 response is `307`/`403` instead of `200`.
 **Done when** an unauthenticated `GET /admin` returns a redirect status and no admin
 markup.
+**Shipped in** `96d792a`: `src/proxy.ts` returns `307` with `location: /sign-in` and
+an empty body for an unauthenticated `/admin` (or `/admin/...`) request, before the
+page renders. Verified locally (`curl -s -o /dev/null -D - localhost:3000/admin` →
+`HTTP/1.1 307`, `location: /sign-in`; a signed-in administrator still gets `200`)
+and in production after the deploy.
 
 ---
 
