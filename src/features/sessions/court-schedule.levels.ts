@@ -11,6 +11,14 @@ export const LEVEL_VALUE: Record<PlayerLevel, number> = {
   PROFESSIONAL: 3,
 };
 
+/** Reads a stored level, falling back to the club default for unknown text. */
+export function toPlayerLevel(value: string | null | undefined): PlayerLevel {
+  if (value === "BEGINNER" || value === "INTERMEDIATE" || value === "PROFESSIONAL") {
+    return value;
+  }
+  return "INTERMEDIATE";
+}
+
 export function levelValue(
   level: PlayerLevel | null | undefined,
 ): number {

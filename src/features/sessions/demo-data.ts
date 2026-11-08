@@ -123,6 +123,7 @@ export function createDemoAdminSessions(now = new Date()): AdminSession[] {
       status: "confirmed" as const,
       availabilityCanChange: true,
       players,
+      timetableNeedsSaving: false,
       courtSchedule: buildDemoCourtSchedule(
         `demo-${dayName.toLowerCase()}-${date}`,
         startsAt,

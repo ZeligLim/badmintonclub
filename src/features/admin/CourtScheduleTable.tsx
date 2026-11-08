@@ -54,6 +54,14 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
         )}
       </div>
 
+      {session.timetableNeedsSaving && !isCancelled ? (
+        <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          This schedule exists only on this page. Save it with
+          {" \u201cregenerate\u201d"} before the release time so members see
+          the same courts.
+        </p>
+      ) : null}
+
       {/* Court schedule table */}
       {isCancelled ? (
         <p className="text-sm text-muted-foreground">

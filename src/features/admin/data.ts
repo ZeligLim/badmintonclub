@@ -1,10 +1,8 @@
 import "server-only";
 
 import { connection } from "next/server";
-import {
-  ensureSessionTimetable,
-  readPersistedTimetables,
-} from "@/features/sessions/api/timetable";
+import { readPersistedTimetables } from "@/features/sessions/api/timetable";
+import { buildSessionTimetable } from "@/features/sessions/timetable-plan";
 import { formatTimeOfDay } from "@/lib/format";
 import { toSessionStatus, toSignupStatus } from "@/features/sessions/status";
 import type {
@@ -49,6 +47,8 @@ export type AdminSession = {
   availabilityCanChange: boolean;
   players: AdminPlayer[];
   courtSchedule: AdminCourtGame[];
+  /** True when the shown schedule exists only in memory and nothing is saved. */
+  timetableNeedsSaving: boolean;
 };
 
 export type AdminClubPlayer = {
@@ -284,7 +284,10 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
       .filter((p) => p.status === "selected" || p.status === "played")
       .sort((a, b) => (a.slotNumber ?? 99) - (b.slotNumber ?? 99));
 
-    const courtScheduleGames = await ensureSessionTimetable({
+    // Reading the admin page must never write. If a timetable is missing or
+    // stale, this plans one for display and flags it so a committee member can
+    // save it deliberately.
+    const timetablePlan = buildSessionTimetable({
       session: {
         id: session.id,
         date: session.event_date,
@@ -304,6 +307,7 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
       persisted: timetableMap.get(session.id),
       seed: options?.allocationSeed,
     });
+    const courtScheduleGames = timetablePlan.games;
 
     const courtSchedule = courtScheduleGames.map((game) => ({
       ...game,
@@ -328,6 +332,7 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
           session.starts_at.slice(0, 5) > londonNow.time),
       players,
       courtSchedule,
+      timetableNeedsSaving: timetablePlan.needsPersisting,
     };
   }));
 }

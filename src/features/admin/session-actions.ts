@@ -5,11 +5,10 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import {
-  isCurrentPersistedCourtSchedule,
-  isSessionTimetableLocked,
-} from "@/features/sessions";
-import { loadAdminData, requireAdminUser } from "./data";
+import { isSessionTimetableLocked } from "@/features/sessions";
+import { toPlayerLevel } from "@/features/sessions/court-schedule.levels";
+import { ensureSessionTimetable } from "@/features/sessions/api/timetable";
+import { requireAdminUser } from "./data";
 import { logError } from "@/lib/log";
 
 export async function regenerateSessionCourtSchedule(sessionId: string): Promise<void> {
@@ -26,7 +25,7 @@ export async function regenerateSessionCourtSchedule(sessionId: string): Promise
   const admin = createAdminClient();
   const { data: session, error: sessionError } = await admin
     .from("sessions")
-    .select("id, status, event_date, starts_at")
+    .select("id, status, event_date, starts_at, duration_minutes, capacity")
     .eq("id", sessionId)
     .maybeSingle();
   if (sessionError || !session || !["open", "confirmed"].includes(session.status)) {
@@ -43,28 +42,74 @@ export async function regenerateSessionCourtSchedule(sessionId: string): Promise
     );
   }
 
-  const { error: deleteError } = await admin
-    .from("session_timetables")
-    .delete()
-    .eq("session_id", sessionId);
-  if (deleteError) {
-    logError("Could not clear the saved court schedule.", deleteError);
-    throw new Error("Could not clear the saved court schedule.");
-  }
-
-  const sessions = await loadAdminData({ allocationSeed: randomUUID() });
-  const regeneratedSession = sessions.find((item) => item.id === sessionId);
-  if (!regeneratedSession?.courtSchedule.length) {
-    throw new Error("The court schedule could not be regenerated.");
-  }
-
-  const { data: timetable, error: timetableError } = await admin
-    .from("session_timetables")
-    .select("court_schedule")
+  const { data: signups, error: signupError } = await admin
+    .from("session_signups")
+    .select("user_id, status, slot_number")
     .eq("session_id", sessionId)
-    .maybeSingle();
-  if (timetableError || !isCurrentPersistedCourtSchedule(timetable?.court_schedule)) {
-    throw new Error("The regenerated court schedule could not be saved.");
+    .in("status", ["selected", "played"]);
+  if (signupError) {
+    logError("Could not load the players for the court schedule.", signupError);
+    throw new Error("Could not load the players for the court schedule.");
+  }
+  if (!signups || signups.length === 0) {
+    throw new Error("There are no selected players to build a court schedule from.");
+  }
+
+  const playerIds = signups.map((signup) => signup.user_id);
+  const [{ data: profiles, error: profileError }, { data: sessionPrefs, error: prefError }, { data: clubPrefs, error: clubError }] =
+    await Promise.all([
+      admin
+        .from("profiles")
+        .select("id, display_name, player_level, is_committee")
+        .in("id", playerIds),
+      admin
+        .from("session_friend_preferences")
+        .select("user_id, friend_user_id")
+        .eq("session_id", sessionId),
+      admin.from("club_friend_list").select("user_id, friend_user_id").in("user_id", playerIds),
+    ]);
+  if (profileError || prefError || clubError) {
+    logError("Could not load the court schedule inputs.", profileError ?? prefError ?? clubError);
+    throw new Error("Could not load the court schedule inputs.");
+  }
+
+  const profileMap = new Map((profiles ?? []).map((profile) => [profile.id, profile]));
+  const friendMap = new Map<string, string[]>();
+  for (const pref of [...(sessionPrefs ?? []), ...(clubPrefs ?? [])]) {
+    const list = friendMap.get(pref.user_id) ?? [];
+    if (!list.includes(pref.friend_user_id)) {
+      list.push(pref.friend_user_id);
+      friendMap.set(pref.user_id, list);
+    }
+  }
+
+  // Write the new schedule in place. Deleting the saved row first would leave
+  // the session without a timetable if the rebuild failed.
+  const timetable = await ensureSessionTimetable({
+    session: {
+      id: session.id,
+      date: session.event_date,
+      startsAt: session.starts_at,
+      durationMinutes: session.duration_minutes,
+      capacity: session.capacity,
+      isConfirmed: session.status === "confirmed",
+    },
+    players: signups.map((signup) => {
+      const profile = profileMap.get(signup.user_id);
+      return {
+        id: signup.user_id,
+        displayName: profile?.display_name ?? signup.user_id.slice(0, 8),
+        priority: signup.slot_number ?? 1,
+        friendIds: friendMap.get(signup.user_id) ?? [],
+        isCommittee: profile?.is_committee ?? false,
+        level: toPlayerLevel(profile?.player_level),
+      };
+    }),
+    seed: randomUUID(),
+  });
+
+  if (timetable.length === 0) {
+    throw new Error("The court schedule could not be regenerated.");
   }
 
   revalidatePath("/admin");
