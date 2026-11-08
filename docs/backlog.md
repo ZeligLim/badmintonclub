@@ -37,6 +37,16 @@ indexes), **BC-31** (`serverNow` comes from the server and
 `useServerClock` ticks from it), **BC-32** (actions log the database error and
 throw a clean message).
 
+Closed by `experimental/p1-corrections` (2026-11-08): **BC-13** (README claims
+match the code; `.env.example` exists), **BC-11** (unknown database values are
+logged and fall back instead of 500ing the dashboard), **BC-08** (`anon` can no
+longer read `session_timetables`), **BC-09** (a friend-list change deletes the
+saved timetable while it is still private), **BC-10** (`/admin` renders without
+writing; saving is an explicit action), **BC-40** (playing level is the tie-break
+inside a fairness bucket, by `82e0dee`), **BC-44** (no migration creates
+sessions: `db reset` leaves `public.sessions` empty) and **BC-42**/**BC-43**
+remain open because they need repository-admin rights.
+
 ---
 
 ## P0 — fix before the next session
@@ -410,6 +420,25 @@ existing databases, ship a one-off migration that deletes sessions on those two
 dates when they have no signups.
 **Done when** `supabase db reset` leaves `public.sessions` empty and the pgTAP
 suite passes without the per-file deletes.
+
+### BC-47 · P1 · S — Monday and Wednesday sessions stopped being generated
+**Problem** While making `db reset` start empty (BC-44) the template path was
+exercised on a fresh database for the first time. The seeded Monday and
+Wednesday templates had `signup_opens_lead_days = 0`, `signup_opens_at = 00:00`
+and `confirmation_lead_days = 1`, `confirmation_at = 00:00`, so
+`ensure_scheduled_sessions()` computed sign-up opening *after* confirmation and
+hit the silent `continue` at
+`supabase/migrations/20261022100100_template_driven_sessions.sql:91`. Only the
+Friday template could produce a session. Every Monday/Wednesday row in
+production predates the template migration; once the current window is used up,
+the dashboard will show no evening sessions and nothing will log a warning.
+**Fix** Shipped in `1aa50e4`: `20261108140000_fix_template_signup_windows.sql`
+opens sign-ups on the Thursday before the club week (`signup_opens_lead_days = 4`)
+for those two templates. Still needed: reject a template whose window cannot open
+(sign-up opening at or after confirmation) in `save_session_template` instead of
+skipping it at generation time, and log a warning when a template is skipped.
+**Done when** a template with an impossible window is rejected when saved, and a
+fresh database generates every active template's session for two weeks ahead.
 
 ### BC-45 · P2 · S — Anonymous `/admin` answers 200 with a shell before redirecting
 **Problem** With the local stack running (`npm run dev`, `curl -s -o /dev/null -w '%{http_code}'

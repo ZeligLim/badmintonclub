@@ -829,5 +829,22 @@ select is(
   'the dashboard reports the fee of a session'
 );
 
+select throws_ok(
+  $$
+    insert into public.session_templates (
+      name, weekday, starts_at, duration_minutes, capacity, fee_cents,
+      allocation_mode, committee_auto_signup, signup_opens_lead_days,
+      signup_opens_at, confirmation_lead_days, confirmation_at
+    )
+    values (
+      'Impossible window', 1, time '18:00', 60, 16, 0,
+      'lottery', false, 0, time '00:00', 1, time '00:00'
+    )
+  $$,
+  '22023',
+  'Sign-ups must open before they close.',
+  'a template whose sign-ups open after they close is rejected'
+);
+
 select * from finish();
 rollback;
