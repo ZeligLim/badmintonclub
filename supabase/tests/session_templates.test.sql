@@ -468,6 +468,16 @@ values (
   'requested'
 );
 
+-- Publishing only reconciles sessions whose sign-ups have not opened yet. The
+-- fixture for the next club week was created before the template moved to
+-- 20:00, and its template lead time may already be in the past by the time this
+-- suite runs, so pin its window into the future to keep the assertion about
+-- following the template meaningful.
+update public.sessions
+set signup_opens_at = now() + interval '1 hour',
+    confirmation_at = now() + interval '2 days'
+where event_date = date_trunc('week', now() at time zone 'Europe/London')::date + 8;
+
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
@@ -510,11 +520,13 @@ select is(
 );
 
 -- A session that is not published yet is removed when its template is paused.
--- Pin the sign-up window into the future first: publishing only reconciles
+-- Pin both ends of the window into the future: publishing only reconciles
 -- sessions whose sign-ups have not opened yet, and the template's four-day lead
--- time lands on midnight of the day this suite runs.
+-- time can land on either side of midnight depending on when this suite runs.
+-- Sign-ups must still open before they close, which the sessions table enforces.
 update public.sessions
-set signup_opens_at = now() + interval '1 day'
+set signup_opens_at = now() + interval '1 day',
+    confirmation_at = now() + interval '2 days'
 where event_date = date_trunc('week', now() at time zone 'Europe/London')::date + 8;
 
 set local role authenticated;
