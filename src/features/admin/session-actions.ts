@@ -140,3 +140,74 @@ export async function updateSessionAvailability(
   revalidatePath("/admin");
   revalidatePath("/");
 }
+
+export async function swapSessionPlayer(
+  sessionId: string,
+  outUserId: string,
+  inUserId: string,
+  reason: string,
+): Promise<void> {
+  if (!(await requireAdminUser())) {
+    throw new Error("Only a club administrator can repair a timetable.");
+  }
+  if (!isUuid(sessionId) || !isUuid(outUserId) || !isUuid(inUserId)) {
+    throw new Error("The timetable repair request is invalid.");
+  }
+  if (typeof reason !== "string" || reason.length > 280) {
+    throw new Error("Keep the reason under 280 characters.");
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_swap_session_player", {
+    p_session_id: sessionId,
+    p_out_user_id: outUserId,
+    p_in_user_id: inUserId,
+    p_reason: reason.trim(),
+  });
+  if (error) {
+    logError("Could not repair the timetable.", error);
+    throw new Error(
+      [
+        "That player is not currently in the timetable.",
+        "That member is not waiting for a place.",
+        "That player is not in the saved timetable.",
+        "Only a club administrator can repair a timetable.",
+        "Choose two different players.",
+      ].includes(error.message)
+        ? error.message
+        : "Could not repair the timetable.",
+    );
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/");
+}
+
+export async function promoteFromWaitlist(
+  sessionId: string,
+  userId: string,
+): Promise<void> {
+  if (!(await requireAdminUser())) {
+    throw new Error("Only a club administrator can promote a member.");
+  }
+  if (!isUuid(sessionId) || !isUuid(userId)) {
+    throw new Error("The promotion request is invalid.");
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_promote_from_waitlist", {
+    p_session_id: sessionId,
+    p_user_id: userId,
+  });
+  if (error) {
+    logError("Could not promote a member from the waitlist.", error);
+    throw new Error(
+      error.message === "Every place is already taken."
+        ? "Every place is already taken."
+        : "Could not promote a member from the waitlist.",
+    );
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/");
+}

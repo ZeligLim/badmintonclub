@@ -25,14 +25,14 @@ export type Database = {
           Tables: {
             "admin_audit_log": {
                   Row: {
-                    "action": string,"actor_id": string | null,"created_at": string,"id": number,"target_user_id": string | null
+                    "action": string,"actor_id": string | null,"created_at": string,"details": Json | null,"id": number,"target_user_id": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "action": string,"actor_id"?: string | null,"created_at"?: string,"id"?: never,"target_user_id"?: string | null
+                    "action": string,"actor_id"?: string | null,"created_at"?: string,"details"?: Json | null,"id"?: never,"target_user_id"?: string | null
                   }
                   Update: {
-                    "action"?: string,"actor_id"?: string | null,"created_at"?: string,"id"?: never,"target_user_id"?: string | null
+                    "action"?: string,"actor_id"?: string | null,"created_at"?: string,"details"?: Json | null,"id"?: never,"target_user_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -234,6 +234,9 @@ isOneToOne: false
               "allocation_mode": string,"capacity": number,"committee_auto_signup": boolean,"confirmation_at": string,"confirmation_lead_days": number,"created_at": string,"duration_minutes": number,"fee_cents": number,"id": string,"is_active": boolean,"name": string,"signup_opens_at": string,"signup_opens_lead_days": number,"starts_at": string,"updated_at": string,"valid_from": string,"valid_until": string,"weekday": number
             }[]
                            },
+"admin_promote_from_waitlist":
+{ Args: { "p_session_id": string,"p_user_id": string }; Returns: undefined
+                           },
 "admin_publish_scheduled_sessions":
 { Args: Record<PropertyKey, never>; Returns: {
               "created_count": number,"removed_count": number,"updated_count": number
@@ -253,6 +256,9 @@ isOneToOne: false
                            },
 "admin_set_session_template_active":
 { Args: { "p_is_active": boolean,"p_template_id": string }; Returns: undefined
+                           },
+"admin_swap_session_player":
+{ Args: { "p_in_user_id": string,"p_out_user_id": string,"p_reason"?: string,"p_session_id": string }; Returns: undefined
                            },
 "admin_update_player_access":
 { Args: { "p_is_committee": boolean,"p_player_level": string,"p_user_id": string }; Returns: undefined

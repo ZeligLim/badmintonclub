@@ -217,10 +217,16 @@ documented.
 (`src/features/admin/player-actions.ts`), but `is_committee_admin` can only be set by
 the hand-written SQL in the README. Adding a second admin, or replacing one who
 leaves, currently needs database access.
-**Fix** Add admin-role management with a "there must always be at least one admin"
-guard, and audit the change.
+**Fix** Shipped in `ec435bf`: `admin_set_committee_admin(uuid, boolean)` enforces
+the caller is an administrator, promotes through `is_committee = true` and refuses to
+demote the last one (`There must always be at least one committee administrator.`).
+Every change lands in `public.admin_audit_log`, shown as "Recent administrator
+changes" under the access table. `/admin` gained an Admin column.
 **Done when** two admins can be managed from `/admin` and the last one cannot be
 removed.
+**Done** — `supabase/tests/committee_admin_management.test.sql` (7 assertions) covers
+the member-cannot-self-promote case, promoting a second admin, demoting one of two,
+refusing the last, and two audit rows.
 
 ### BC-16 · P1 · M — Committee cannot fix a bad timetable by hand
 **Problem** `CourtScheduleTable` can cancel a session or regenerate everything
