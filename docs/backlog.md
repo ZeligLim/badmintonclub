@@ -315,9 +315,18 @@ non-signed-up friends with an explanation, and finish the a11y states.
 but candidate generation, greedy selection, doubles optimisation, scoring and
 validation are still ~1,400 lines in `src/features/sessions/court-schedule.ts`, and
 the 500-candidate branch (`:1329`) is only exercised by the benchmark.
-**Fix** Extract `candidates`, `score` and `validate` into their own modules, and
-turn the latency check into a p95 budget over repeated runs in CI.
+**Fix** Shipped in `3b88647`: the pipeline is now `court-schedule.shared.ts`
+(types, constants, RNG and small comparisons), `court-schedule.select.ts` (anchors,
+friend packs, court groups, doubles pairing), `court-schedule.candidates.ts`
+(round-by-round greedy build), `court-schedule.score.ts` (the lexicographic score
+vector), `court-schedule.validate.ts` (court sizes and the finished-timetable
+check) and `court-schedule.levels.ts`. `court-schedule.ts` is 262 lines and only
+keeps the persistence helpers plus the public entry points.
 **Done when** each step is a module with its own tests, not just examples.
+**Done** — `court-schedule.validate.test.ts` covers court sizes, round
+double-booking, roster membership, duplicate players and score ranking, and
+`court-schedule.properties.test.ts` holds a p95 latency budget over ten seeded
+runs of a 40-player, four-court evening.
 
 ---
 
@@ -336,6 +345,11 @@ have changed no behaviour while coupling the tests to a table that BC-01 wants
 deleted.
 **Done when** the full suite passes at any hour, including the 00:00 and week
 boundaries.
+**Done** — the failing scenario was reproduced after midnight, the fixture now
+pins its own window, and `npm run check:tests` (inside `verify` and `build`)
+refuses any session fixture that takes a date from `now()` without pinning
+`signup_opens_at` and `confirmation_at`. The suite has since passed on CI at
+00:05 and locally in the evening.
 
 ---
 
@@ -506,10 +520,10 @@ markup.
 
 ## Suggested first five
 
-1. **BC-01** — the clock backdoor is a one-afternoon security fix.
-2. **BC-39** — the timetable can no longer be repaired; ship the escape hatch before
-   the next release window.
-3. **BC-07** — confirmation still needs a browser open; one missed window means no
-   timetable at all.
-4. **BC-04** — the waitlist is currently a dead end.
-5. **BC-35** — stop shipping untested commits to members.
+1. **BC-01** — the clock backdoor is a one-afternoon security fix, and it is live
+   in production right now.
+2. **BC-04** — the waitlist is still a dead end: cancelling never promotes anybody.
+3. **BC-36** — migrations only reach production by hand; wire them into CI.
+4. **BC-35** — previews are invisible to the committee and would crash without
+   preview-scoped environment variables.
+5. **BC-42** — a red build stops a deploy but not a merge; turn on branch protection.
