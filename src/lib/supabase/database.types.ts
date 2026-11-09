@@ -235,7 +235,7 @@ isOneToOne: false
             }[]
                            },
 "admin_place_session_player":
-{ Args: { "p_court_number": number,"p_reason"?: string,"p_session_id": string,"p_start_at": string,"p_user_id": string }; Returns: undefined
+{ Args: { "p_court_number": number,"p_from_court_number"?: number,"p_from_start_at"?: string,"p_reason"?: string,"p_session_id": string,"p_start_at": string,"p_user_id": string }; Returns: undefined
                            },
 "admin_promote_from_waitlist":
 { Args: { "p_session_id": string,"p_user_id": string }; Returns: undefined
@@ -270,7 +270,7 @@ isOneToOne: false
 { Args: { "p_in_user_id": string,"p_out_user_id": string,"p_reason"?: string,"p_session_id": string }; Returns: undefined
                            },
 "admin_swap_session_players":
-{ Args: { "p_reason"?: string,"p_session_id": string,"p_user_a_id": string,"p_user_b_id": string }; Returns: undefined
+{ Args: { "p_court_a": number,"p_court_b": number,"p_reason"?: string,"p_session_id": string,"p_start_a": string,"p_start_b": string,"p_user_a_id": string,"p_user_b_id": string }; Returns: undefined
                            },
 "admin_update_player_access":
 { Args: { "p_is_committee": boolean,"p_player_level": string,"p_user_id": string }; Returns: undefined

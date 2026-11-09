@@ -237,10 +237,13 @@ the member-cannot-self-promote case, promoting a second admin, demoting one of t
 refusing the last, and two audit rows.
 
 ### BC-16 · P1 · M — Committee cannot fix a bad timetable by hand
-**Shipped in `af338a4`.** Committee members can now edit a released timetable from
-the app: tap a player, tap another to swap their whole night, tap an empty seat to
-place the selected player, or swap in a waiting member. Every change is audited in
-`public.admin_audit_log` with an optional reason.
+**Shipped in `af338a4`; seat-scoped in `20261109150000_swap_timetable_seats.sql`.**
+Committee members can now edit a released timetable from the app: tap a player,
+tap another to swap just those two seats, tap an empty seat to move the selected
+player, or swap in a waiting member. A swap or move only changes the tapped seats,
+and the database refuses any edit that would put one member on two courts in the
+same round. Every change is audited in `public.admin_audit_log` with an optional
+reason.
 
 **Problem** `CourtScheduleTable` could cancel a session or regenerate everything
 (`src/features/admin/CourtScheduleTable.tsx`), but could not add/remove a player,
@@ -251,10 +254,14 @@ again".
 bottom sheet, `Escape` to clear, `aria-live` announcements) drives three
 administrator-only RPCs in `supabase/migrations/20261108200000_admin_timetable_editing.sql`:
 `admin_swap_session_players`, `admin_place_session_player`,
-`admin_remove_session_player`. They set
+`admin_remove_session_player`. The 2026-11-09 migration gives the first two the
+seats they act on and rebuilds only those games:
+`admin_swap_session_players` trades one seat each and
+`admin_place_session_player` moves a placed player (or adds a waiting member).
+They set
 `badminton.allow_locked_timetable_write = 'on'` so a released schedule can still be
 repaired, rebuild `teamA`/`teamB` after every edit, and refuse a full court with
-`That court is full. Swap two players instead.` Covered by 17 pgTAP assertions in
+`That court is full. Swap two players instead.` Covered by 24 pgTAP assertions in
 `supabase/tests/admin_timetable_editing.test.sql` and verified end to end at a
 390×844 viewport (screenshots in `artifacts/`).
 

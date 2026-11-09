@@ -264,11 +264,33 @@ function reasonOrNull(reason: string | undefined): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
+function isCourtNumber(value: number): boolean {
+  return Number.isInteger(value) && value >= 1;
+}
+
+function isStartAt(value: string): boolean {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
 export async function swapTimetablePlayers(
-  input: TimetableEditArgs & { playerAId: string; playerBId: string },
+  input: TimetableEditArgs & {
+    playerAId: string;
+    courtA: number;
+    startA: string;
+    playerBId: string;
+    courtB: number;
+    startB: string;
+  },
 ): Promise<void> {
   assertTimetableEdit((await requireAdminUser()) !== null, input.sessionId);
-  if (!isUuid(input.playerAId) || !isUuid(input.playerBId)) {
+  if (
+    !isUuid(input.playerAId) ||
+    !isUuid(input.playerBId) ||
+    !isCourtNumber(input.courtA) ||
+    !isCourtNumber(input.courtB) ||
+    !isStartAt(input.startA) ||
+    !isStartAt(input.startB)
+  ) {
     throw new Error("The timetable request is invalid.");
   }
 
@@ -276,7 +298,11 @@ export async function swapTimetablePlayers(
   const { error } = await supabase.rpc("admin_swap_session_players", {
     p_session_id: input.sessionId,
     p_user_a_id: input.playerAId,
+    p_court_a: input.courtA,
+    p_start_a: input.startA,
     p_user_b_id: input.playerBId,
+    p_court_b: input.courtB,
+    p_start_b: input.startB,
     p_reason: reasonOrNull(input.reason),
   });
   if (error) {
@@ -314,14 +340,19 @@ export async function placeTimetablePlayer(
     playerId: string;
     courtNumber: number;
     startAt: string;
+    /** The seat the player is leaving, when they are already in the timetable. */
+    fromCourtNumber?: number;
+    fromStartAt?: string;
   },
 ): Promise<void> {
   assertTimetableEdit((await requireAdminUser()) !== null, input.sessionId);
   if (
     !isUuid(input.playerId) ||
-    !Number.isInteger(input.courtNumber) ||
-    input.courtNumber < 1 ||
-    typeof input.startAt !== "string"
+    !isCourtNumber(input.courtNumber) ||
+    !isStartAt(input.startAt) ||
+    (input.fromCourtNumber !== undefined && !isCourtNumber(input.fromCourtNumber)) ||
+    (input.fromStartAt !== undefined && !isStartAt(input.fromStartAt)) ||
+    (input.fromCourtNumber === undefined) !== (input.fromStartAt === undefined)
   ) {
     throw new Error("The timetable request is invalid.");
   }
@@ -333,6 +364,8 @@ export async function placeTimetablePlayer(
     p_court_number: input.courtNumber,
     p_start_at: input.startAt,
     p_reason: reasonOrNull(input.reason),
+    p_from_court_number: input.fromCourtNumber,
+    p_from_start_at: input.fromStartAt,
   });
   if (error) {
     logError("Could not place that player.", error);

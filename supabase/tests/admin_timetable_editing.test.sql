@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(17);
+select plan(24);
 
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
 select
@@ -28,7 +28,8 @@ set display_name = 'Editor ' || right(id::text, 1)
 where id::text like 'f6000000-0000-4000-8000-%';
 
 -- A released session whose timetable has two courts and two rounds, so a swap
--- has to follow a player across more than one game.
+-- can move a seat between rounds and the double-booking guard has something to
+-- catch.
 insert into public.sessions (
   id, event_date, starts_at, duration_minutes, capacity,
   signup_opens_at, confirmation_at, status, allocation_mode, fee_cents, committee_auto_signup
@@ -116,7 +117,9 @@ select throws_ok(
   $$ select public.admin_swap_session_players(
        'f7000000-0000-4000-8000-000000000001',
        'f6000000-0000-4000-8000-000000000001',
+       1, '00:01',
        'f6000000-0000-4000-8000-000000000005',
+       2, '00:01',
        'member attempt'
      ) $$,
   '42501',
@@ -126,21 +129,24 @@ select throws_ok(
 reset role;
 
 select ok(
-  not has_function_privilege('anon', 'public.admin_swap_session_players(uuid,uuid,uuid,text)', 'execute'),
+  not has_function_privilege('anon', 'public.admin_swap_session_players(uuid,uuid,integer,text,uuid,integer,text,text)', 'execute'),
   'anonymous visitors cannot call the editor'
 );
 
--- An administrator can swap two players across every round, even after release.
+-- An administrator can swap two seats in a released timetable. Only the two
+-- tapped seats move, so both players keep their seat in the other round.
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"f6000000-0000-4000-8000-000000000001","email":"edit-1@atu.ie","role":"authenticated"}', true);
 select lives_ok(
   $$ select public.admin_swap_session_players(
        'f7000000-0000-4000-8000-000000000001',
        'f6000000-0000-4000-8000-000000000001',
+       1, '00:01',
        'f6000000-0000-4000-8000-000000000005',
+       2, '00:01',
        'they wanted to play together'
      ) $$,
-  'an administrator can swap players in a released timetable'
+  'an administrator can swap two seats in a released timetable'
 );
 reset role;
 
@@ -153,9 +159,25 @@ select is(
     where timetable.session_id = 'f7000000-0000-4000-8000-000000000001'
       and private.timetable_player_id(player) = 'f6000000-0000-4000-8000-000000000001'
       and (game ->> 'courtNumber')::int = 2
+      and (game ->> 'startAt') = '00:01'
   ),
-  2::bigint,
-  'the first player now plays both rounds on court 2'
+  1::bigint,
+  'the first player takes the tapped seat on court 2'
+);
+
+select is(
+  (
+    select count(*)
+    from public.session_timetables as timetable
+    cross join lateral jsonb_array_elements(timetable.court_schedule) as game
+    cross join lateral jsonb_array_elements(game -> 'players') as player
+    where timetable.session_id = 'f7000000-0000-4000-8000-000000000001'
+      and private.timetable_player_id(player) = 'f6000000-0000-4000-8000-000000000001'
+      and (game ->> 'courtNumber')::int = 1
+      and (game ->> 'startAt') = '00:31'
+  ),
+  1::bigint,
+  'the first player keeps their second-round seat'
 );
 
 select is(
@@ -167,9 +189,25 @@ select is(
     where timetable.session_id = 'f7000000-0000-4000-8000-000000000001'
       and private.timetable_player_id(player) = 'f6000000-0000-4000-8000-000000000005'
       and (game ->> 'courtNumber')::int = 1
+      and (game ->> 'startAt') = '00:01'
   ),
-  2::bigint,
-  'the second player now plays both rounds on court 1'
+  1::bigint,
+  'the second player takes the tapped seat on court 1'
+);
+
+select is(
+  (
+    select count(*)
+    from public.session_timetables as timetable
+    cross join lateral jsonb_array_elements(timetable.court_schedule) as game
+    cross join lateral jsonb_array_elements(game -> 'players') as player
+    where timetable.session_id = 'f7000000-0000-4000-8000-000000000001'
+      and private.timetable_player_id(player) = 'f6000000-0000-4000-8000-000000000005'
+      and (game ->> 'courtNumber')::int = 2
+      and (game ->> 'startAt') = '00:31'
+  ),
+  1::bigint,
+  'the second player keeps their second-round seat'
 );
 
 select is(
@@ -201,6 +239,24 @@ select is(
   true,
   'the audit notes that the timetable had already been released'
 );
+
+-- A swap that would put one member on two courts in the same round is refused.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"f6000000-0000-4000-8000-000000000001","email":"edit-1@atu.ie","role":"authenticated"}', true);
+select throws_ok(
+  $$ select public.admin_swap_session_players(
+       'f7000000-0000-4000-8000-000000000001',
+       'f6000000-0000-4000-8000-000000000001',
+       1, '00:31',
+       'f6000000-0000-4000-8000-000000000002',
+       1, '00:01',
+       'cross-round swap'
+     ) $$,
+  '22023',
+  'That swap would put Editor 1 on two courts at 00:01.',
+  'a swap that double-books a player is refused'
+);
+reset role;
 
 -- A player can be taken out; they move to the waitlist and every seat clears.
 set local role authenticated;
@@ -236,6 +292,68 @@ select ok(
   ),
   'the removed player is gone from every game'
 );
+
+-- Moving a player to an empty seat changes only the seat they were tapped on.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"f6000000-0000-4000-8000-000000000001","email":"edit-1@atu.ie","role":"authenticated"}', true);
+select lives_ok(
+  $$ select public.admin_place_session_player(
+       'f7000000-0000-4000-8000-000000000001',
+       'f6000000-0000-4000-8000-000000000001',
+       1, '00:01',
+       'moved to an empty seat',
+       2, '00:01'
+     ) $$,
+  'an administrator can move a player into an empty seat'
+);
+reset role;
+
+select is(
+  (
+    select count(*)
+    from public.session_timetables as timetable
+    cross join lateral jsonb_array_elements(timetable.court_schedule) as game
+    cross join lateral jsonb_array_elements(game -> 'players') as player
+    where timetable.session_id = 'f7000000-0000-4000-8000-000000000001'
+      and private.timetable_player_id(player) = 'f6000000-0000-4000-8000-000000000001'
+      and (game ->> 'courtNumber')::int = 1
+      and (game ->> 'startAt') = '00:01'
+  ),
+  1::bigint,
+  'the moved player takes the empty seat'
+);
+
+select is(
+  (
+    select count(*)
+    from public.session_timetables as timetable
+    cross join lateral jsonb_array_elements(timetable.court_schedule) as game
+    cross join lateral jsonb_array_elements(game -> 'players') as player
+    where timetable.session_id = 'f7000000-0000-4000-8000-000000000001'
+      and private.timetable_player_id(player) = 'f6000000-0000-4000-8000-000000000001'
+      and (game ->> 'courtNumber')::int = 2
+      and (game ->> 'startAt') = '00:01'
+  ),
+  0::bigint,
+  'the moved player leaves the seat they were tapped on'
+);
+
+-- A move that would put the same member on two courts in one round is refused.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"f6000000-0000-4000-8000-000000000001","email":"edit-1@atu.ie","role":"authenticated"}', true);
+select throws_ok(
+  $$ select public.admin_place_session_player(
+       'f7000000-0000-4000-8000-000000000001',
+       'f6000000-0000-4000-8000-000000000002',
+       1, '00:31',
+       'trying a second court',
+       1, '00:01'
+     ) $$,
+  '22023',
+  'Editor 2 is already playing on another court at 00:31.',
+  'a move that double-books a player is refused'
+);
+reset role;
 
 -- A member can be placed into the seat that just opened up.
 set local role authenticated;
@@ -280,8 +398,8 @@ select throws_ok(
   $$ select public.admin_place_session_player(
        'f7000000-0000-4000-8000-000000000001',
        'f6000000-0000-4000-8000-000000000010',
-       2,
-       '00:01',
+       1,
+       '00:31',
        'trying a full court'
      ) $$,
   '22023',
@@ -293,9 +411,9 @@ reset role;
 select is(
   (
     select count(*) from public.admin_audit_log
-    where action in ('swap-seats', 'remove-player', 'place-player')
+    where action in ('swap-seats', 'remove-player', 'move-player', 'place-player')
   ),
-  3::bigint,
+  4::bigint,
   'each edit is audited once'
 );
 

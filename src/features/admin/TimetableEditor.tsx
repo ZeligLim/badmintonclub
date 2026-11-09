@@ -74,7 +74,13 @@ export function TimetableEditor({ session }: { session: AdminSession }) {
     }
 
     if (selected.id === player.id) {
-      setSelected(null);
+      // A player can appear in several games; tapping another of their seats
+      // moves the selection there instead of clearing it.
+      setSelected(
+        selected.courtNumber === courtNumber && selected.startAt === startAt
+          ? null
+          : { ...player, courtNumber, startAt },
+      );
       return;
     }
 
@@ -106,7 +112,11 @@ export function TimetableEditor({ session }: { session: AdminSession }) {
           await swapTimetablePlayers({
             sessionId: session.id,
             playerAId: pending.player.id,
+            courtA: pending.player.courtNumber,
+            startA: pending.player.startAt,
             playerBId: pending.other.id,
+            courtB: pending.other.courtNumber,
+            startB: pending.other.startAt,
             reason,
           });
         } else if (pending.kind === "place") {
@@ -115,6 +125,8 @@ export function TimetableEditor({ session }: { session: AdminSession }) {
             playerId: pending.player.id,
             courtNumber: pending.courtNumber,
             startAt: pending.startAt,
+            fromCourtNumber: pending.player.courtNumber,
+            fromStartAt: pending.player.startAt,
             reason,
           });
         } else if (pending.kind === "remove") {
@@ -153,7 +165,7 @@ export function TimetableEditor({ session }: { session: AdminSession }) {
       >
         {session.timetableLocked
           ? "This timetable has already been released to players. Changes are saved immediately and recorded in the audit log."
-          : "Tap a player, then tap another player to swap them, or an empty seat to place them."}
+          : "Tap a player, then tap another player to swap just those two seats, or an empty seat to move them there. A player can play several rounds, but never two courts at once."}
       </p>
 
       <p aria-live="polite" className="sr-only">
@@ -191,7 +203,10 @@ export function TimetableEditor({ session }: { session: AdminSession }) {
 
                   <ul className="grid gap-1.5">
                     {players.map((player) => {
-                      const isSelected = selected?.id === player.id;
+                      const isSelected =
+                        selected?.id === player.id &&
+                        selected.courtNumber === courtNumber &&
+                        selected.startAt === slot.startAt;
                       return (
                         <li key={`${slot.key}-${courtNumber}-${player.id}`}>
                           <button
@@ -287,6 +302,11 @@ export function TimetableEditor({ session }: { session: AdminSession }) {
           {pending ? (
             <div className="mt-2 space-y-2 border-t pt-2">
               <p className="text-sm font-medium">{describePending(pending)}</p>
+              {pending.kind === "swap" || pending.kind === "place" ? (
+                <p className="text-xs text-muted-foreground">
+                  Only these seats change. Every other game in the session stays as it is.
+                </p>
+              ) : null}
               <label className="block text-xs text-muted-foreground">
                 Reason (optional)
                 <input
@@ -340,9 +360,11 @@ export function TimetableEditor({ session }: { session: AdminSession }) {
 function describePending(pending: PendingAction): string {
   switch (pending.kind) {
     case "swap":
-      return `Swap ${pending.player.displayName} and ${pending.other.displayName} for the whole session?`;
+      return pending.player.startAt === pending.other.startAt
+        ? `Swap ${pending.player.displayName} (court ${pending.player.courtNumber}) and ${pending.other.displayName} (court ${pending.other.courtNumber}) at ${pending.player.startAt}?`
+        : `Swap ${pending.player.displayName} (court ${pending.player.courtNumber} at ${pending.player.startAt}) with ${pending.other.displayName} (court ${pending.other.courtNumber} at ${pending.other.startAt})?`;
     case "place":
-      return `Place ${pending.player.displayName} on court ${pending.courtNumber} at ${pending.startAt}?`;
+      return `Move ${pending.player.displayName} to court ${pending.courtNumber} at ${pending.startAt}?`;
     case "remove":
       return `Take ${pending.player.displayName} out of every game?`;
     case "replace":
