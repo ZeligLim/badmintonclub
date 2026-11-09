@@ -21,6 +21,7 @@ import {
 import type { SessionSignupStatus } from "../types";
 import { useServerClock } from "../use-server-clock";
 import { SessionsHeader } from "./SessionsHeader";
+import { RealNamePrompt } from "./RealNamePrompt";
 import { SessionCard } from "./SessionCard";
 import { FriendListCard } from "./FriendListCard";
 import type {
@@ -313,6 +314,12 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
           playerLevel={initialData.user?.playerLevel ?? "INTERMEDIATE"}
           canChooseProfessional={initialData.user?.canChooseProfessional ?? false}
         />
+        {initialData.user ? (
+          <RealNamePrompt
+            displayName={initialData.user.displayName}
+            userId={initialData.user.id}
+          />
+        ) : null}
         <h1 className="sr-only">ATU Galway Badminton Club</h1>
 
         <section aria-label="Club sessions" className="mt-7 sm:mt-10">
