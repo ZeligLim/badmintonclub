@@ -594,6 +594,16 @@ select is(
   'an opted-in member is added to an upcoming session even after signup closes'
 );
 
+-- ensure_next_week_sessions() above creates the club's real sessions from the
+-- templates. On a Monday the current week's session is already due for
+-- confirmation, which would make finalize_due_sessions() report two sessions
+-- instead of this fixture's one. Park any other due session in the future.
+update public.sessions
+set confirmation_at = now() + interval '1 day'
+where status = 'open'
+  and confirmation_at <= now()
+  and id <> '32000000-0000-4000-8000-000000000001';
+
 set local role authenticated;
 select set_config(
   'request.jwt.claim.sub',
