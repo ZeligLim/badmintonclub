@@ -18,6 +18,16 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
     (player) => player.paymentStatus === "paid",
   ).length;
 
+  // How many games each member appears in for this session. With a full
+  // roster this makes an uneven timetable (someone playing three rounds while
+  // someone else plays one) visible at a glance.
+  const gamesByPlayer = new Map<string, number>();
+  for (const game of session.courtSchedule) {
+    for (const player of game.players) {
+      gamesByPlayer.set(player.id, (gamesByPlayer.get(player.id) ?? 0) + 1);
+    }
+  }
+
   const statusBadge =
     session.status === "confirmed"
       ? "bg-primary/10 text-primary"
@@ -138,6 +148,9 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
                     Player
                   </th>
                   <th className="px-4 py-2 text-left font-medium text-muted-foreground">
+                    Games
+                  </th>
+                  <th className="px-4 py-2 text-left font-medium text-muted-foreground">
                     Status
                   </th>
                   <th className="px-4 py-2 text-left font-medium text-muted-foreground">
@@ -155,6 +168,9 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
                   .map((player) => (
                     <tr key={player.userId} className="border-t border-border/50 bg-card">
                       <td className="px-4 py-2">{player.displayName}</td>
+                      <td className="px-4 py-2 tabular-nums text-muted-foreground">
+                        {gamesByPlayer.get(player.userId) ?? 0}
+                      </td>
                       <td className="px-4 py-2 capitalize text-muted-foreground">
                         {player.status === "waitlisted" ||
                         player.status === "requested" ? (
