@@ -274,7 +274,7 @@ being presented as current.
 recorded that a player had dropped out after the timetable was released. The
 other three players on that court turned up to an empty seat, and the committee
 had no record of who failed to show.
-**Fix** On `feat/late-cancel-and-timetable-ux` (not yet merged):
+**Fix** Shipped in `5250a09` (branch `feat/late-cancel-and-timetable-ux`, not merged):
 `20261108210000_late_cancellation_and_no_shows.sql` moves the cancellation cutoff
 to the first serve and adds `session_signups.no_show_at` plus
 `public.set_session_no_show(session_id, no_show)` — start-only, selected/played-only.
@@ -290,7 +290,7 @@ run-through at 390×844 with screenshots in `artifacts/`.
 **Problem** Invalidating or rebuilding a published timetable changed the JSON with
 no version, no record of what each member had seen, and no notice — a member who
 checked their courts in the morning would arrive to a different schedule.
-**Fix** On `feat/late-cancel-and-timetable-ux`: `session_timetables.version`
+**Fix** Shipped in `5250a09`: `session_timetables.version`
 bumped by the single writer `public.save_session_timetable(...)`,
 `session_signups.timetable_seen_version`, `public.mark_session_timetable_seen(...)`,
 and `TimetableChangeNotice` — a `role="alertdialog"` shown on dashboard load when
@@ -349,7 +349,7 @@ non-signed-up friends with an explanation, and finish the a11y states.
 ### BC-51 · P2 · S — There is no dark mode
 **Problem** The app only had a light palette, and plenty of components hardcoded
 `bg-white`, so a `dark` class on `<html>` produced white cards with light text.
-**Fix** On `feat/late-cancel-and-timetable-ux`: `ThemeToggle` (a `switch` inside the
+**Fix** Shipped in `5250a09`: `ThemeToggle` (a `switch` inside the
 header's overflow menu) writes `localStorage.theme`, an inline script in
 `src/app/layout.tsx` applies it before paint, and every `bg-white` became the
 `bg-card` token so the existing `.dark` variables in `src/app/globals.css` apply.
@@ -361,7 +361,7 @@ reload.
 their own name in their court line, and gave no way to see the whole session's
 schedule — so during play the page was long, repetitive and hard to read on a
 phone.
-**Fix** On `feat/late-cancel-and-timetable-ux`: an in-progress session shows only
+**Fix** Shipped in `5250a09`: an in-progress session shows only
 the current and next games (current one highlighted), prints the member's own name
 first, offers "Show all N of your games", and a "See everyone's timetable" dialog
 with every court and round, read-only, with no-shows struck through.
