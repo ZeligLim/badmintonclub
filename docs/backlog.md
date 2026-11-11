@@ -268,6 +268,41 @@ community at the admin repair tool.
 **Done when** an outdated released timetable is visible as outdated instead of
 being presented as current.
 
+### BC-49 · P1 · M — Cancelling stops 30 minutes before the session, so late drops are invisible
+**Problem** `cancel_session_signup` refused any cancellation from start−30 minutes
+(`20261015093209_close_cancellations_at_confirmation_time.sql`), and nothing
+recorded that a player had dropped out after the timetable was released. The
+other three players on that court turned up to an empty seat, and the committee
+had no record of who failed to show.
+**Fix** On `feat/late-cancel-and-timetable-ux` (not yet merged):
+`20261108210000_late_cancellation_and_no_shows.sql` moves the cancellation cutoff
+to the first serve and adds `session_signups.no_show_at` plus
+`public.set_session_no_show(session_id, no_show)` — start-only, selected/played-only.
+The timetable is not re-drawn after the start: a no-show keeps their place and is
+shown struck through in everyone's timetable. A cancellation before the start
+rebuilds the published timetable through `save_session_timetable`.
+**Done when** cancelling works until the first serve, and after the start a player
+can mark themselves as not coming without moving anyone else's games.
+**Done** — `supabase/tests/late_cancellation.test.sql` (13 assertions); mobile
+run-through at 390×844 with screenshots in `artifacts/`.
+
+### BC-50 · P1 · M — A re-drawn timetable is never announced to the players it moved
+**Problem** Invalidating or rebuilding a published timetable changed the JSON with
+no version, no record of what each member had seen, and no notice — a member who
+checked their courts in the morning would arrive to a different schedule.
+**Fix** On `feat/late-cancel-and-timetable-ux`: `session_timetables.version`
+bumped by the single writer `public.save_session_timetable(...)`,
+`session_signups.timetable_seen_version`, `public.mark_session_timetable_seen(...)`,
+and `TimetableChangeNotice` — a `role="alertdialog"` shown on dashboard load when
+a session's saved version is newer than the version that member acknowledged.
+`timetableChanged` is only true once a member has seen a version before, so the
+first view never nags.
+**Done when** after a re-draw, affected members are told once and the notice never
+reappears until the next change.
+**Done** — covered by `supabase/tests/late_cancellation.test.sql` (save returns 1
+then 2; seen copies 2) and verified in the browser.
+
+
 ---
 
 ## P2 — missing product
@@ -310,6 +345,29 @@ chips lack `aria-pressed`.
 **Fix** Separate "add to my friends" from "request this session", disable
 non-signed-up friends with an explanation, and finish the a11y states.
 **Done when** selecting a friend for one session changes nothing global.
+
+### BC-51 · P2 · S — There is no dark mode
+**Problem** The app only had a light palette, and plenty of components hardcoded
+`bg-white`, so a `dark` class on `<html>` produced white cards with light text.
+**Fix** On `feat/late-cancel-and-timetable-ux`: `ThemeToggle` (a `switch` inside the
+header's overflow menu) writes `localStorage.theme`, an inline script in
+`src/app/layout.tsx` applies it before paint, and every `bg-white` became the
+`bg-card` token so the existing `.dark` variables in `src/app/globals.css` apply.
+**Done when** a member can switch themes from the menu and the choice survives a
+reload.
+
+### BC-52 · P2 · M — An ongoing session lists every 15-minute game
+**Problem** The card listed all of a member's games in a flat list, did not include
+their own name in their court line, and gave no way to see the whole session's
+schedule — so during play the page was long, repetitive and hard to read on a
+phone.
+**Fix** On `feat/late-cancel-and-timetable-ux`: an in-progress session shows only
+the current and next games (current one highlighted), prints the member's own name
+first, offers "Show all N of your games", and a "See everyone's timetable" dialog
+with every court and round, read-only, with no-shows struck through.
+**Done when** a member on court can see what is happening now and next in one
+screen, and can open the full grid in one tap.
+
 
 ---
 

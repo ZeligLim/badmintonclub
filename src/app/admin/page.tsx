@@ -34,7 +34,7 @@ export default async function AdminPage() {
       <div className="mx-auto w-full max-w-6xl">
         <header className="mb-8 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
           <Button
-            className="h-10 rounded-md bg-white px-3 hover:bg-white"
+            className="h-10 rounded-md bg-card px-3 hover:bg-card"
             nativeButton={false}
             render={<Link href="/" />}
             variant="outline"

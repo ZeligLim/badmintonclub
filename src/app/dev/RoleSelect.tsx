@@ -50,7 +50,7 @@ export function RoleSelect({ userId, initialRole }: RoleSelectProps) {
       ) : (
         <select
           aria-label="Test account role"
-          className="h-7 rounded-md bg-white px-2 py-0 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="h-7 rounded-md bg-card px-2 py-0 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
           onChange={(event) => changeRole(event.target.value)}
           value={role}
         >

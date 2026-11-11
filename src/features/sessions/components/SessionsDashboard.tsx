@@ -7,6 +7,8 @@ import {
   addFriendToList,
   finalizeDueSessions,
   joinConfirmedSessionFcfs,
+  markNoShow,
+  markTimetablesSeen,
   saveSessionFriendPreferences,
   removeFriendFromList,
   signUpForSession,
@@ -23,6 +25,7 @@ import { useServerClock } from "../use-server-clock";
 import { SessionsHeader } from "./SessionsHeader";
 import { SessionCard } from "./SessionCard";
 import { FriendListCard } from "./FriendListCard";
+import { TimetableChangeNotice } from "./TimetableChangeNotice";
 import type {
   ClubSession,
   DashboardData,
@@ -62,8 +65,10 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
   const isScheduleRefreshPending = useRef(false);
   const [errorMessage, setErrorMessage] = useState("");
   const currentTime = useServerClock(initialData.serverNow);
+  const [noticeDismissed, setNoticeDismissed] = useState(false);
   const sessionClockTime = currentTime;
   const sessions = initialData.sessions;
+  const changedSessions = sessions.filter((session) => session.timetableChanged);
 
   if (serverFriendList !== previousServerFriendList) {
     setPreviousServerFriendList(serverFriendList);
@@ -153,6 +158,22 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
         isFinalizationPending.current = false;
       });
   }, [initialData.user, router, sessionClockTime, sessions]);
+
+  async function changeNoShow(session: ClubSession) {
+    setErrorMessage("");
+    setPendingSessionId(session.id);
+    try {
+      await markNoShow(session.id, !(session.currentUserNoShow ?? false));
+      router.refresh();
+    } catch (error: unknown) {
+      logError("Could not update attendance.", {
+        errorType: error instanceof Error ? error.name : "unknown",
+      });
+      setErrorMessage("Could not update whether you are coming. Please try again.");
+    } finally {
+      setPendingSessionId(null);
+    }
+  }
 
   async function changeSignup(session: ClubSession, friendIds: string[] = []) {
     setErrorMessage("");
@@ -315,6 +336,16 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
         />
         <h1 className="sr-only">ATU Galway Badminton Club</h1>
 
+        {changedSessions.length > 0 && !noticeDismissed && (
+          <TimetableChangeNotice
+            onDismiss={() => {
+              setNoticeDismissed(true);
+              void markTimetablesSeen(changedSessions.map((session) => session.id));
+            }}
+            sessions={changedSessions}
+          />
+        )}
+
         <section aria-label="Club sessions" className="mt-7 sm:mt-10">
           <div className="grid gap-4 lg:grid-cols-2">
             {sessions.map((session) => {
@@ -349,11 +380,23 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
                       ? "not-open"
                       : getSignupWindowStatus(session, sessionClockTime)
                   }
-                  isPastCancellationDeadline={
+                  hasStarted={
+                    sessionClockTime !== null &&
+                    sessionClockTime.getTime() >=
+                      getSessionStartTimestamp(session)
+                  }
+                  isPastSignupLock={
                     sessionClockTime !== null &&
                     sessionClockTime.getTime() >=
                       getSessionStartTimestamp(session) - 30 * 60_000
                   }
+                  currentLondonTime={
+                    sessionClockTime === null
+                      ? "00:00"
+                      : londonTimeOfDay(sessionClockTime)
+                  }
+                  currentUserName={initialData.user?.displayName}
+                  onMarkNoShow={() => void changeNoShow(session)}
                   isSignedIn={Boolean(initialData.user)}
                   isPending={pendingSessionId === session.id}
                   friendList={friendList}
@@ -388,4 +431,14 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
       </div>
     </main>
   );
+}
+
+/** The London wall-clock time, `HH:MM`, for "which game is on court now". */
+function londonTimeOfDay(date: Date): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/London",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
 }

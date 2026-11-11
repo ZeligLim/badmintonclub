@@ -9,6 +9,8 @@ import {
   searchClubMembers as searchClubMembersAction,
   markSessionPlayed as markPlayed,
   cancelSignup,
+  markTimetableSeen as markTimetableSeenAction,
+  setSessionNoShow,
   signOut,
   signUp,
   updateCommitteeAutoSignup,
@@ -78,6 +80,17 @@ export async function joinConfirmedSessionFcfs(sessionId: string): Promise<void>
 
 export async function cancelSignupForSession(sessionId: string): Promise<void> {
   await cancelSignup(sessionId);
+}
+
+export async function markNoShow(
+  sessionId: string,
+  noShow = true,
+): Promise<void> {
+  await setSessionNoShow(sessionId, noShow);
+}
+
+export async function markTimetablesSeen(sessionIds: string[]): Promise<void> {
+  await markTimetableSeenAction(sessionIds);
 }
 
 export async function markSessionPlayed(sessionId: string): Promise<void> {

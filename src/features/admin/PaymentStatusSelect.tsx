@@ -49,7 +49,7 @@ export function PaymentStatusSelect({
     <span className="inline-flex flex-col gap-1">
       <select
         aria-label={`${displayName} payment`}
-        className="h-7 rounded-md border-0 bg-white px-2 py-0 outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="h-7 rounded-md border-0 bg-card px-2 py-0 outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         onChange={(event) => changePaymentStatus(event.target.value)}
         value={paymentStatus}
       >

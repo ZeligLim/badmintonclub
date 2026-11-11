@@ -41,7 +41,7 @@ export function PromoteFromWaitlistButton({
     <span className="inline-flex flex-col gap-1">
       <button
         aria-label={`Promote ${displayName} from the waitlist`}
-        className="h-7 rounded-md border border-border bg-white px-2 text-xs font-medium hover:bg-muted disabled:opacity-50"
+        className="h-7 rounded-md border border-border bg-card px-2 text-xs font-medium hover:bg-muted disabled:opacity-50"
         disabled={isPending}
         onClick={promote}
         type="button"

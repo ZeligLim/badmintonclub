@@ -20,6 +20,7 @@ import Link from "next/link";
 import { useState } from "react";
 import type { SessionSignupStatus as SignupStatus } from "../types";
 import { SessionFriendPicker } from "./SessionFriendPicker";
+import { SessionTimetableDialog } from "./SessionTimetableDialog";
 import { SessionSignupStatus } from "./SessionSignupStatus";
 
 type SessionSignupState = {
@@ -37,7 +38,14 @@ type SessionCardProps = {
   isSessionOver: boolean;
   signupWindowStatus: "not-open" | "open" | "closed";
   /** True once the clock passes session start − 30 min. The timetable is released at that point and no further changes are accepted. */
-  isPastCancellationDeadline: boolean;
+  /** The session has started; places are locked but cancel stays open until then. */
+  hasStarted: boolean;
+  /** Sign-ups and friend preferences are locked 30 minutes before the start. */
+  isPastSignupLock: boolean;
+  /** London wall-clock time, `HH:MM`, used to pick the current game. */
+  currentLondonTime: string;
+  currentUserName?: string;
+  onMarkNoShow?: () => void;
   isSignedIn: boolean;
   isPending: boolean;
   friendList: FriendCandidate[];
@@ -53,7 +61,11 @@ export function SessionCard({
   isSessionInProgress,
   isSessionOver,
   signupWindowStatus,
-  isPastCancellationDeadline,
+  hasStarted,
+  isPastSignupLock,
+  currentLondonTime,
+  currentUserName,
+  onMarkNoShow,
   isSignedIn,
   isPending,
   friendList,
@@ -76,6 +88,8 @@ export function SessionCard({
       new Set([...selectedFromSession, ...savedFriendIds]),
     ).slice(0, 3);
   });
+  const [showAllGames, setShowAllGames] = useState(false);
+  const [showEveryone, setShowEveryone] = useState(false);
 
    const signupStatus = signupState.currentUserStatus ?? "";
   const isWaitlisted = signupStatus === "waitlisted";
@@ -87,7 +101,7 @@ export function SessionCard({
     signupStatus === "selected" ? session.playerGameSchedule ?? [] : [];
   const hasFcfsSpace =
     session.status === "confirmed" &&
-    !isPastCancellationDeadline &&
+    !isPastSignupLock &&
     signupState.registeredCount < session.capacity;
   const isFirstComeFirstServed = session.allocationMode === "fcfs";
   const feeLabel = formatFee(session.feeCents);
@@ -100,13 +114,38 @@ export function SessionCard({
         : "Join session";
   const canCancelSignup =
     isSignedUp &&
-    !isSessionInProgress &&
+    !hasStarted &&
     !isSessionOver &&
-    !isPastCancellationDeadline &&
     (session.status === "confirmed" || session.status === "open");
+  const canMarkNoShow =
+    (signupStatus === "selected" || signupStatus === "played") &&
+    (isSessionInProgress || isSessionOver) &&
+    Boolean(onMarkNoShow);
+  const isNoShow = session.currentUserNoShow ?? false;
+  const nowMinutes = toMinutes(currentLondonTime);
+  const currentGames = playerGameSchedule.filter(
+    (game) =>
+      toMinutes(game.startAt) <= nowMinutes && nowMinutes < toMinutes(game.endAt),
+  );
+  const highlightedGames = isSessionInProgress
+    ? [
+        ...currentGames,
+        ...playerGameSchedule.filter(
+          (game) => toMinutes(game.startAt) > nowMinutes,
+        ),
+      ].slice(0, 2)
+    : playerGameSchedule;
+  const shownGames =
+    isSessionInProgress && !showAllGames ? highlightedGames : playerGameSchedule;
+
+  function isCurrentGame(game: { startAt: string; endAt: string }): boolean {
+    return (
+      toMinutes(game.startAt) <= nowMinutes && nowMinutes < toMinutes(game.endAt)
+    );
+  }
   const canJoinSession =
     !isSignedUp &&
-    !isPastCancellationDeadline &&
+    !isPastSignupLock &&
     !isSessionInProgress &&
     !isSessionOver &&
     (session.status === "open" || hasFcfsSpace) &&
@@ -121,7 +160,7 @@ export function SessionCard({
   }
 
   return (
-    <article className="overflow-hidden rounded-2xl bg-white">
+    <article className="overflow-hidden rounded-2xl bg-card">
       <div className="flex items-stretch">
         <div className="min-w-0 flex-1 p-4 sm:p-5">
           <div className="mt-1 grid gap-y-1 sm:flex sm:flex-wrap sm:items-baseline sm:gap-x-3">
@@ -224,11 +263,21 @@ export function SessionCard({
 
               <div className="mt-3 flex items-start gap-2 text-xs leading-5 text-muted-foreground">
                 <Clock3 aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
-                {isPastCancellationDeadline ? (
+                {hasStarted ? (
+                  <p>
+                    Playing now ·{" "}
+                    <span className="font-medium text-foreground">
+                      mark yourself as not coming
+                    </span>{" "}
+                    if you cannot make it
+                  </p>
+                ) : isPastSignupLock ? (
                   <p>
                     Timetable released ·{" "}
-                    <span className="font-medium text-foreground">session locked</span>{" "}
-                    (no further changes)
+                    <span className="font-medium text-foreground">
+                      you can still cancel
+                    </span>{" "}
+                    until the first serve
                   </p>
                 ) : hasFcfsSpace ? (
                   <p>
@@ -292,32 +341,73 @@ export function SessionCard({
             session.status !== "cancelled" &&
             playerGameSchedule.length > 0 && (
             <div aria-label="Your games" className="mt-3">
-              <p className="mb-2 text-sm font-semibold text-foreground">
-                Your games
-              </p>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-foreground">
+                  Your games
+                  {isSessionInProgress && (
+                    <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[0.65rem] font-medium uppercase tracking-wide text-primary">
+                      {currentGames.length > 0 ? "on court now" : "next up"}
+                    </span>
+                  )}
+                </p>
+                {isNoShow && (
+                  <span className="text-[0.65rem] font-medium uppercase tracking-wide text-amber-700">
+                    Not coming
+                  </span>
+                )}
+              </div>
               <ul className="grid gap-2 text-sm sm:grid-cols-2">
-                {playerGameSchedule.map((game) => (
+                {shownGames.map((game) => (
                   <li
+                    className={`rounded-xl p-3 text-foreground ${
+                      isCurrentGame(game) ? "bg-primary/10 ring-1 ring-primary/30" : "bg-primary/5"
+                    }`}
                     key={`${game.startAt}-${game.courtNumber}`}
-                    className="rounded-xl bg-primary/5 p-3 text-foreground"
                   >
                     <div className="font-semibold text-primary">
                       Court {game.courtNumber} ·{" "}
                       {formatTimeOfDay(game.startAt)}–
                       {formatTimeOfDay(game.endAt)}
                     </div>
-                    {game.courtPlayers.length > 0 && (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        with{" "}
-                        <span className="font-medium text-foreground">
-                          {game.courtPlayers.join(", ")}
-                        </span>
-                      </p>
-                    )}
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      <span className="font-semibold text-foreground">
+                        {currentUserName ?? "You"}
+                      </span>
+                      {game.courtPlayers.length > 0 && (
+                        <>, {game.courtPlayers.join(", ")}</>
+                      )}
+                    </p>
                   </li>
                 ))}
               </ul>
+              {isSessionInProgress && playerGameSchedule.length > shownGames.length && (
+                <button
+                  className="mt-2 text-xs font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  onClick={() => setShowAllGames((value) => !value)}
+                  type="button"
+                >
+                  {showAllGames
+                    ? "Show fewer games"
+                    : `Show all ${playerGameSchedule.length} of your games`}
+                </button>
+              )}
+              {(session.fullTimetable?.length ?? 0) > 0 && (
+                <button
+                  className="mt-2 block text-xs font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  onClick={() => setShowEveryone(true)}
+                  type="button"
+                >
+                  See everyone’s timetable
+                </button>
+              )}
             </div>
+          )}
+
+          {showEveryone && (
+            <SessionTimetableDialog
+              onClose={() => setShowEveryone(false)}
+              session={session}
+            />
           )}
 
           {isWaitlisted && session.status !== "cancelled" && (
@@ -332,7 +422,7 @@ export function SessionCard({
             session.status !== "cancelled" &&
             !isSessionInProgress &&
             !isSessionOver &&
-            !isPastCancellationDeadline &&
+            !isPastSignupLock &&
             (isSignedUp || canJoinSession) && (
               <SessionFriendPicker
                 friendCandidates={friendCandidates}
@@ -368,6 +458,17 @@ export function SessionCard({
                 ) : null}
               </>
             )}
+            {canMarkNoShow && (
+              <Button
+                className="h-auto min-h-10 py-2.5"
+                disabled={isPending}
+                onClick={onMarkNoShow}
+                size="sm"
+                variant={isNoShow ? "secondary" : "outline"}
+              >
+                {isNoShow ? "I’m coming after all" : "No show"}
+              </Button>
+            )}
             {!isPlayed &&
               session.status !== "cancelled" &&
               (canCancelSignup || canJoinSession) && (
@@ -390,7 +491,7 @@ export function SessionCard({
                 ) : (
                   <>
                     {isSignedUp && <Check aria-hidden="true" />}
-                    {actionLabel}
+                    {canCancelSignup ? "Cancel place" : actionLabel}
                     {!isSignedUp && <ArrowRight aria-hidden="true" />}
                   </>
                 )}
@@ -402,4 +503,10 @@ export function SessionCard({
       </div>
     </article>
   );
+}
+
+/** "18:15" -> 1095. Unreadable values sort to the front rather than throwing. */
+function toMinutes(time: string): number {
+  const [hour, minute] = time.split(":").map(Number);
+  return Number.isFinite(hour) && Number.isFinite(minute) ? hour * 60 + minute : 0;
 }

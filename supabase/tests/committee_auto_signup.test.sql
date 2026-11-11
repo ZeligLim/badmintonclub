@@ -605,6 +605,19 @@ select set_config(
   '{"sub":"22000000-0000-4000-8000-000000000012","email":"committee-auto-12@atu.ie","role":"authenticated"}',
   true
 );
+-- finalize_due_sessions materialises the club's scheduled sessions, and on a
+-- Wednesday the evening session's confirmation deadline has already passed.
+-- Materialise them first, park any that are already due, then finalize: only the
+-- fixture below should be counted.
+reset role;
+select public.ensure_next_week_sessions();
+update public.sessions
+set confirmation_at = now() + interval '1 day'
+where id::text not like '32000000-0000-4000-8000-%'
+  and status = 'open'
+  and confirmation_at <= now();
+set local role authenticated;
+
 select is(
   public.finalize_due_sessions(),
   1,

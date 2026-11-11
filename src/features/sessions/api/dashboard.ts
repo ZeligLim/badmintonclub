@@ -15,16 +15,19 @@ import type {
   SessionAllocationMode,
   SessionSignupStatus,
   SessionStatus,
+  TimetableGame,
 } from "../types";
 import {
   getCourtCount,
   getPlayerGamesFromCourtSchedule,
+  type PersistedCourtGame,
   isCurrentPersistedCourtSchedule,
   isSessionTimetableLocked,
 } from "../court-schedule";
 import {
   ensureSessionTimetable,
   readPersistedTimetables,
+  readTimetableVersions,
 } from "@/features/sessions/api/timetable";
 import { isClubEmail } from "@/lib/validation";
 import { logError, logWarning } from "@/lib/log";
@@ -117,6 +120,9 @@ export async function loadDashboardData(): Promise<DashboardData> {
 
   const userPlayerGameSchedules = new Map<string, import("../types").PlayerGame[]>();
   const outdatedTimetimeables = new Set<string>();
+  const fullTimetables = new Map<string, TimetableGame[]>();
+  const mySignups = new Map<string, MySignup>();
+  const timetableVersions = new Map<string, number>();
   if (user) {
     try {
       const confirmedSessionIds = sessionRows
@@ -134,6 +140,25 @@ export async function loadDashboardData(): Promise<DashboardData> {
       const timetableBySession = await readPersistedTimetables(
         confirmedSessionIds,
       );
+      for (const [sessionId, version] of await readTimetableVersions(
+        confirmedSessionIds,
+      )) {
+        timetableVersions.set(sessionId, version);
+      }
+      for (const [sessionId, signup] of await getMySignups(
+        supabase,
+        user.id,
+        sessionRows.map((row) => row.id),
+      )) {
+        mySignups.set(sessionId, signup);
+      }
+      const noShowBySession = new Map<string, Set<string>>();
+      for (const player of scheduleInputs) {
+        if (!player.no_show) continue;
+        const set = noShowBySession.get(player.session_id) ?? new Set<string>();
+        set.add(player.user_id);
+        noShowBySession.set(player.session_id, set);
+      }
 
       for (const sessionRow of sessionRows.filter(
         (row) => row.status === "confirmed",
@@ -161,6 +186,15 @@ export async function loadDashboardData(): Promise<DashboardData> {
         userPlayerGameSchedules.set(
           sessionRow.id,
           getPlayerGamesFromCourtSchedule(timetable, user.id),
+        );
+        fullTimetables.set(
+          sessionRow.id,
+          buildTimetableView(
+            timetable,
+            playersBySession.get(sessionRow.id) ?? [],
+            user.id,
+            noShowBySession.get(sessionRow.id) ?? new Set<string>(),
+          ),
         );
 
         const persisted = timetableBySession.get(sessionRow.id);
@@ -200,6 +234,19 @@ export async function loadDashboardData(): Promise<DashboardData> {
         sessionId: row.id,
       });
     }
+  }
+
+  for (const session of sessions) {
+    const mine = mySignups.get(session.id);
+    const version = timetableVersions.get(session.id) ?? 0;
+    const seenVersion = mine?.timetableSeenVersion ?? 0;
+    session.fullTimetable = fullTimetables.get(session.id) ?? [];
+    session.timetableVersion = version;
+    session.timetableSeenVersion = seenVersion;
+    // Only a member who has already looked at a saved timetable can tell that
+    // it moved. A first view is not a change.
+    session.timetableChanged = seenVersion > 0 && version > seenVersion;
+    session.currentUserNoShow = mine?.noShow ?? false;
   }
 
   return {
@@ -499,4 +546,62 @@ function getSignupStatus(
 
   logWarning("A session signup returned an unsupported status.", { value });
   return null;
+}
+
+type MySignup = {
+  timetableSeenVersion: number;
+  noShow: boolean;
+};
+
+/** The caller's own signups: what they last saw, and whether they called off. */
+async function getMySignups(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  sessionIds: string[],
+): Promise<Map<string, MySignup>> {
+  const result = new Map<string, MySignup>();
+  if (sessionIds.length === 0) {
+    return result;
+  }
+
+  const { data, error } = await supabase
+    .from("session_signups")
+    .select("session_id, timetable_seen_version, no_show_at")
+    .eq("user_id", userId)
+    .in("session_id", sessionIds);
+
+  if (error) {
+    logError("Could not read your place in these sessions.", error);
+    return result;
+  }
+
+  for (const row of data ?? []) {
+    result.set(row.session_id, {
+      timetableSeenVersion: row.timetable_seen_version,
+      noShow: row.no_show_at !== null,
+    });
+  }
+
+  return result;
+}
+
+/** Project the saved timetable into the read-only view every member can open. */
+function buildTimetableView(
+  games: PersistedCourtGame[],
+  roster: ScheduleInputRow[],
+  viewerId: string,
+  noShow: Set<string>,
+): TimetableGame[] {
+  const names = new Map(roster.map((player) => [player.user_id, player.display_name]));
+
+  return games.map((game) => ({
+    courtNumber: game.courtNumber,
+    startAt: game.startAt,
+    endAt: game.endAt,
+    players: game.players.map((player) => ({
+      displayName: names.get(player.id) ?? player.displayName,
+      isYou: player.id === viewerId,
+      noShow: noShow.has(player.id),
+    })),
+  }));
 }

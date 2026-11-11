@@ -72,7 +72,7 @@ export function RepairTimetableForm({
         <label className="flex flex-col gap-1 text-xs">
           <span className="text-muted-foreground">Take out</span>
           <select
-            className="h-8 rounded-md border border-border bg-white px-2 text-sm"
+            className="h-8 rounded-md border border-border bg-card px-2 text-sm"
             onChange={(event) => setOutUserId(event.target.value)}
             value={outUserId}
           >
@@ -87,7 +87,7 @@ export function RepairTimetableForm({
         <label className="flex flex-col gap-1 text-xs">
           <span className="text-muted-foreground">Put in</span>
           <select
-            className="h-8 rounded-md border border-border bg-white px-2 text-sm"
+            className="h-8 rounded-md border border-border bg-card px-2 text-sm"
             onChange={(event) => setInUserId(event.target.value)}
             value={inUserId}
           >
@@ -102,7 +102,7 @@ export function RepairTimetableForm({
         <label className="flex min-w-48 flex-1 flex-col gap-1 text-xs">
           <span className="text-muted-foreground">Why (recorded in the audit log)</span>
           <input
-            className="h-8 rounded-md border border-border bg-white px-2 text-sm"
+            className="h-8 rounded-md border border-border bg-card px-2 text-sm"
             onChange={(event) => setReason(event.target.value)}
             placeholder="e.g. injured, asked to swap"
             type="text"

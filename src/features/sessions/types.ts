@@ -41,6 +41,21 @@ export type SessionTimeSlot = {
 
 export type PlayerGame = CourtPlayerGame;
 
+/** One player as they appear on the published timetable. */
+export type TimetablePlayer = {
+  displayName: string;
+  isYou: boolean;
+  noShow: boolean;
+};
+
+/** One court for one round, as every member sees it. */
+export type TimetableGame = {
+  courtNumber: number;
+  startAt: string;
+  endAt: string;
+  players: TimetablePlayer[];
+};
+
 export type ClubSession = {
   id: string;
   date: string;
@@ -62,6 +77,19 @@ export type ClubSession = {
   friendCandidates: FriendCandidate[];
   timeSlots: SessionTimeSlot[];
   playerGameSchedule?: PlayerGame[];
+  /**
+   * The whole published timetable for this session (every court, every round),
+   * shown read-only so members can see who else is playing when.
+   */
+  fullTimetable?: TimetableGame[];
+  /** Version of the saved timetable this page rendered. */
+  timetableVersion?: number;
+  /** Version this member last acknowledged. */
+  timetableSeenVersion?: number;
+  /** True when the timetable moved since the member last looked at it. */
+  timetableChanged?: boolean;
+  /** The member told the club they are not coming after the session started. */
+  currentUserNoShow?: boolean;
   /**
    * Set when the database returned a value this build does not understand.
    * The session still renders, with a warning badge, instead of 500ing the page.
