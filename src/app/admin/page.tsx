@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { AdminNavigation } from "@/features/admin/AdminNavigation";
+import { SessionTabs } from "@/features/admin/SessionTabs";
 import {
   CourtScheduleTable,
   loadAdminData,
@@ -43,11 +44,11 @@ export default async function AdminPage() {
         {sessions.length === 0 ? (
           <p className="text-sm text-muted-foreground">No upcoming sessions found.</p>
         ) : (
-          <div className="space-y-10">
+          <SessionTabs sessions={sessions}>
             {sessions.map((session) => (
               <CourtScheduleTable key={session.id} session={session} />
             ))}
-          </div>
+          </SessionTabs>
         )}
 
       </div>
