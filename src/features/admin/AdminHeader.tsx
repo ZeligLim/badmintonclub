@@ -6,10 +6,10 @@ export function AdminHeader({ email }: { email?: string | null }) {
   return (
     <header className="mb-8 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
       <Button
-        className="h-10 rounded-md bg-white px-3 hover:bg-white"
+        className="h-10 rounded-lg border-primary bg-primary px-4 text-primary-foreground hover:bg-primary/90"
         nativeButton={false}
         render={<Link href="/" />}
-        variant="outline"
+        variant="default"
       >
         <ArrowLeft aria-hidden="true" />
         Sessions

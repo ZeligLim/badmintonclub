@@ -115,9 +115,8 @@ export function isSessionTimetableLocked(
 }
 
 /**
- * A saved timetable is refreshed only while it is still private. A published
- * timetable is used exactly as saved, even if it was produced by an older
- * allocator version.
+ * A saved timetable is the source of truth until an explicit regeneration.
+ * Merely loading an admin or member page must never reshuffle its games.
  */
 export function shouldRefreshPersistedCourtSchedule(
   value: unknown,
@@ -127,7 +126,7 @@ export function shouldRefreshPersistedCourtSchedule(
   // A confirmed timetable has already been announced to players by email or
   // on the dashboard. Never rewrite it just because the allocator changed.
   if (options.isLocked || options.isConfirmed) return false;
-  return !isCurrentPersistedCourtSchedule(value);
+  return false;
 }
 
 /** Project a saved timetable into the games one player appears in. */

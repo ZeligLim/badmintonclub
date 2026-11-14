@@ -23,6 +23,7 @@ type SessionFriendPickerProps = {
   sessionId: string;
   onAddToFriendList: (friend: FriendCandidate) => Promise<void>;
   onChange: (friendIds: string[]) => void;
+  onDropdownOpenChange: (isOpen: boolean) => void;
   onSave: (friendIds: string[]) => Promise<void>;
   selectedFriendIds: string[];
 };
@@ -35,6 +36,7 @@ export function SessionFriendPicker({
   sessionId,
   onAddToFriendList,
   onChange,
+  onDropdownOpenChange,
   onSave,
   selectedFriendIds,
 }: SessionFriendPickerProps) {
@@ -96,7 +98,7 @@ export function SessionFriendPicker({
     const requestId = searchRequestId.current;
 
     if (
-      normalizedQuery.length < 2 ||
+      normalizedQuery.length < 1 ||
       normalizedQuery.length > 64
     ) {
       return;
@@ -165,6 +167,8 @@ export function SessionFriendPicker({
       setQuery("");
       setSearchResults([]);
       setIsSearching(false);
+      setIsSearchFocused(false);
+      onDropdownOpenChange(false);
       setFeedback(`${friend.displayName} added to your friend list.`);
     } catch (error: unknown) {
       logError("Could not add this friend.", {
@@ -231,8 +235,8 @@ export function SessionFriendPicker({
   }
 
   return (
-    <fieldset className="mt-4 border-t border-border pt-3">
-      <legend className="text-sm font-medium">Play with friends (optional)</legend>
+    <fieldset className="mt-4">
+      <legend className="mb-2 text-sm font-medium">Play with friends</legend>
       <p className="text-xs font-medium text-muted-foreground">
         Selected friends ({selectedFriends.length})
       </p>
@@ -283,12 +287,13 @@ export function SessionFriendPicker({
         <p className="mt-1 text-xs text-muted-foreground">No friends selected.</p>
       )}
       <div
-        className="mt-2 grid min-w-0 gap-1"
+        className={`relative mt-2 grid min-w-0 gap-1 ${isSearchFocused ? "z-30" : ""}`}
         onBlur={(event) => {
           const searchContainer = event.currentTarget;
           window.setTimeout(() => {
             if (!searchContainer.contains(document.activeElement)) {
               setIsSearchFocused(false);
+              onDropdownOpenChange(false);
             }
           }, 0);
         }}
@@ -310,7 +315,10 @@ export function SessionFriendPicker({
           disabled={isPending || isAddingFriend}
           id={`${searchId}-input`}
           maxLength={64}
-          onFocus={() => setIsSearchFocused(true)}
+          onFocus={() => {
+            setIsSearchFocused(true);
+            onDropdownOpenChange(true);
+          }}
           onChange={(event) => {
             searchRequestId.current += 1;
             setQuery(event.target.value);
@@ -328,7 +336,7 @@ export function SessionFriendPicker({
       {isSearchFocused && availableFriends.length > 0 && (
         <ul
           aria-label="Search results"
-          className="mt-1 grid max-h-56 gap-1 overflow-y-auto rounded-lg border border-border bg-background p-1 shadow-lg"
+          className="absolute left-0 right-0 top-full z-30 mt-1 grid max-h-56 gap-1 overflow-y-auto rounded-lg border border-border bg-background p-1 shadow-lg"
           id={`${searchId}-results`}
           role="listbox"
         >

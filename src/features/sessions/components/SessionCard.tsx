@@ -62,6 +62,7 @@ export function SessionCard({
   onSaveFriendPreferences,
 }: SessionCardProps) {
   const friendCandidates = session.friendCandidates ?? [];
+  const [isFriendSearchOpen, setIsFriendSearchOpen] = useState(false);
   const [selectedFriendIds, setSelectedFriendIds] = useState(() => {
     const savedFriendIds = friendList
       .map((friend) => friend.userId)
@@ -118,7 +119,9 @@ export function SessionCard({
   }
 
   return (
-    <article className="overflow-hidden rounded-2xl bg-white">
+    <article
+      className={`relative rounded-2xl bg-white ${isFriendSearchOpen ? "z-20" : ""}`}
+    >
       <div className="flex items-stretch">
         <div className="min-w-0 flex-1 p-4 sm:p-5">
           <div className="mt-1 grid gap-y-1 sm:flex sm:flex-wrap sm:items-baseline sm:gap-x-3">
@@ -339,6 +342,7 @@ export function SessionCard({
                 sessionId={session.id}
                 onAddToFriendList={onAddToFriendList}
                 onChange={setSelectedFriendIds}
+                onDropdownOpenChange={setIsFriendSearchOpen}
                 onSave={onSaveFriendPreferences}
                 selectedFriendIds={selectedFriendIds}
               />

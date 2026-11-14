@@ -358,36 +358,46 @@ export async function swapTimetablePlayers(
     courtB: number;
     startB: string;
   },
-): Promise<void> {
-  assertTimetableEdit((await requireAdminUser()) !== null, input.sessionId);
-  if (
-    !isUuid(input.playerAId) ||
-    !isUuid(input.playerBId) ||
-    !isCourtNumber(input.courtA) ||
-    !isCourtNumber(input.courtB) ||
-    !isStartAt(input.startA) ||
-    !isStartAt(input.startB)
-  ) {
-    throw new Error("The timetable request is invalid.");
-  }
+): Promise<{ error?: string }> {
+  try {
+    assertTimetableEdit((await requireAdminUser()) !== null, input.sessionId);
+    if (
+      !isUuid(input.playerAId) ||
+      !isUuid(input.playerBId) ||
+      !isCourtNumber(input.courtA) ||
+      !isCourtNumber(input.courtB) ||
+      !isStartAt(input.startA) ||
+      !isStartAt(input.startB)
+    ) {
+      return { error: "The timetable request is invalid. Refresh and try again." };
+    }
 
-  const supabase = await createClient();
-  const { error } = await supabase.rpc("admin_swap_session_players", {
-    p_session_id: input.sessionId,
-    p_user_a_id: input.playerAId,
-    p_court_a: input.courtA,
-    p_start_a: input.startA,
-    p_user_b_id: input.playerBId,
-    p_court_b: input.courtB,
-    p_start_b: input.startB,
-    p_reason: reasonOrNull(input.reason),
-  });
-  if (error) {
-    logError("Could not swap those players.", error);
-    throw new Error(error.message || "Could not swap those players.");
-  }
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("admin_swap_session_players", {
+      p_session_id: input.sessionId,
+      p_user_a_id: input.playerAId,
+      p_court_a: input.courtA,
+      p_start_a: input.startA,
+      p_user_b_id: input.playerBId,
+      p_court_b: input.courtB,
+      p_start_b: input.startB,
+      p_reason: reasonOrNull(input.reason),
+    });
+    if (error) {
+      logError("Could not swap those players.", error);
+      return { error: error.message || "Could not swap those players." };
+    }
 
-  revalidatePath("/admin");
+    revalidatePath("/admin");
+    return {};
+  } catch (cause) {
+    logError("Could not swap those players.", cause);
+    return {
+      error: cause instanceof Error
+        ? cause.message
+        : "Could not swap those players. Please try again.",
+    };
+  }
 }
 
 export async function removeTimetablePlayer(
