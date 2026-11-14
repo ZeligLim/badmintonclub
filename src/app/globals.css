@@ -130,14 +130,6 @@
   }
 }
 
-body {
-  background-image: radial-gradient(
-    ellipse at 48% -30%,
-    oklch(0.94 0.04 100 / 65%),
-    transparent 55%
-  );
-}
-
 .capacity-track {
   width: 3.25rem;
   height: 0.25rem;
