@@ -346,6 +346,7 @@ export type Database = {
           capacity: number;
           committee_auto_signup: boolean;
           confirmation_at: string;
+          court_count: number;
           created_at: string;
           duration_minutes: number;
           event_date: string;
@@ -355,7 +356,6 @@ export type Database = {
           starts_at: string;
           status: string;
           template_id: string | null;
-          court_count: number;
         };
         ComputedFields: never;
         Insert: {
@@ -363,6 +363,7 @@ export type Database = {
           capacity?: number;
           committee_auto_signup?: boolean;
           confirmation_at: string;
+          court_count: number;
           created_at?: string;
           duration_minutes?: number;
           event_date: string;
@@ -372,13 +373,13 @@ export type Database = {
           starts_at?: string;
           status?: string;
           template_id?: string | null;
-          court_count: number;
         };
         Update: {
           allocation_mode?: string;
           capacity?: number;
           committee_auto_signup?: boolean;
           confirmation_at?: string;
+          court_count?: number;
           created_at?: string;
           duration_minutes?: number;
           event_date?: string;
@@ -388,7 +389,6 @@ export type Database = {
           starts_at?: string;
           status?: string;
           template_id?: string | null;
-          court_count?: number;
         };
         Relationships: [
           {
@@ -580,8 +580,8 @@ export type Database = {
         Returns: {
           allocation_mode: string;
           capacity: number;
-          court_count: number;
           confirmation_at: string;
+          court_count: number;
           current_user_slot: number;
           current_user_status: string;
           day_name: string;
