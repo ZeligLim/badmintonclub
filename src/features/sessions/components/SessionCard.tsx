@@ -67,14 +67,11 @@ export function SessionCard({
       .map((friend) => friend.userId)
       .filter((userId) =>
         friendCandidates.some((candidate) => candidate.userId === userId),
-      )
-      .slice(0, 3);
+      );
     const selectedFromSession = friendCandidates
       .filter((candidate) => candidate.isSelected)
       .map((candidate) => candidate.userId);
-    return Array.from(
-      new Set([...selectedFromSession, ...savedFriendIds]),
-    ).slice(0, 3);
+    return Array.from(new Set([...selectedFromSession, ...savedFriendIds]));
   });
 
    const signupStatus = signupState.currentUserStatus ?? "";

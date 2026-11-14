@@ -97,8 +97,7 @@ export function SessionFriendPicker({
 
     if (
       normalizedQuery.length < 2 ||
-      normalizedQuery.length > 64 ||
-      selectedFriendIds.length >= 3
+      normalizedQuery.length > 64
     ) {
       return;
     }
@@ -139,7 +138,7 @@ export function SessionFriendPicker({
   ]);
 
   async function addSelectedFriend(friend: FriendCandidate) {
-    if (isPending || isAddingFriend || selectedFriendIds.length >= 3) {
+    if (isPending || isAddingFriend) {
       return;
     }
     if (selectedFriendIds.includes(friend.userId)) {
@@ -147,16 +146,21 @@ export function SessionFriendPicker({
       return;
     }
 
+    const isInFriendList =
+      friendList.some((item) => item.userId === friend.userId) ||
+      addedFriends.some((item) => item.userId === friend.userId);
     setIsAddingFriend(true);
     setFeedback(null);
     try {
-      await onAddToFriendList(friend);
-      setAddedFriends((currentFriends) => [
-        ...currentFriends.filter(
-          (currentFriend) => currentFriend.userId !== friend.userId,
-        ),
-        friend,
-      ]);
+      if (!isInFriendList) {
+        await onAddToFriendList(friend);
+        setAddedFriends((currentFriends) => [
+          ...currentFriends.filter(
+            (currentFriend) => currentFriend.userId !== friend.userId,
+          ),
+          friend,
+        ]);
+      }
       onChange([...selectedFriendIds, friend.userId]);
       setQuery("");
       setSearchResults([]);
@@ -230,7 +234,7 @@ export function SessionFriendPicker({
     <fieldset className="mt-4 border-t border-border pt-3">
       <legend className="text-sm font-medium">Play with friends (optional)</legend>
       <p className="text-xs font-medium text-muted-foreground">
-        Selected friends ({selectedFriends.length}/3)
+        Selected friends ({selectedFriends.length})
       </p>
       {selectedFriends.length > 0 ? (
         <>
@@ -303,7 +307,7 @@ export function SessionFriendPicker({
           aria-expanded={isSearchFocused && availableFriends.length > 0}
           autoComplete="off"
           className="h-10 w-full min-w-0 rounded-md border-0 bg-background px-3 text-sm outline-none focus:border-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0"
-          disabled={isPending || isAddingFriend || selectedFriendIds.length >= 3}
+          disabled={isPending || isAddingFriend}
           id={`${searchId}-input`}
           maxLength={64}
           onFocus={() => setIsSearchFocused(true)}
@@ -345,8 +349,7 @@ export function SessionFriendPicker({
                   disabled={
                     isPending ||
                     isAddingFriend ||
-                    isSelected ||
-                    selectedFriendIds.length >= 3
+                    isSelected
                   }
                   onClick={() => void addSelectedFriend(friend)}
                   onMouseEnter={() => setActiveResultIndex(index)}

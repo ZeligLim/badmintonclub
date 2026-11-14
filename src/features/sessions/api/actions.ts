@@ -310,8 +310,8 @@ function validateSessionId(sessionId: string): void {
 
 function validateFriendIds(friendIds: string[]): void {
   const hasInvalidId = friendIds.some((friendId) => !isUuid(friendId));
-  if (friendIds.length > 3 || hasInvalidId) {
-    throw new Error("Select up to three valid club members.");
+  if (hasInvalidId) {
+    throw new Error("Select valid club members.");
   }
 }
 
