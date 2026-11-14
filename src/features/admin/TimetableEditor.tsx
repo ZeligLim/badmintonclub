@@ -183,7 +183,7 @@ export function TimetableEditor({ session }: { session: AdminSession }) {
             </span>
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {Array.from({ length: session.courtCount }, (_, index) => {
               const courtNumber = index + 1;
               const game = gameFor(slot.startAt, courtNumber);
