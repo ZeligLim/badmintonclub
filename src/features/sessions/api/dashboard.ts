@@ -146,6 +146,7 @@ export async function loadDashboardData(): Promise<DashboardData> {
             startsAt: sessionRow.starts_at,
             durationMinutes: sessionRow.duration_minutes,
             capacity: sessionRow.capacity,
+            courtCount: sessionRow.court_count,
             isConfirmed: true,
           },
           players: (playersBySession.get(sessionRow.id) ?? []).map((player) => ({
@@ -367,7 +368,7 @@ function mapSession(
     dayName,
     startsAt: row.starts_at,
     durationMinutes: row.duration_minutes,
-    courtCount: getCourtCount(row.capacity),
+    courtCount: row.court_count ?? getCourtCount(row.capacity),
     capacity: row.capacity,
     registeredCount: row.registered_count,
     playersPerSlot: 4,

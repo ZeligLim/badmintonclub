@@ -10,10 +10,7 @@ import type {
 } from "@/features/sessions/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import {
-  getCourtCount,
-  type SessionAllocationMode,
-} from "@/features/sessions";
+import type { SessionAllocationMode } from "@/features/sessions";
 import { getSessionDayName } from "@/lib/sessions/schedule";
 import { getClubNow } from "@/features/sessions/club-clock";
 import { isSessionTimetableLocked } from "@/features/sessions/court-schedule";
@@ -273,7 +270,7 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
   // no longer actionable and should not appear on the admin schedule view.
   const { data: sessions, error: sessionsErr } = await admin
     .from("sessions")
-    .select("id, event_date, starts_at, duration_minutes, capacity, fee_cents, status")
+    .select("id, event_date, starts_at, duration_minutes, capacity, court_count, fee_cents, status")
     .in("status", ["open", "confirmed", "cancelled"])
     .gte("event_date", londonNow.date)
     .order("event_date");
@@ -358,7 +355,7 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
       paymentStatus: toPaymentStatus(s.payment_status),
     }));
 
-    const courtCount = getCourtCount(session.capacity);
+    const courtCount = session.court_count;
     const selectedPlayers = players
       .filter((p) => p.status === "selected" || p.status === "played")
       .sort((a, b) => (a.slotNumber ?? 99) - (b.slotNumber ?? 99));
@@ -373,6 +370,7 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
         startsAt: session.starts_at,
         durationMinutes: session.duration_minutes,
         capacity: session.capacity,
+        courtCount,
         isConfirmed: session.status === "confirmed",
       },
       now: clubNow,

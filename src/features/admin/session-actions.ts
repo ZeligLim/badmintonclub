@@ -25,7 +25,7 @@ export async function regenerateSessionCourtSchedule(sessionId: string): Promise
   const admin = createAdminClient();
   const { data: session, error: sessionError } = await admin
     .from("sessions")
-    .select("id, status, event_date, starts_at, duration_minutes, capacity")
+    .select("id, status, event_date, starts_at, duration_minutes, capacity, court_count")
     .eq("id", sessionId)
     .maybeSingle();
   if (sessionError || !session || !["open", "confirmed"].includes(session.status)) {
@@ -92,6 +92,7 @@ export async function regenerateSessionCourtSchedule(sessionId: string): Promise
       startsAt: session.starts_at,
       durationMinutes: session.duration_minutes,
       capacity: session.capacity,
+      courtCount: session.court_count,
       isConfirmed: session.status === "confirmed",
     },
     players: signups.map((signup) => {
@@ -112,6 +113,37 @@ export async function regenerateSessionCourtSchedule(sessionId: string): Promise
     throw new Error("The court schedule could not be regenerated.");
   }
 
+  revalidatePath("/admin");
+  revalidatePath("/");
+}
+
+export async function updateSessionCourtCount(sessionId: string, courtCount: number): Promise<void> {
+  if (!(await requireAdminUser())) throw new Error("Only a club administrator can change court count.");
+  if (!isUuid(sessionId) || !Number.isInteger(courtCount) || courtCount < 1 || courtCount > 4) {
+    throw new Error("Choose between one and four courts.");
+  }
+  const admin = createAdminClient();
+  const { data: session, error: readError } = await admin.from("sessions")
+    .select("id, status, event_date, starts_at, court_count").eq("id", sessionId).maybeSingle();
+  if (readError || !session || !["open", "confirmed"].includes(session.status)) throw new Error("This session cannot be changed.");
+  if (isSessionTimetableLocked({ eventDate: session.event_date, startsAt: session.starts_at })) {
+    throw new Error("The timetable has already been released and can no longer be changed.");
+  }
+  const { error } = await admin.from("sessions").update({ court_count: courtCount }).eq("id", sessionId);
+  if (error) throw new Error("Could not update the court count.");
+  const { count: selectedCount, error: selectedError } = await admin.from("session_signups")
+    .select("user_id", { count: "exact", head: true }).eq("session_id", sessionId).in("status", ["selected", "played"]);
+  if (selectedError) {
+    await admin.from("sessions").update({ court_count: session.court_count }).eq("id", sessionId);
+    throw new Error("Could not check the current timetable.");
+  }
+  if ((selectedCount ?? 0) > 0) {
+    try { await regenerateSessionCourtSchedule(sessionId); }
+    catch (scheduleError) {
+      await admin.from("sessions").update({ court_count: session.court_count }).eq("id", sessionId);
+      throw scheduleError;
+    }
+  }
   revalidatePath("/admin");
   revalidatePath("/");
 }

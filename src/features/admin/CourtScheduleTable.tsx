@@ -6,6 +6,8 @@ import { RegenerateCourtScheduleButton } from "./RegenerateCourtScheduleButton";
 import { PromoteFromWaitlistButton } from "./PromoteFromWaitlistButton";
 import { PaymentStatusSelect } from "./PaymentStatusSelect";
 import { TimetableEditor } from "./TimetableEditor";
+import { SessionCourtCountSelect } from "./SessionCourtCountSelect";
+import { TimetablePngDownload } from "./TimetablePngDownload";
 
 export function CourtScheduleTable({ session }: { session: AdminSession }) {
   const selectedPlayers = session.players.filter(
@@ -69,6 +71,8 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
         {!isCancelled && !timetableLocked && selectedPlayers.length > 0 && (
           <RegenerateCourtScheduleButton sessionId={session.id} />
         )}
+        {!isCancelled && <SessionCourtCountSelect courtCount={session.courtCount} sessionId={session.id} disabled={timetableLocked} />}
+        {!isCancelled && session.courtSchedule.length > 0 && <TimetablePngDownload session={session} />}
       </div>
 
       {session.timetableNeedsSaving && !isCancelled ? (

@@ -197,14 +197,14 @@ isOneToOne: true
                   ]
                 },"sessions": {
                   Row: {
-                    "allocation_mode": string,"capacity": number,"committee_auto_signup": boolean,"confirmation_at": string,"created_at": string,"duration_minutes": number,"event_date": string,"fee_cents": number,"id": string,"signup_opens_at": string,"starts_at": string,"status": string,"template_id": string | null
+                    "allocation_mode": string,"capacity": number,"court_count": number,"committee_auto_signup": boolean,"confirmation_at": string,"created_at": string,"duration_minutes": number,"event_date": string,"fee_cents": number,"id": string,"signup_opens_at": string,"starts_at": string,"status": string,"template_id": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "allocation_mode"?: string,"capacity"?: number,"committee_auto_signup"?: boolean,"confirmation_at": string,"created_at"?: string,"duration_minutes"?: number,"event_date": string,"fee_cents"?: number,"id"?: string,"signup_opens_at": string,"starts_at"?: string,"status"?: string,"template_id"?: string | null
+                    "allocation_mode"?: string,"capacity"?: number,"court_count"?: number,"committee_auto_signup"?: boolean,"confirmation_at": string,"created_at"?: string,"duration_minutes"?: number,"event_date": string,"fee_cents"?: number,"id"?: string,"signup_opens_at": string,"starts_at"?: string,"status"?: string,"template_id"?: string | null
                   }
                   Update: {
-                    "allocation_mode"?: string,"capacity"?: number,"committee_auto_signup"?: boolean,"confirmation_at"?: string,"created_at"?: string,"duration_minutes"?: number,"event_date"?: string,"fee_cents"?: number,"id"?: string,"signup_opens_at"?: string,"starts_at"?: string,"status"?: string,"template_id"?: string | null
+                    "allocation_mode"?: string,"capacity"?: number,"court_count"?: number,"committee_auto_signup"?: boolean,"confirmation_at"?: string,"created_at"?: string,"duration_minutes"?: number,"event_date"?: string,"fee_cents"?: number,"id"?: string,"signup_opens_at"?: string,"starts_at"?: string,"status"?: string,"template_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -316,7 +316,7 @@ isOneToOne: false
                            },
 "get_dashboard_sessions":
 { Args: { "p_from_date": string,"p_through_date": string }; Returns: {
-              "allocation_mode": string,"capacity": number,"confirmation_at": string,"current_user_slot": number,"current_user_status": string,"day_name": string,"duration_minutes": number,"event_date": string,"fee_cents": number,"id": string,"registered_count": number,"signup_opens_at": string,"starts_at": string,"status": string
+              "allocation_mode": string,"capacity": number,"court_count": number,"confirmation_at": string,"current_user_slot": number,"current_user_status": string,"day_name": string,"duration_minutes": number,"event_date": string,"fee_cents": number,"id": string,"registered_count": number,"signup_opens_at": string,"starts_at": string,"status": string
             }[]
                            },
 "get_dashboard_window":

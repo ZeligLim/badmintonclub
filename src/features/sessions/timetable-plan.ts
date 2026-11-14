@@ -26,6 +26,7 @@ export type TimetableSession = {
   startsAt: string;
   durationMinutes: number;
   capacity: number;
+  courtCount?: number;
   isConfirmed: boolean;
 };
 
@@ -106,7 +107,7 @@ export function buildSessionTimetable({
           id: session.id,
           startsAt: session.startsAt,
           durationMinutes: session.durationMinutes,
-          courtCount: getCourtCount(session.capacity),
+          courtCount: session.courtCount ?? getCourtCount(session.capacity),
         },
         roster,
         seed ? { seed } : undefined,
