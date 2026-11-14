@@ -98,7 +98,7 @@ export function SessionFriendPicker({
     const requestId = searchRequestId.current;
 
     if (
-      normalizedQuery.length < 2 ||
+      normalizedQuery.length < 1 ||
       normalizedQuery.length > 64
     ) {
       return;
@@ -235,8 +235,8 @@ export function SessionFriendPicker({
   }
 
   return (
-    <fieldset className="mt-4 border-t border-border pt-3">
-      <legend className="text-sm font-medium">Play with friends (optional)</legend>
+    <fieldset className="mt-4">
+      <legend className="mb-2 text-sm font-medium">Play with friends</legend>
       <p className="text-xs font-medium text-muted-foreground">
         Selected friends ({selectedFriends.length})
       </p>

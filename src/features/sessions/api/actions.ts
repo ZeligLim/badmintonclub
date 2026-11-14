@@ -89,8 +89,8 @@ export async function searchClubMembers(
   sessionId?: string,
 ): Promise<FriendCandidate[]> {
   const normalizedQuery = query.trim();
-  if (normalizedQuery.length < 2 || normalizedQuery.length > 64) {
-    throw new Error("Search using at least two characters.");
+  if (normalizedQuery.length < 1 || normalizedQuery.length > 64) {
+    throw new Error("Search using at least one character.");
   }
 
   const supabase = await requireAuthenticatedClient();

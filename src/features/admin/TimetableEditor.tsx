@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { ArrowLeftRight, LogOut, UserPlus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AdminCourtPlayer, AdminPlayer, AdminSession } from "./data";
@@ -21,10 +20,8 @@ type PendingAction =
   | { kind: "replace"; player: Selected; incoming: AdminPlayer };
 
 export function TimetableEditor({ session }: { session: AdminSession }) {
-  const router = useRouter();
   const [selected, setSelected] = useState<Selected | null>(null);
   const [pending, setPending] = useState<PendingAction | null>(null);
-  const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
 
@@ -38,7 +35,6 @@ export function TimetableEditor({ session }: { session: AdminSession }) {
       if (event.key === "Escape") {
         setSelected(null);
         setPending(null);
-        setReason("");
         setError(null);
       }
     }
@@ -109,7 +105,7 @@ export function TimetableEditor({ session }: { session: AdminSession }) {
     startSaving(async () => {
       try {
         if (pending.kind === "swap") {
-          await swapTimetablePlayers({
+          const result = await swapTimetablePlayers({
             sessionId: session.id,
             playerAId: pending.player.id,
             courtA: pending.player.courtNumber,
@@ -117,8 +113,11 @@ export function TimetableEditor({ session }: { session: AdminSession }) {
             playerBId: pending.other.id,
             courtB: pending.other.courtNumber,
             startB: pending.other.startAt,
-            reason,
           });
+          if (result.error) {
+            setError(result.error);
+            return;
+          }
         } else if (pending.kind === "place") {
           await placeTimetablePlayer({
             sessionId: session.id,
@@ -127,26 +126,23 @@ export function TimetableEditor({ session }: { session: AdminSession }) {
             startAt: pending.startAt,
             fromCourtNumber: pending.player.courtNumber,
             fromStartAt: pending.player.startAt,
-            reason,
           });
         } else if (pending.kind === "remove") {
           await removeTimetablePlayer({
             sessionId: session.id,
             playerId: pending.player.id,
-            reason,
           });
         } else {
           await swapSessionPlayer(
             session.id,
             pending.player.id,
             pending.incoming.userId,
-            reason,
+            "",
           );
         }
         setSelected(null);
         setPending(null);
-        setReason("");
-        router.refresh();
+        setError(null);
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "Could not save that change.");
       }
@@ -302,47 +298,19 @@ export function TimetableEditor({ session }: { session: AdminSession }) {
           {pending ? (
             <div className="mt-2 space-y-2 border-t pt-2">
               <p className="text-sm font-medium">{describePending(pending)}</p>
-              {pending.kind === "swap" || pending.kind === "place" ? (
-                <p className="text-xs text-muted-foreground">
-                  Only these seats change. Every other game in the session stays as it is.
-                </p>
-              ) : null}
-              <label className="block text-xs text-muted-foreground">
-                Reason (optional)
-                <input
-                  value={reason}
-                  onChange={(event) => setReason(event.target.value)}
-                  className="mt-1 min-h-11 w-full rounded-md border bg-background px-3 text-sm text-foreground"
-                  placeholder="e.g. knee injury, wanted to play together"
-                  maxLength={200}
-                />
-              </label>
               {error ? (
                 <p className="text-sm text-destructive" role="alert">
                   {error}
                 </p>
               ) : null}
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={confirm}
-                  disabled={isSaving}
-                  className="min-h-11 flex-1 rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
-                >
-                  {isSaving ? "Saving…" : "Confirm"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPending(null);
-                    setReason("");
-                    setError(null);
-                  }}
-                  className="min-h-11 rounded-md border px-4 text-sm"
-                >
-                  Cancel
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={confirm}
+                disabled={isSaving}
+                className="min-h-11 w-full rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+              >
+                {isSaving ? "Saving…" : "Save"}
+              </button>
             </div>
           ) : null}
         </div>

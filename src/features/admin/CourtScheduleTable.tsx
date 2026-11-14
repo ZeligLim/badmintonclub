@@ -2,7 +2,6 @@ import { isSessionTimetableLocked } from "@/features/sessions/court-schedule";
 import { formatDuration, formatFee, formatTimeOfDay } from "@/lib/format";
 import type { AdminSession } from "./data";
 import { SessionAvailabilityToggle } from "./SessionAvailabilityToggle";
-import { RegenerateCourtScheduleButton } from "./RegenerateCourtScheduleButton";
 import { PromoteFromWaitlistButton } from "./PromoteFromWaitlistButton";
 import { PaymentStatusSelect } from "./PaymentStatusSelect";
 import { TimetableEditor } from "./TimetableEditor";
@@ -72,9 +71,6 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
               isConfirmed={session.status === "confirmed"}
             />
           )}
-          {!isCancelled && !timetableLocked && selectedPlayers.length > 0 && (
-            <RegenerateCourtScheduleButton sessionId={session.id} />
-          )}
           {!isCancelled && (
             <SessionCourtCountSelect
               courtCount={session.courtCount}
@@ -99,9 +95,8 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
 
       {session.timetableNeedsSaving && !isCancelled ? (
         <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          This schedule exists only on this page. Save it with
-          {" \u201cregenerate\u201d"} before the release time so members see
-          the same courts.
+          This schedule is a preview until the session is confirmed. It will
+          stay the same while you review the timetable.
         </p>
       ) : null}
 
