@@ -44,45 +44,57 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
   return (
     <section>
       {/* Session header */}
-      <div className="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 className="text-base font-semibold">
-          {session.dayName},{" "}
-          {new Intl.DateTimeFormat("en-GB", {
-            day: "numeric",
-            month: "short",
-            year: "numeric",
-          }).format(new Date(`${session.date}T12:00:00Z`))}
-        </h2>
-        <span className="text-sm text-muted-foreground">
-          {formatTimeOfDay(session.startsAt)} · {formatDuration(session.durationMinutes)} ·{" "}
-          {session.courtCount} courts
-        </span>
-        <span
-          className={`rounded-full px-2 py-0.5 text-[0.65rem] font-semibold capitalize ${statusBadge}`}
-        >
-          {isCancelled ? "Not happening" : session.status}
-        </span>
-        {session.availabilityCanChange && (
-          <SessionAvailabilityToggle
-            sessionId={session.id}
-            isHappening={!isCancelled}
-            isConfirmed={session.status === "confirmed"}
-          />
-        )}
-        {!isCancelled && !timetableLocked && selectedPlayers.length > 0 && (
-          <RegenerateCourtScheduleButton sessionId={session.id} />
-        )}
-        {!isCancelled && <SessionCourtCountSelect courtCount={session.courtCount} sessionId={session.id} disabled={timetableLocked} />}
-        {!isCancelled && (
-          <SessionCapacitySelect
-            capacity={session.capacity}
-            sessionId={session.id}
-            disabled={
-              timetableLocked || !["open", "confirmed"].includes(session.status)
-            }
-          />
-        )}
-        {!isCancelled && session.courtSchedule.length > 0 && <TimetablePngDownload session={session} />}
+      <div className="mb-4 space-y-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <h2 className="text-base font-semibold">
+            {session.dayName},{" "}
+            {new Intl.DateTimeFormat("en-GB", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            }).format(new Date(`${session.date}T12:00:00Z`))}
+          </h2>
+          <span className="text-sm text-muted-foreground">
+            {formatTimeOfDay(session.startsAt)} · {formatDuration(session.durationMinutes)} ·{" "}
+            {session.courtCount} courts
+          </span>
+          <span
+            className={`rounded-full px-2 py-0.5 text-[0.65rem] font-semibold capitalize ${statusBadge}`}
+          >
+            {isCancelled ? "Not happening" : session.status}
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {session.availabilityCanChange && (
+            <SessionAvailabilityToggle
+              sessionId={session.id}
+              isHappening={!isCancelled}
+              isConfirmed={session.status === "confirmed"}
+            />
+          )}
+          {!isCancelled && !timetableLocked && selectedPlayers.length > 0 && (
+            <RegenerateCourtScheduleButton sessionId={session.id} />
+          )}
+          {!isCancelled && (
+            <SessionCourtCountSelect
+              courtCount={session.courtCount}
+              sessionId={session.id}
+              disabled={timetableLocked}
+            />
+          )}
+          {!isCancelled && (
+            <SessionCapacitySelect
+              capacity={session.capacity}
+              sessionId={session.id}
+              disabled={
+                timetableLocked || !["open", "confirmed"].includes(session.status)
+              }
+            />
+          )}
+          {!isCancelled && session.courtSchedule.length > 0 && (
+            <TimetablePngDownload session={session} />
+          )}
+        </div>
       </div>
 
       {session.timetableNeedsSaving && !isCancelled ? (
