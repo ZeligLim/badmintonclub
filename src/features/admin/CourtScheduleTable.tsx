@@ -7,6 +7,7 @@ import { PromoteFromWaitlistButton } from "./PromoteFromWaitlistButton";
 import { PaymentStatusSelect } from "./PaymentStatusSelect";
 import { TimetableEditor } from "./TimetableEditor";
 import { SessionCourtCountSelect } from "./SessionCourtCountSelect";
+import { SessionCapacitySelect } from "./SessionCapacitySelect";
 import { TimetablePngDownload } from "./TimetablePngDownload";
 
 export function CourtScheduleTable({ session }: { session: AdminSession }) {
@@ -54,7 +55,7 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
         </h2>
         <span className="text-sm text-muted-foreground">
           {formatTimeOfDay(session.startsAt)} · {formatDuration(session.durationMinutes)} ·{" "}
-          {session.courtCount} courts · capacity {session.capacity}
+          {session.courtCount} courts
         </span>
         <span
           className={`rounded-full px-2 py-0.5 text-[0.65rem] font-semibold capitalize ${statusBadge}`}
@@ -72,6 +73,15 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
           <RegenerateCourtScheduleButton sessionId={session.id} />
         )}
         {!isCancelled && <SessionCourtCountSelect courtCount={session.courtCount} sessionId={session.id} disabled={timetableLocked} />}
+        {!isCancelled && (
+          <SessionCapacitySelect
+            capacity={session.capacity}
+            sessionId={session.id}
+            disabled={
+              timetableLocked || !["open", "confirmed"].includes(session.status)
+            }
+          />
+        )}
         {!isCancelled && session.courtSchedule.length > 0 && <TimetablePngDownload session={session} />}
       </div>
 

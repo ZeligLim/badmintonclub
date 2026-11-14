@@ -148,6 +148,51 @@ export async function updateSessionCourtCount(sessionId: string, courtCount: num
   revalidatePath("/");
 }
 
+export async function updateSessionCapacity(sessionId: string, capacity: number): Promise<void> {
+  if (!(await requireAdminUser())) throw new Error("Only a club administrator can change session capacity.");
+  if (!isUuid(sessionId) || !Number.isInteger(capacity) || capacity < 4 || capacity > 64 || capacity % 4 !== 0) {
+    throw new Error("Choose a capacity from 4 to 64 in steps of four.");
+  }
+
+  const admin = createAdminClient();
+  const { data: session, error: readError } = await admin
+    .from("sessions")
+    .select("id, status, event_date, starts_at")
+    .eq("id", sessionId)
+    .maybeSingle();
+  if (readError || !session || !["open", "confirmed"].includes(session.status)) {
+    throw new Error("This session capacity cannot be changed.");
+  }
+  if (isSessionTimetableLocked({ eventDate: session.event_date, startsAt: session.starts_at })) {
+    throw new Error("The timetable has already been released and can no longer be changed.");
+  }
+
+  const { count: activeSignupCount, error: signupError } = await admin
+    .from("session_signups")
+    .select("user_id", { count: "exact", head: true })
+    .eq("session_id", sessionId)
+    .in("status", ["requested", "selected", "played"]);
+  if (signupError) {
+    logError("Could not check the current session signups.", signupError);
+    throw new Error("Could not check the current session signups.");
+  }
+  if ((activeSignupCount ?? 0) > capacity) {
+    throw new Error(`Capacity cannot be lower than the ${activeSignupCount} active signups.`);
+  }
+
+  const { error: updateError } = await admin
+    .from("sessions")
+    .update({ capacity })
+    .eq("id", sessionId);
+  if (updateError) {
+    logError("Could not update session capacity.", updateError);
+    throw new Error("Could not update session capacity.");
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/");
+}
+
 export async function updateSessionAvailability(
   sessionId: string,
   isHappening: boolean,
