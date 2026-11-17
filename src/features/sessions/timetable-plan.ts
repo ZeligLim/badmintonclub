@@ -26,6 +26,7 @@ export type TimetableSession = {
   startsAt: string;
   durationMinutes: number;
   capacity: number;
+  courtCount?: number;
   isConfirmed: boolean;
 };
 
@@ -58,6 +59,7 @@ export function buildSessionTimetable({
   persisted,
   seed,
   forceRefresh = false,
+  now,
 }: {
   session: TimetableSession;
   players: TimetablePlayer[];
@@ -70,11 +72,16 @@ export function buildSessionTimetable({
    * allocator changed.
    */
   forceRefresh?: boolean;
+  /** The club's clock. Defaults to the server's clock. */
+  now?: Date;
 }): SessionTimetablePlan {
-  const isLocked = isSessionTimetableLocked({
-    eventDate: session.date,
-    startsAt: session.startsAt,
-  });
+  const isLocked = isSessionTimetableLocked(
+    {
+      eventDate: session.date,
+      startsAt: session.startsAt,
+    },
+    now,
+  );
   const needsRebuild =
     forceRefresh ||
     shouldRefreshPersistedCourtSchedule(persisted, {
@@ -110,7 +117,7 @@ export function buildSessionTimetable({
           id: session.id,
           startsAt: session.startsAt,
           durationMinutes: session.durationMinutes,
-          courtCount: getCourtCount(session.capacity),
+          courtCount: session.courtCount ?? getCourtCount(session.capacity),
         },
         roster,
         seed ? { seed } : undefined,

@@ -277,7 +277,7 @@ select is(
       and user_id = '21000000-0000-4000-8000-000000000008'
   ),
   3::bigint,
-  'the maximum supported friend group of three is persisted'
+  'three friend preferences are persisted'
 );
 
 set local role authenticated;
@@ -383,20 +383,6 @@ select set_config(
   'request.jwt.claims',
   '{"sub":"21000000-0000-4000-8000-000000000012","email":"matching-invariant-12@atu.ie","role":"authenticated"}',
   true
-);
-select throws_ok(
-  $$select public.request_session_signup(
-    '31000000-0000-4000-8000-000000000003',
-    array[
-      '21000000-0000-4000-8000-000000000001'::uuid,
-      '21000000-0000-4000-8000-000000000002'::uuid,
-      '21000000-0000-4000-8000-000000000003'::uuid,
-      '21000000-0000-4000-8000-000000000004'::uuid
-    ]
-  )$$,
-  '22023',
-  'Select no more than three friends.',
-  'the server rejects more than three friends'
 );
 select throws_ok(
   $$select public.update_my_player_level('PROFESSIONAL')$$,
@@ -757,25 +743,6 @@ select is(
   ),
   0::bigint,
   'every selected court is complete when enough eligible players fill capacity'
-);
-select is(
-  (
-    select count(*)
-    from (
-      select session_id, user_id
-      from public.session_friend_preferences
-      where session_id in (
-        '31000000-0000-4000-8000-000000000001',
-        '31000000-0000-4000-8000-000000000002',
-        '31000000-0000-4000-8000-000000000003',
-        '31000000-0000-4000-8000-000000000004'
-      )
-      group by session_id, user_id
-      having count(*) > 3
-    ) as oversized_preferences
-  ),
-  0::bigint,
-  'no signup persists more than three friend preferences'
 );
 select is(
   (

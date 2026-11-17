@@ -1,17 +1,11 @@
 import { redirect } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { AdminNavigation } from "@/features/admin/AdminNavigation";
+import { AdminHeader } from "@/features/admin/AdminHeader";
+import { SessionTabs } from "@/features/admin/SessionTabs";
 import {
-  ClubPlayerAccessTable,
   CourtScheduleTable,
-  loadAdminAccountCount,
   loadAdminData,
-  loadAdminAuditLog,
-  loadClubPlayers,
-  loadSessionTemplates,
   requireAdminUser,
-  SessionTemplateManager,
 } from "@/features/admin";
 
 export const instant = false;
@@ -20,53 +14,24 @@ export default async function AdminPage() {
   const user = await requireAdminUser();
   if (!user) redirect("/sign-in");
 
-  const [sessions, players, accountCount, templates, auditLog] =
-    await Promise.all([
-      loadAdminData(),
-      loadClubPlayers(),
-      loadAdminAccountCount(),
-      loadSessionTemplates(),
-      loadAdminAuditLog(),
-    ]);
+  const sessions = await loadAdminData();
 
   return (
     <main className="min-h-screen bg-background px-4 pb-16 pt-6 sm:px-8">
       <div className="mx-auto w-full max-w-6xl">
-        <header className="mb-8 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
-          <Button
-            className="h-10 rounded-md bg-card px-3 hover:bg-card"
-            nativeButton={false}
-            render={<Link href="/" />}
-            variant="outline"
-          >
-            <ArrowLeft aria-hidden="true" />
-            Sessions
-          </Button>
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">Admin — Court Schedule</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {user.email} · {accountCount} {accountCount === 1 ? "account" : "accounts"}
-            </p>
-          </div>
-        </header>
+        <AdminHeader email={user.email} />
+
+        <AdminNavigation current="sessions" />
 
         {sessions.length === 0 ? (
           <p className="text-sm text-muted-foreground">No upcoming sessions found.</p>
         ) : (
-          <div className="space-y-10">
+          <SessionTabs sessions={sessions}>
             {sessions.map((session) => (
               <CourtScheduleTable key={session.id} session={session} />
             ))}
-          </div>
+          </SessionTabs>
         )}
-
-        <div className="mt-16">
-          <SessionTemplateManager templates={templates} />
-        </div>
-
-        <div className="mt-16">
-          <ClubPlayerAccessTable auditLog={auditLog} players={players} />
-        </div>
       </div>
     </main>
   );

@@ -194,7 +194,7 @@ export function SessionTemplateManager({
         template never changes a session that has already been published.
       </p>
 
-      <div className="overflow-x-auto rounded-xl border border-border">
+      <div className="relative overflow-x-auto rounded-xl border border-border">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/50">
@@ -216,9 +216,10 @@ export function SessionTemplateManager({
               <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
                 Active
               </th>
-              <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                <span className="sr-only">Actions</span>
-              </th>
+              <th
+                aria-label="Actions"
+                className="px-4 py-2.5 text-left font-medium text-muted-foreground"
+              />
             </tr>
           </thead>
           <tbody>

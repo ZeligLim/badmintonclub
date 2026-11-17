@@ -1,6 +1,6 @@
 begin;
 
-select plan(49);
+select plan(48);
 
 alter table public.sessions drop constraint sessions_capacity_check;
 
@@ -204,20 +204,6 @@ select throws_ok(
   'Only a club administrator can change player access.',
   'members cannot assign another player Professional level or committee status'
 );
-select throws_ok(
-  $$select public.request_session_signup(
-    '30000000-0000-4000-8000-000000000005',
-    array[
-      '20000000-0000-4000-8000-000000000001'::uuid,
-      '20000000-0000-4000-8000-000000000002'::uuid,
-      '20000000-0000-4000-8000-000000000003'::uuid,
-      '20000000-0000-4000-8000-000000000004'::uuid
-    ]
-  )$$,
-  '22023',
-  'Select no more than three friends.',
-  'the database rejects more than three selected friends'
-);
 select lives_ok(
   $$select public.request_session_signup(
     '30000000-0000-4000-8000-000000000005',
@@ -369,7 +355,7 @@ select is(
   '20000000-0000-4000-8000-000000000017',
   'updating preferences replaces the previous selected friends'
 );
-select throws_ok(
+select lives_ok(
   $$select public.update_session_friend_preferences(
     '30000000-0000-4000-8000-000000000005',
     array[
@@ -379,9 +365,7 @@ select throws_ok(
       '20000000-0000-4000-8000-000000000004'::uuid
     ]
   )$$,
-  '22023',
-  'Select no more than three friends.',
-  'the update RPC rejects more than three selected friends'
+  'the update RPC accepts more than three selected friends'
 );
 select throws_ok(
   $$select public.update_session_friend_preferences(

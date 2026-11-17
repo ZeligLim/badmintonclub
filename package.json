@@ -14,7 +14,7 @@
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset --local",
     "db:test": "supabase test db --local",
-    "db:types": "supabase gen types typescript --local > src/lib/supabase/database.types.ts",
+    "db:types": "supabase gen types typescript --local > src/lib/supabase/database.types.ts && oxfmt src/lib/supabase/database.types.ts",
     "bench": "RUN_BENCH=1 vitest run src/features/sessions/court-schedule.bench.test.ts",
     "check:tests": "node scripts/check-session-fixtures.mjs"
   },
@@ -38,6 +38,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.0",
+    "oxfmt": "0.78.0",
     "supabase": "2.120.0",
     "tailwindcss": "^4",
     "typescript": "^5",

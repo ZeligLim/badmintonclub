@@ -52,8 +52,8 @@ export async function searchClubMembers(
   sessionId?: string,
 ): Promise<FriendCandidate[]> {
   const normalizedQuery = query.trim();
-  if (normalizedQuery.length < 2 || normalizedQuery.length > 64) {
-    throw new Error("Search using at least two characters.");
+  if (normalizedQuery.length < 1 || normalizedQuery.length > 64) {
+    throw new Error("Search using at least one character.");
   }
 
   const supabase = await requireAuthenticatedClient();
@@ -314,8 +314,8 @@ function validateSessionId(sessionId: string): void {
 
 function validateFriendIds(friendIds: string[]): void {
   const hasInvalidId = friendIds.some((friendId) => !isUuid(friendId));
-  if (friendIds.length > 3 || hasInvalidId) {
-    throw new Error("Select up to three valid club members.");
+  if (hasInvalidId) {
+    throw new Error("Select valid club members.");
   }
 }
 

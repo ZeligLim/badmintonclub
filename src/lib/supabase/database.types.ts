@@ -197,14 +197,14 @@ isOneToOne: true
                   ]
                 },"sessions": {
                   Row: {
-                    "allocation_mode": string,"capacity": number,"committee_auto_signup": boolean,"confirmation_at": string,"created_at": string,"duration_minutes": number,"event_date": string,"fee_cents": number,"id": string,"signup_opens_at": string,"starts_at": string,"status": string,"template_id": string | null
+                    "allocation_mode": string,"capacity": number,"committee_auto_signup": boolean,"confirmation_at": string,"court_count": number,"created_at": string,"duration_minutes": number,"event_date": string,"fee_cents": number,"id": string,"signup_opens_at": string,"starts_at": string,"status": string,"template_id": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "allocation_mode"?: string,"capacity"?: number,"committee_auto_signup"?: boolean,"confirmation_at": string,"created_at"?: string,"duration_minutes"?: number,"event_date": string,"fee_cents"?: number,"id"?: string,"signup_opens_at": string,"starts_at"?: string,"status"?: string,"template_id"?: string | null
+                    "allocation_mode"?: string,"capacity"?: number,"committee_auto_signup"?: boolean,"confirmation_at": string,"court_count": number,"created_at"?: string,"duration_minutes"?: number,"event_date": string,"fee_cents"?: number,"id"?: string,"signup_opens_at": string,"starts_at"?: string,"status"?: string,"template_id"?: string | null
                   }
                   Update: {
-                    "allocation_mode"?: string,"capacity"?: number,"committee_auto_signup"?: boolean,"confirmation_at"?: string,"created_at"?: string,"duration_minutes"?: number,"event_date"?: string,"fee_cents"?: number,"id"?: string,"signup_opens_at"?: string,"starts_at"?: string,"status"?: string,"template_id"?: string | null
+                    "allocation_mode"?: string,"capacity"?: number,"committee_auto_signup"?: boolean,"confirmation_at"?: string,"court_count"?: number,"created_at"?: string,"duration_minutes"?: number,"event_date"?: string,"fee_cents"?: number,"id"?: string,"signup_opens_at"?: string,"starts_at"?: string,"status"?: string,"template_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -234,6 +234,9 @@ isOneToOne: false
               "allocation_mode": string,"capacity": number,"committee_auto_signup": boolean,"confirmation_at": string,"confirmation_lead_days": number,"created_at": string,"duration_minutes": number,"fee_cents": number,"id": string,"is_active": boolean,"name": string,"signup_opens_at": string,"signup_opens_lead_days": number,"starts_at": string,"updated_at": string,"valid_from": string,"valid_until": string,"weekday": number
             }[]
                            },
+"admin_place_session_player":
+{ Args: { "p_court_number": number,"p_from_court_number"?: number,"p_from_start_at"?: string,"p_reason"?: string,"p_session_id": string,"p_start_at": string,"p_user_id": string }; Returns: undefined
+                           },
 "admin_promote_from_waitlist":
 { Args: { "p_session_id": string,"p_user_id": string }; Returns: undefined
                            },
@@ -241,6 +244,9 @@ isOneToOne: false
 { Args: Record<PropertyKey, never>; Returns: {
               "created_count": number,"removed_count": number,"updated_count": number
             }[]
+                           },
+"admin_remove_session_player":
+{ Args: { "p_reason"?: string,"p_session_id": string,"p_user_id": string }; Returns: undefined
                            },
 "admin_set_committee_admin":
 { Args: { "p_is_admin": boolean,"p_user_id": string }; Returns: undefined
@@ -262,6 +268,9 @@ isOneToOne: false
                            },
 "admin_swap_session_player":
 { Args: { "p_in_user_id": string,"p_out_user_id": string,"p_reason"?: string,"p_session_id": string }; Returns: undefined
+                           },
+"admin_swap_session_players":
+{ Args: { "p_court_a": number,"p_court_b": number,"p_reason"?: string,"p_session_id": string,"p_start_a": string,"p_start_b": string,"p_user_a_id": string,"p_user_b_id": string }; Returns: undefined
                            },
 "admin_update_player_access":
 { Args: { "p_is_committee": boolean,"p_player_level": string,"p_user_id": string }; Returns: undefined
@@ -307,7 +316,7 @@ isOneToOne: false
                            },
 "get_dashboard_sessions":
 { Args: { "p_from_date": string,"p_through_date": string }; Returns: {
-              "allocation_mode": string,"capacity": number,"confirmation_at": string,"current_user_slot": number,"current_user_status": string,"day_name": string,"duration_minutes": number,"event_date": string,"fee_cents": number,"id": string,"registered_count": number,"signup_opens_at": string,"starts_at": string,"status": string
+              "allocation_mode": string,"capacity": number,"confirmation_at": string,"court_count": number,"current_user_slot": number,"current_user_status": string,"day_name": string,"duration_minutes": number,"event_date": string,"fee_cents": number,"id": string,"registered_count": number,"signup_opens_at": string,"starts_at": string,"status": string
             }[]
                            },
 "get_dashboard_window":

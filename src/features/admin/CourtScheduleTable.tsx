@@ -2,10 +2,12 @@ import { isSessionTimetableLocked } from "@/features/sessions/court-schedule";
 import { formatDuration, formatFee, formatTimeOfDay } from "@/lib/format";
 import type { AdminSession } from "./data";
 import { SessionAvailabilityToggle } from "./SessionAvailabilityToggle";
-import { RegenerateCourtScheduleButton } from "./RegenerateCourtScheduleButton";
 import { PromoteFromWaitlistButton } from "./PromoteFromWaitlistButton";
 import { PaymentStatusSelect } from "./PaymentStatusSelect";
-import { RepairTimetableForm } from "./RepairTimetableForm";
+import { TimetableEditor } from "./TimetableEditor";
+import { SessionCourtCountSelect } from "./SessionCourtCountSelect";
+import { SessionCapacitySelect } from "./SessionCapacitySelect";
+import { TimetablePngDownload } from "./TimetablePngDownload";
 
 export function CourtScheduleTable({ session }: { session: AdminSession }) {
   const selectedPlayers = session.players.filter(
@@ -17,6 +19,16 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
   const paidCount = selectedPlayers.filter(
     (player) => player.paymentStatus === "paid",
   ).length;
+
+  // How many games each member appears in for this session. With a full
+  // roster this makes an uneven timetable (someone playing three rounds while
+  // someone else plays one) visible at a glance.
+  const gamesByPlayer = new Map<string, number>();
+  for (const game of session.courtSchedule) {
+    for (const player of game.players) {
+      gamesByPlayer.set(player.id, (gamesByPlayer.get(player.id) ?? 0) + 1);
+    }
+  }
 
   const statusBadge =
     session.status === "confirmed"
@@ -31,41 +43,60 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
   return (
     <section>
       {/* Session header */}
-      <div className="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 className="text-base font-semibold">
-          {session.dayName},{" "}
-          {new Intl.DateTimeFormat("en-GB", {
-            day: "numeric",
-            month: "short",
-            year: "numeric",
-          }).format(new Date(`${session.date}T12:00:00Z`))}
-        </h2>
-        <span className="text-sm text-muted-foreground">
-          {formatTimeOfDay(session.startsAt)} · {formatDuration(session.durationMinutes)} ·{" "}
-          {session.courtCount} courts · capacity {session.capacity}
-        </span>
-        <span
-          className={`rounded-full px-2 py-0.5 text-[0.65rem] font-semibold capitalize ${statusBadge}`}
-        >
-          {isCancelled ? "Not happening" : session.status}
-        </span>
-        {session.availabilityCanChange && (
-          <SessionAvailabilityToggle
-            sessionId={session.id}
-            isHappening={!isCancelled}
-            isConfirmed={session.status === "confirmed"}
-          />
-        )}
-        {!isCancelled && !timetableLocked && selectedPlayers.length > 0 && (
-          <RegenerateCourtScheduleButton sessionId={session.id} />
-        )}
+      <div className="mb-4 space-y-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <h2 className="text-base font-semibold">
+            {session.dayName},{" "}
+            {new Intl.DateTimeFormat("en-GB", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            }).format(new Date(`${session.date}T12:00:00Z`))}
+          </h2>
+          <span className="text-sm text-muted-foreground">
+            {formatTimeOfDay(session.startsAt)} · {formatDuration(session.durationMinutes)} ·{" "}
+            {session.courtCount} courts
+          </span>
+          <span
+            className={`rounded-full px-2 py-0.5 text-[0.65rem] font-semibold capitalize ${statusBadge}`}
+          >
+            {isCancelled ? "Not happening" : session.status}
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {session.availabilityCanChange && (
+            <SessionAvailabilityToggle
+              sessionId={session.id}
+              isHappening={!isCancelled}
+              isConfirmed={session.status === "confirmed"}
+            />
+          )}
+          {!isCancelled && (
+            <SessionCourtCountSelect
+              courtCount={session.courtCount}
+              sessionId={session.id}
+              disabled={timetableLocked}
+            />
+          )}
+          {!isCancelled && (
+            <SessionCapacitySelect
+              capacity={session.capacity}
+              sessionId={session.id}
+              disabled={
+                timetableLocked || !["open", "confirmed"].includes(session.status)
+              }
+            />
+          )}
+          {!isCancelled && session.courtSchedule.length > 0 && (
+            <TimetablePngDownload session={session} />
+          )}
+        </div>
       </div>
 
       {session.timetableNeedsSaving && !isCancelled ? (
         <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          This schedule exists only on this page. Save it with
-          {" \u201cregenerate\u201d"} before the release time so members see
-          the same courts.
+          This schedule is a preview until the session is confirmed. It will
+          stay the same while you review the timetable.
         </p>
       ) : null}
 
@@ -75,62 +106,7 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
           This session will not take place. Existing sign-ups are retained.
         </p>
       ) : session.courtSchedule.length > 0 ? (
-        <div className="overflow-x-auto">
-          <div className="flex flex-col gap-3">
-            {Array.from(
-              session.courtSchedule.reduce((slots, game) => {
-                const key = `${game.startAt}|${game.endAt}`;
-                if (!slots.has(key)) {
-                  slots.set(key, { startAt: game.startAt, endAt: game.endAt });
-                }
-                return slots;
-              }, new Map<string, { startAt: string; endAt: string }>()),
-            )
-              .sort(([a], [b]) => a.localeCompare(b))
-              .map(([slotKey, slot]) => (
-                <div
-                  key={slotKey}
-                  className="grid grid-cols-[5rem_1fr] items-start gap-3 rounded-xl bg-muted/40 p-3 sm:grid-cols-[6rem_1fr]"
-                >
-                  <div className="whitespace-nowrap tabular-nums text-muted-foreground">
-                    <span className="block text-sm font-medium text-foreground">
-                      {slot.startAt}
-                    </span>
-                    <span className="block text-xs">{slot.endAt}</span>
-                  </div>
-                  <div
-                    className="grid gap-2"
-                    style={{
-                      gridTemplateColumns: `repeat(${session.courtCount}, minmax(0, 1fr))`,
-                    }}
-                  >
-                    {Array.from({ length: session.courtCount }, (_, courtIndex) => {
-                      const courtNumber = courtIndex + 1;
-                      const game = session.courtSchedule.find(
-                        (item) =>
-                          item.startAt === slot.startAt &&
-                          item.endAt === slot.endAt &&
-                          item.courtNumber === courtNumber,
-                      );
-                      return (
-                        <div
-                          key={courtNumber}
-                          className="min-w-0 rounded-lg bg-background p-2"
-                        >
-                          <div className="mb-1 text-xs font-semibold text-muted-foreground">
-                            Court {courtNumber}
-                          </div>
-                          <div className="whitespace-pre-line text-xs text-foreground">
-                            {game?.players.join("\n") ?? "—"}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-          </div>
-        </div>
+        <TimetableEditor session={session} />
       ) : (
         <p className="text-sm text-muted-foreground">
           {session.status === "confirmed"
@@ -138,20 +114,6 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
             : "Players will be assigned after confirmation."}
         </p>
       )}
-      {!isCancelled && (
-        <RepairTimetableForm
-          inTimetable={selectedPlayers.map((player) => ({
-            userId: player.userId,
-            displayName: player.displayName,
-          }))}
-          sessionId={session.id}
-          waiting={[...requestedPlayers, ...waitlistedPlayers].map((player) => ({
-            userId: player.userId,
-            displayName: player.displayName,
-          }))}
-        />
-      )}
-
       {/* Player summary */}
       <div className="mt-4 flex flex-wrap gap-6 text-xs text-muted-foreground">
         <span>
@@ -199,12 +161,15 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
           <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground">
             Full roster ({session.players.length})
           </summary>
-          <div className="mt-2 overflow-x-auto rounded-xl border border-border">
+          <div className="relative mt-2 overflow-x-auto rounded-xl border border-border">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/50">
                   <th className="px-4 py-2 text-left font-medium text-muted-foreground">
                     Player
+                  </th>
+                  <th className="px-4 py-2 text-left font-medium text-muted-foreground">
+                    Games
                   </th>
                   <th className="px-4 py-2 text-left font-medium text-muted-foreground">
                     Status
@@ -224,6 +189,9 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
                   .map((player) => (
                     <tr key={player.userId} className="border-t border-border/50 bg-card">
                       <td className="px-4 py-2">{player.displayName}</td>
+                      <td className="px-4 py-2 tabular-nums text-muted-foreground">
+                        {gamesByPlayer.get(player.userId) ?? 0}
+                      </td>
                       <td className="px-4 py-2 capitalize text-muted-foreground">
                         {player.status === "waitlisted" ||
                         player.status === "requested" ? (

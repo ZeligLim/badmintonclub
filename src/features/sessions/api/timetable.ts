@@ -153,6 +153,7 @@ export async function ensureSessionTimetable({
   persisted,
   seed,
   forceRefresh = false,
+  now,
 }: {
   session: TimetableSession;
   players: TimetablePlayer[];
@@ -160,6 +161,8 @@ export async function ensureSessionTimetable({
   seed?: string;
   /** Rebuild a released timetable after the roster genuinely changed. */
   forceRefresh?: boolean;
+  /** The club's clock. Defaults to the server's clock. */
+  now?: Date;
 }): Promise<PersistedCourtGame[]> {
   const plan = buildSessionTimetable({
     session,
@@ -167,6 +170,7 @@ export async function ensureSessionTimetable({
     persisted,
     seed,
     forceRefresh,
+    now,
   });
   const allocation = plan.games;
 

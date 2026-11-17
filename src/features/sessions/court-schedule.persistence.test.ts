@@ -85,14 +85,14 @@ describe("refresh decisions", () => {
     ).toBe(true);
   });
 
-  it("rewrites a stale private timetable", () => {
+  it("keeps a saved private timetable from an older allocator", () => {
     const olderSnapshot = savedSchedule().map((game) => ({
       ...game,
       allocationVersion: 1,
     }));
     expect(
       shouldRefreshPersistedCourtSchedule(olderSnapshot, { isLocked: false }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("keeps a current private timetable", () => {
@@ -276,7 +276,7 @@ describe("planning a timetable without writing", () => {
     expect(plan.needsPersisting).toBe(true);
   });
 
-  it("plans a replacement for an unlocked schedule built by an older allocator", () => {
+  it("reuses an unlocked schedule built by an older allocator", () => {
     const stale = savedSchedule().map((game) => ({
       ...game,
       allocationVersion: (COURT_ALLOCATION_VERSION - 1) as typeof COURT_ALLOCATION_VERSION,
@@ -287,9 +287,7 @@ describe("planning a timetable without writing", () => {
       persisted: stale,
     });
 
-    expect(plan.needsPersisting).toBe(true);
-    expect(
-      plan.games.every((game) => game.allocationVersion === COURT_ALLOCATION_VERSION),
-    ).toBe(true);
+    expect(plan.needsPersisting).toBe(false);
+    expect(plan.games).toEqual(stale);
   });
 });

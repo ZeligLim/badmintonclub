@@ -79,6 +79,7 @@ jobs:
       - name: Generated types drift
         run: |
           npx supabase gen types typescript --local > /tmp/database.types.ts
+          npx oxfmt /tmp/database.types.ts
           if ! diff -u src/lib/supabase/database.types.ts /tmp/database.types.ts; then
             echo "::error file=src/lib/supabase/database.types.ts::Generated types are stale; run npm run db:types"
             exit 1

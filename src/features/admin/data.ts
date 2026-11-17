@@ -10,11 +10,10 @@ import type {
 } from "@/features/sessions/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import {
-  getCourtCount,
-  type SessionAllocationMode,
-} from "@/features/sessions";
+import type { SessionAllocationMode } from "@/features/sessions";
 import { getSessionDayName } from "@/lib/sessions/schedule";
+import { getClubNow } from "@/features/sessions/club-clock";
+import { isSessionTimetableLocked } from "@/features/sessions/court-schedule";
 import type { PlayerLevel } from "@/types/player";
 import { isClubEmail } from "@/lib/validation";
 import { logError } from "@/lib/log";
@@ -38,11 +37,16 @@ export type AdminPlayer = {
   paymentStatus: PaymentStatus;
 };
 
+export type AdminCourtPlayer = {
+  id: string;
+  displayName: string;
+};
+
 export type AdminCourtGame = {
   courtNumber: number;
   startAt: string;
   endAt: string;
-  players: string[];
+  players: AdminCourtPlayer[];
 };
 
 export type AdminSession = {
@@ -60,6 +64,8 @@ export type AdminSession = {
   courtSchedule: AdminCourtGame[];
   /** True when the shown schedule exists only in memory and nothing is saved. */
   timetableNeedsSaving: boolean;
+  /** True once the timetable has been released, so only administrators may edit it. */
+  timetableLocked: boolean;
 };
 
 export type AdminClubPlayer = {
@@ -256,14 +262,15 @@ export async function loadAdminAccountCount(): Promise<number> {
 export async function loadAdminData(options?: { allocationSeed?: string }): Promise<AdminSession[]> {
   await connection();
   const admin = createAdminClient();
-  const londonNow = getLondonDateTime(new Date());
+  const clubNow = await getClubNow(admin);
+  const londonNow = getLondonDateTime(clubNow);
 
   // Fetch all sessions that can be managed, including sessions marked as cancelled.
   // Only include sessions from today onwards (London date) — past sessions are
   // no longer actionable and should not appear on the admin schedule view.
   const { data: sessions, error: sessionsErr } = await admin
     .from("sessions")
-    .select("id, event_date, starts_at, duration_minutes, capacity, fee_cents, status")
+    .select("id, event_date, starts_at, duration_minutes, capacity, court_count, fee_cents, status")
     .in("status", ["open", "confirmed", "cancelled"])
     .gte("event_date", londonNow.date)
     .order("event_date");
@@ -348,7 +355,7 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
       paymentStatus: toPaymentStatus(s.payment_status),
     }));
 
-    const courtCount = getCourtCount(session.capacity);
+    const courtCount = session.court_count;
     const selectedPlayers = players
       .filter((p) => p.status === "selected" || p.status === "played")
       .sort((a, b) => (a.slotNumber ?? 99) - (b.slotNumber ?? 99));
@@ -363,8 +370,10 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
         startsAt: session.starts_at,
         durationMinutes: session.duration_minutes,
         capacity: session.capacity,
+        courtCount,
         isConfirmed: session.status === "confirmed",
       },
+      now: clubNow,
       players: selectedPlayers.map((player) => ({
         id: player.userId,
         displayName: player.displayName,
@@ -381,7 +390,15 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
     const courtSchedule = courtScheduleGames.map((game) => ({
       ...game,
       players: game.players.map((player) =>
-        typeof player === "string" ? player : player.displayName,
+        typeof player === "string"
+          ? {
+              id: player,
+              displayName: profileMap.get(player)?.displayName ?? "Unknown player",
+            }
+          : {
+              id: player.id,
+              displayName: player.displayName,
+            },
       ),
     }));
 
@@ -403,6 +420,13 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
       players,
       courtSchedule,
       timetableNeedsSaving: timetablePlan.needsPersisting,
+      timetableLocked: isSessionTimetableLocked(
+        {
+          eventDate: session.event_date,
+          startsAt: session.starts_at,
+        },
+        clubNow,
+      ),
     };
   }));
 }
