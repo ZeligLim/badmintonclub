@@ -623,3 +623,5 @@ and in production after the deploy.
 4. **BC-35** — previews are invisible to the committee and would crash without
    preview-scoped environment variables.
 5. **BC-42** — a red build stops a deploy but not a merge; turn on branch protection.
+
+**BC-53 (P3, S) — The drift check depends on `oxfmt`, which is not installed by a plain `npm ci` on older lockfiles.** Hitting this cost one red CI run. The workflow formats the freshly generated types before diffing, so a committed file that was generated without the formatter always looks stale even when the schema matches. *Done when* `npm run db:types` is the only way the file is produced (it is) and the failure message names the formatter (it does).
