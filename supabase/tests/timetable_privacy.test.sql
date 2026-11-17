@@ -10,6 +10,11 @@ insert into auth.users (id, instance_id, aud, role, email, encrypted_password, e
 values
   ('e1000000-0000-4000-8000-000000000001', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'timetable-one@atu.ie', crypt('password', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now()),
   ('e1000000-0000-4000-8000-000000000002', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'timetable-two@atu.ie', crypt('password', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now());
+-- Fixtures are members who answered the level picker before this run.
+update public.profiles
+set level_confirmed_at = now()
+where level_confirmed_at is null;
+
 
 -- The auth trigger already created both profiles; name them for readability.
 update public.profiles

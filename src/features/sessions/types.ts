@@ -107,6 +107,8 @@ export type DashboardData = {
     id: string;
     displayName: string;
     playerLevel: PlayerLevel;
+    /** False until the member has answered the level picker once. */
+    playerLevelConfirmed: boolean;
     canChooseProfessional: boolean;
     isCommittee: boolean;
     isCommitteeAdmin: boolean;

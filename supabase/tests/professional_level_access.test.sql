@@ -39,6 +39,11 @@ values
     now(),
     now()
   );
+-- Fixtures are members who answered the level picker before this run.
+update public.profiles
+set level_confirmed_at = now()
+where level_confirmed_at is null;
+
 
 update public.profiles
 set is_committee_admin = true
@@ -170,7 +175,7 @@ select is(
     from public.profiles
     where id = '98000000-0000-4000-8000-000000000002'
   ),
-  'INTERMEDIATE',
+  'BEGINNER',
   'changing committee status does not change player level'
 );
 select is(

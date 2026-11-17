@@ -14,12 +14,23 @@ import {
 import { allocateOnce } from "./court-schedule.candidates";
 import { getCourtSizes, validateSchedule } from "./court-schedule.validate";
 import { compareScore, scoreAllocation } from "./court-schedule.score";
+import {
+  DEFAULT_MATCHING_PRIORITY,
+  type MatchingPriorityKey,
+} from "./court-schedule.shared";
 
 export type { PlayerLevel } from "./court-schedule.levels";
-export { COURT_ALLOCATION_VERSION } from "./court-schedule.shared";
+export {
+  COURT_ALLOCATION_VERSION,
+  DEFAULT_MATCHING_PRIORITY,
+  MATCHING_PRIORITY_KEYS,
+  isMatchingPriority,
+  toMatchingPriority,
+} from "./court-schedule.shared";
 export type {
   AllocatedCourtGame,
   CourtRosterPlayer,
+  MatchingPriorityKey,
   PlayerGame,
 } from "./court-schedule.shared";
 
@@ -153,7 +164,11 @@ export function getCourtCount(capacity: number): number {
 export function allocateCourtSchedule(
   session: Pick<ClubSession, "id" | "startsAt" | "durationMinutes" | "courtCount">,
   roster: CourtRosterPlayer[],
-  options?: { candidateCount?: number; seed?: string },
+  options?: {
+    candidateCount?: number;
+    seed?: string;
+    priority?: readonly MatchingPriorityKey[];
+  },
 ): AllocatedCourtGame[] {
   if (roster.length === 0) {
     throw new Error("Court allocation requires at least one confirmed player.");
@@ -179,7 +194,12 @@ export function allocateCourtSchedule(
         ? `${options.seed}|candidate-${candidateIndex}`
         : `candidate-${candidateIndex}`;
       const candidate = allocateOnce(session, roster, candidateSeed);
-      const score = scoreAllocation(session, roster, candidate);
+      const score = scoreAllocation(
+        session,
+        roster,
+        candidate,
+        options?.priority ?? DEFAULT_MATCHING_PRIORITY,
+      );
       if (
         bestScore === null ||
         compareScore(score, bestScore) < 0

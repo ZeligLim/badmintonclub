@@ -22,6 +22,7 @@ import {
 } from "../session-timing";
 import type { SessionSignupStatus } from "../types";
 import { useServerClock } from "../use-server-clock";
+import { LevelPickerDialog } from "./LevelPickerDialog";
 import { SessionsHeader } from "./SessionsHeader";
 import { RealNamePrompt } from "./RealNamePrompt";
 import { SessionCard } from "./SessionCard";
@@ -47,6 +48,10 @@ type SignupOverride = {
 
 export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
   const router = useRouter();
+  const [levelDialogOpen, setLevelDialogOpen] = useState(false);
+  const needsLevelChoice = Boolean(
+    initialData.user && !initialData.user.playerLevelConfirmed,
+  );
   const serverFriendList = initialData.user?.friendList;
   const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
   const [signupOverrides, setSignupOverrides] = useState<
@@ -334,11 +339,24 @@ export function SessionsDashboard({ initialData }: SessionsDashboardProps) {
           committeeAutoSignup={initialData.user?.committeeAutoSignup ?? false}
           playerLevel={initialData.user?.playerLevel ?? "INTERMEDIATE"}
           canChooseProfessional={initialData.user?.canChooseProfessional ?? false}
+          onEditLevel={() => setLevelDialogOpen(true)}
         />
         {initialData.user ? (
           <RealNamePrompt
             displayName={initialData.user.displayName}
             userId={initialData.user.id}
+          />
+        ) : null}
+        {initialData.user && (needsLevelChoice || levelDialogOpen) ? (
+          <LevelPickerDialog
+            blocking={needsLevelChoice}
+            canChooseProfessional={initialData.user.canChooseProfessional}
+            currentLevel={initialData.user.playerLevel}
+            onClose={needsLevelChoice ? undefined : () => setLevelDialogOpen(false)}
+            onSaved={() => {
+              setLevelDialogOpen(false);
+              router.refresh();
+            }}
           />
         ) : null}
         <h1 className="sr-only">ATU Galway Badminton Club</h1>

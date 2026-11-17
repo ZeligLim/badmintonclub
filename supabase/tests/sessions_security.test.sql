@@ -215,6 +215,11 @@ select
   now()
 from generated_players;
 
+-- Fixtures are members who answered the level picker before this run.
+update public.profiles
+set level_confirmed_at = now()
+where level_confirmed_at is null;
+
 update public.sessions
 set
   signup_opens_at = now() + interval '1 day',

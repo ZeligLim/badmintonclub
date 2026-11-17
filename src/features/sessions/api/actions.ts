@@ -115,7 +115,7 @@ export async function removeClubFriend(friendId: string): Promise<void> {
 }
 
 export async function updatePlayerLevel(
-  playerLevel: "BEGINNER" | "INTERMEDIATE" | "PROFESSIONAL",
+  playerLevel: "BEGINNER" | "INTERMEDIATE" | "ADVANCED" | "PROFESSIONAL",
 ): Promise<void> {
   const supabase = await requireAuthenticatedClient();
   const { error } = await supabase.rpc("update_my_player_level", {

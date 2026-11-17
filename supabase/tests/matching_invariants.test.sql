@@ -26,6 +26,11 @@ select
   now(),
   now()
 from generate_series(1, 22) as player_number;
+-- Fixtures are members who answered the level picker before this run.
+update public.profiles
+set level_confirmed_at = now()
+where level_confirmed_at is null;
+
 
 update public.profiles
 set last_played_at = case right(id::text, 12)::integer

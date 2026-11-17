@@ -3,11 +3,16 @@
  */
 import type { ClubSession } from "./types";
 import {
+  DEFAULT_MATCHING_PRIORITY,
   GAME_DURATION_MINUTES,
   type AllocatedCourtGame,
   type CourtRosterPlayer,
+  type MatchingPriorityKey,
 } from "./court-schedule.shared";
-import { levelSpreadWithin } from "./court-schedule.levels";
+import {
+  levelCompositionPenalty,
+  levelSpreadWithin,
+} from "./court-schedule.levels";
 import { getCourtSizes } from "./court-schedule.validate";
 
 export function compareScore(a: number[], b: number[]): number {
@@ -24,6 +29,7 @@ export function scoreAllocation(
   session: Pick<ClubSession, "id" | "durationMinutes" | "courtCount">,
   roster: CourtRosterPlayer[],
   schedule: AllocatedCourtGame[],
+  priority: readonly MatchingPriorityKey[] = DEFAULT_MATCHING_PRIORITY,
 ): number[] {
   const rosterIds = new Set(roster.map((player) => player.id));
   const rosterById = new Map(roster.map((player) => [player.id, player]));
@@ -83,16 +89,19 @@ export function scoreAllocation(
   let committeeDirectOccurrences = 0;
   let committeeNestedOccurrences = 0;
   let occurrences = 0;
-  let levelGap = 0;
+  let levelPenalty = 0;
+  let levelSpread = 0;
   const courtPairOccurrences = new Map<string, number>();
   const doublesPairOccurrences = new Map<string, number>();
 
   for (const game of schedule) {
     const playerIdsInGame = game.players.map((player) => player.id);
     const playerSet = new Set(playerIdsInGame);
-    levelGap += levelSpreadWithin(
-      game.players.map((player) => rosterById.get(player.id) ?? player),
+    const gamePlayers = game.players.map(
+      (player) => rosterById.get(player.id) ?? player,
     );
+    levelPenalty += levelCompositionPenalty(gamePlayers);
+    levelSpread += levelSpreadWithin(gamePlayers);
     for (const playerId of playerIdsInGame) {
       for (const friendId of normalizedFriends.get(playerId) ?? []) {
         if (!playerSet.has(friendId)) continue;
@@ -154,16 +163,23 @@ export function scoreAllocation(
   const uniqueCount = fulfilledUnique.size;
   const occurrenceCount = occurrences;
 
-  return [
-    hardViolations,
-    fairnessViolation,
-    -committeeWeighted.count,
-    -committeeNestedUnique.size,
-    -committeeDirectOccurrences,
-    -committeeNestedOccurrences,
-    -uniqueCount,
-    -occurrenceCount,
-    levelGap,
-    repeatedCourtPairs + repeatedDoubles,
-  ];
+  // The array order is the priority: the first meaningful difference wins.
+  // Fairness and the hard rules are never reorderable.
+  const score = [hardViolations, fairnessViolation];
+  for (const key of priority) {
+    if (key === "committee") {
+      score.push(
+        -committeeWeighted.count,
+        -committeeNestedUnique.size,
+        -committeeDirectOccurrences,
+        -committeeNestedOccurrences,
+      );
+    } else if (key === "level") {
+      score.push(levelPenalty, levelSpread);
+    } else {
+      score.push(-uniqueCount, -occurrenceCount);
+    }
+  }
+  score.push(repeatedCourtPairs + repeatedDoubles);
+  return score;
 }

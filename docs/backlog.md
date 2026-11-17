@@ -331,6 +331,51 @@ reappears until the next change.
 then 2; seen copies 2) and verified in the browser.
 
 
+### BC-54 · P1 · L — There is no Advanced level, and level barely affects a court
+**Problem** The club only had Beginner/Intermediate/Professional, so the strong
+club players who are not invited professionals had no honest box to tick, and
+because `levelSpreadWithin` summed pairwise differences a 3-intermediate + 1-beginner
+court scored *better* than 2+2 — the exact mix the club wants to avoid. Level was
+also the ninth of ten score keys, so friends outranked it.
+**Fix** Shipped in `20261117120000_advanced_level.sql` + the composition work:
+four levels with a `private.player_level_rank(...)` used by the fairness draw,
+`levelCompositionPenalty` scoring the six wanted shapes (all same → 2+2 → 3 strong
++ 1 weak → 2+1+1 → 3 weak + 1 strong → 4 different) ahead of friend edges, and
+`court-schedule.composition.test.ts` pinning the two inversions the old score had.
+**Done when** an Advanced member can pick the level, and a court of 3 strong + 1 weak
+is preferred over 2+2 and over 3 intermediates + 1 beginner.
+**Done** — `supabase/tests/advanced_level.test.sql`, 6 vitest composition tests,
+and a 390×844 run-through of the picker.
+
+### BC-55 · P1 · M — A new level can be added without anyone confirming their own
+**Problem** The database defaulted every member to Intermediate, so adding Advanced
+would silently leave strong players mislabelled unless they happened to open their
+profile — and nothing forced a decision.
+**Fix** Shipped in `20261117120000_advanced_level.sql`: `profiles.level_confirmed_at`,
+a one-way latch set by `update_my_player_level`, and a gate in
+`request_session_signup` (`Confirm your playing level before signing up.`).
+`LevelPickerDialog` renders blocking when the flag is null, with self-assessment
+copy for each level. Existing sign-ups are never touched and committee auto-signup
+still runs for unconfirmed members.
+**Done when** a member who has never answered cannot join a new session, and a
+place they already hold survives.
+**Done** — `supabase/tests/advanced_level.test.sql` (gate, existing place, latch),
+Playwright screenshot `artifacts/level-blocking.png`.
+
+### BC-56 · P2 · M — The matching order is hard-coded
+**Problem** Fairness → committee → level → friends was baked into the score vector,
+so the committee could not try "level before committee" or "friends last" without a
+deploy.
+**Fix** Shipped in `20261117120000_advanced_level.sql`: `public.matching_settings`
+(one row, default `{committee,level,friends}`), `public.admin_set_matching_priority`
+(administrator-only permutation check), `session_timetables.matching_priority`
+recording the order a row was built with, and `MatchingPriorityPanel` on `/admin`.
+A released timetable is never rearranged; only the next generation uses the new order.
+**Done when** an administrator can reorder the three keys, the next unlocked
+timetable uses them, and locked rows keep their shape.
+**Done** — `supabase/tests/advanced_level.test.sql`; UI verified at 390×844
+(`artifacts/admin-panel.png`, `artifacts/admin-panel-saved.png`).
+
 ---
 
 ## P2 — missing product

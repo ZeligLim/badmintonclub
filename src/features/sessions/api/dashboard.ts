@@ -28,10 +28,14 @@ import {
 import {
   ensureSessionTimetable,
   readPersistedTimetables,
+  readTimetablePriorities,
   readTimetableVersions,
 } from "@/features/sessions/api/timetable";
+import { readMatchingPriority } from "@/features/sessions/api/settings";
 import { isClubEmail } from "@/lib/validation";
 import { logError, logWarning } from "@/lib/log";
+import { PLAYER_LEVELS } from "@/types/player";
+import type { PlayerLevel } from "@/types/player";
 
 type DashboardSessionRow =
   Database["public"]["Functions"]["get_dashboard_sessions"]["Returns"][number];
@@ -146,6 +150,10 @@ export async function loadDashboardData(): Promise<DashboardData> {
       )) {
         timetableVersions.set(sessionId, version);
       }
+      const timetablePriorities = await readTimetablePriorities(
+        confirmedSessionIds,
+      );
+      const matchingPriority = await readMatchingPriority(supabase);
       for (const [sessionId, signup] of await getMySignups(
         supabase,
         user.id,
@@ -183,6 +191,8 @@ export async function loadDashboardData(): Promise<DashboardData> {
             level: parsePlayerLevel(player.player_level),
           })),
           persisted: timetableBySession.get(sessionRow.id),
+          priority: matchingPriority,
+          persistedPriority: timetablePriorities.get(sessionRow.id) ?? null,
         });
 
         userPlayerGameSchedules.set(
@@ -262,6 +272,7 @@ export async function loadDashboardData(): Promise<DashboardData> {
             user.email?.split("@")[0] ??
             "Player",
           playerLevel: parsePlayerLevel(profile?.player_level ?? "INTERMEDIATE"),
+          playerLevelConfirmed: Boolean(profile?.level_confirmed_at),
           canChooseProfessional: profile?.can_choose_professional ?? false,
           isCommittee: profile?.is_committee ?? false,
           isCommitteeAdmin: profile?.is_committee_admin ?? false,
@@ -302,7 +313,7 @@ async function getProfile(
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "display_name, player_level, can_choose_professional, is_committee, is_committee_admin, committee_auto_signup",
+      "display_name, player_level, level_confirmed_at, can_choose_professional, is_committee, is_committee_admin, committee_auto_signup",
     )
     .eq("id", userId)
     .maybeSingle();
@@ -449,12 +460,8 @@ function parsePlayerLevel(
   playerLevel: string,
   context?: { userId?: string },
 ): FriendCandidate["playerLevel"] {
-  if (
-    playerLevel === "BEGINNER" ||
-    playerLevel === "INTERMEDIATE" ||
-    playerLevel === "PROFESSIONAL"
-  ) {
-    return playerLevel;
+  if (PLAYER_LEVELS.includes(playerLevel as PlayerLevel)) {
+    return playerLevel as PlayerLevel;
   }
 
   // A value written by a newer build (or a hand-edited row) must not take the

@@ -26,6 +26,11 @@ select
   now(),
   now()
 from generate_series(1, 14) as player_number;
+-- Fixtures are members who answered the level picker before this run.
+update public.profiles
+set level_confirmed_at = now()
+where level_confirmed_at is null;
+
 
 update public.profiles
 set is_committee = right(id::text, 12)::integer in (1, 2, 3, 4, 5, 7, 13, 14)

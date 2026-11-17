@@ -2,7 +2,11 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Json } from "@/lib/supabase/database.types";
-import type { PersistedCourtGame } from "@/features/sessions/court-schedule";
+import {
+  toMatchingPriority,
+  type MatchingPriorityKey,
+  type PersistedCourtGame,
+} from "@/features/sessions/court-schedule";
 import {
   buildSessionTimetable,
   type TimetablePlayer,
@@ -10,6 +14,8 @@ import {
 } from "@/features/sessions/timetable-plan";
 import type { createClient } from "@/lib/supabase/server";
 import { logError } from "@/lib/log";
+import { toPlayerLevel } from "@/features/sessions/court-schedule.levels";
+import { readMatchingPriority } from "@/features/sessions/api/settings";
 
 /**
  * The one place that builds, stores and reads a session's court timetable.
@@ -52,6 +58,28 @@ export async function readPersistedTimetables(
     }
   }
 
+  return result;
+}
+
+/** The matching order each saved timetable was built with. */
+export async function readTimetablePriorities(
+  sessionIds: string[],
+): Promise<Map<string, MatchingPriorityKey[]>> {
+  const result = new Map<string, MatchingPriorityKey[]>();
+  if (sessionIds.length === 0) return result;
+
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("session_timetables")
+    .select("session_id, matching_priority")
+    .in("session_id", sessionIds);
+  if (error) {
+    logError("Could not read saved timetable orders.", error);
+    return result;
+  }
+  for (const row of data ?? []) {
+    result.set(row.session_id, toMatchingPriority(row.matching_priority));
+  }
   return result;
 }
 
@@ -125,6 +153,9 @@ export async function rebuildSessionTimetable(
 
   const persisted =
     (await readPersistedTimetables([sessionId])).get(sessionId) ?? null;
+  const persistedPriority =
+    (await readTimetablePriorities([sessionId])).get(sessionId) ?? null;
+  const priority = await readMatchingPriority(admin);
 
   await ensureSessionTimetable({
     session: {
@@ -141,9 +172,12 @@ export async function rebuildSessionTimetable(
       priority: player.slot_number ?? 1,
       friendIds: player.friend_ids ?? [],
       isCommittee: player.is_committee,
+      level: toPlayerLevel(player.player_level),
     })),
     persisted,
     forceRefresh: true,
+    priority,
+    persistedPriority,
   });
 }
 
@@ -154,6 +188,8 @@ export async function ensureSessionTimetable({
   seed,
   forceRefresh = false,
   now,
+  priority,
+  persistedPriority,
 }: {
   session: TimetableSession;
   players: TimetablePlayer[];
@@ -163,6 +199,10 @@ export async function ensureSessionTimetable({
   forceRefresh?: boolean;
   /** The club's clock. Defaults to the server's clock. */
   now?: Date;
+  /** The club's current matching order. */
+  priority?: readonly MatchingPriorityKey[];
+  /** The order the saved timetable was built with. */
+  persistedPriority?: readonly MatchingPriorityKey[] | null;
 }): Promise<PersistedCourtGame[]> {
   const plan = buildSessionTimetable({
     session,
@@ -171,6 +211,8 @@ export async function ensureSessionTimetable({
     seed,
     forceRefresh,
     now,
+    priority,
+    persistedPriority,
   });
   const allocation = plan.games;
 
@@ -197,6 +239,7 @@ export async function ensureSessionTimetable({
       p_session_id: session.id,
       p_court_schedule: allocation as Exclude<Json, null>,
       p_generated_by: undefined,
+      p_matching_priority: priority ? [...priority] : undefined,
     });
     if (error) {
       throw error;

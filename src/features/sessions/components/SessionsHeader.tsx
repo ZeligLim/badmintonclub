@@ -15,6 +15,7 @@ import {
   MoreVertical,
   Pencil,
   X,
+  ChevronDown,
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import Image from "next/image";
@@ -25,7 +26,6 @@ import {
   signOutFromClub,
   updateCommitteeAutoSignupForCurrentUser,
   updateDisplayNameForCurrentUser,
-  updatePlayerLevelForCurrentUser,
   type PlayerLevel,
 } from "@/features/sessions";
 import { useRouter } from "next/navigation";
@@ -37,20 +37,25 @@ type SessionsHeaderProps = {
   committeeAutoSignup: boolean;
   playerLevel: PlayerLevel;
   canChooseProfessional: boolean;
+  onEditLevel: () => void;
 };
+
+export function playerLevelLabel(level: PlayerLevel): string {
+  if (level === "BEGINNER") return "Beginner";
+  if (level === "ADVANCED") return "Advanced";
+  if (level === "PROFESSIONAL") return "Professional";
+  return "Intermediate";
+}
 
 export function SessionsHeader({
   displayName,
   isCommittee,
   isCommitteeAdmin,
   committeeAutoSignup: initialCommitteeAutoSignup,
-  playerLevel: initialPlayerLevel,
-  canChooseProfessional,
+  playerLevel,
+  onEditLevel,
 }: SessionsHeaderProps) {
   const router = useRouter();
-  const [playerLevel, setPlayerLevel] = useState(initialPlayerLevel);
-  const [isUpdatingLevel, startTransition] = useTransition();
-  const [levelError, setLevelError] = useState("");
   const [committeeAutoSignup, setCommitteeAutoSignup] = useState(
     initialCommitteeAutoSignup,
   );
@@ -84,30 +89,6 @@ export function SessionsHeader({
     observer.observe(nameElement);
     return () => observer.disconnect();
   }, [displayName]);
-
-  function changePlayerLevel(value: string) {
-    if (
-      value !== "BEGINNER" &&
-      value !== "INTERMEDIATE" &&
-      value !== "PROFESSIONAL"
-    ) {
-      return;
-    }
-    if (value === "PROFESSIONAL" && !canChooseProfessional) {
-      return;
-    }
-
-    setLevelError("");
-    startTransition(async () => {
-      try {
-        await updatePlayerLevelForCurrentUser(value);
-        setPlayerLevel(value);
-        router.refresh();
-      } catch {
-        setLevelError("We couldn’t update your playing level. Please try again.");
-      }
-    });
-  }
 
   function changeCommitteeAutoSignup(nextValue: boolean) {
     if (nextValue === committeeAutoSignup) {
@@ -259,22 +240,15 @@ export function SessionsHeader({
               )}
               {!isEditingName && (
                 <>
-                  <label className="sr-only" htmlFor="player-level">
-                    Playing level
-                  </label>
-                  <select
-                    className="h-10 min-w-0 flex-1 rounded-md border-0 bg-card px-2 text-xs outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-auto sm:flex-none sm:px-3 sm:text-sm"
-                    disabled={isUpdatingLevel}
-                    id="player-level"
-                    onChange={(event) => changePlayerLevel(event.target.value)}
-                    value={playerLevel}
+                  <button
+                    aria-haspopup="dialog"
+                    className="flex h-10 min-w-0 items-center gap-1 rounded-md border-0 bg-card px-2 text-xs outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring sm:px-3 sm:text-sm"
+                    onClick={onEditLevel}
+                    type="button"
                   >
-                    <option value="BEGINNER">Beginner</option>
-                    <option value="INTERMEDIATE">Intermediate</option>
-                    {canChooseProfessional && (
-                      <option value="PROFESSIONAL">Professional</option>
-                    )}
-                  </select>
+                    <span className="truncate">{playerLevelLabel(playerLevel)}</span>
+                    <ChevronDown aria-hidden="true" className="size-3.5 shrink-0" />
+                  </button>
                   <div className="relative shrink-0">
                     <button
                       aria-expanded={menuOpen}
@@ -391,11 +365,6 @@ export function SessionsHeader({
           </span>
         )}
       </div>
-    )}
-    {levelError && (
-      <span className="mt-1 block text-[0.65rem] text-destructive" role="alert">
-        {levelError}
-      </span>
     )}
     </>
   );

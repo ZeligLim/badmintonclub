@@ -1,3 +1,5 @@
+import { PLAYER_LEVELS } from "@/types/player";
+import type { PlayerLevel } from "@/types/player";
 import "server-only";
 
 import {
@@ -13,6 +15,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlayerGamesFromCourtSchedule } from "../court-schedule";
 import type { createClient } from "@/lib/supabase/server";
 import { logError } from "@/lib/log";
+import { readMatchingPriority } from "@/features/sessions/api/settings";
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 type BookingEmailRecipient = {
@@ -332,6 +335,7 @@ async function createBookingConfirmationEmail(
       level: levelByUser.get(player.user_id) ?? "INTERMEDIATE",
     })),
     persisted: asPersistedTimetable(persistedTimetable?.court_schedule),
+    priority: await readMatchingPriority(admin),
   });
   const playerGames = getPlayerGamesFromCourtSchedule(timetable, userId);
   const assignedCourts = [
@@ -389,13 +393,9 @@ function formatSessionDate(date: string): string {
   }).format(new Date(`${date}T12:00:00Z`));
 }
 
-function parsePlayerLevel(value: string): "BEGINNER" | "INTERMEDIATE" | "PROFESSIONAL" {
-  if (
-    value === "BEGINNER" ||
-    value === "INTERMEDIATE" ||
-    value === "PROFESSIONAL"
-  ) {
-    return value;
+function parsePlayerLevel(value: string): PlayerLevel {
+  if ((PLAYER_LEVELS as readonly string[]).includes(value)) {
+    return value as PlayerLevel;
   }
   throw new Error("A club member has an unsupported player level.");
 }

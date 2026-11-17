@@ -1,7 +1,11 @@
 import "server-only";
 
 import { connection } from "next/server";
-import { readPersistedTimetables } from "@/features/sessions/api/timetable";
+import {
+  readPersistedTimetables,
+  readTimetablePriorities,
+} from "@/features/sessions/api/timetable";
+import { readMatchingPriority } from "@/features/sessions/api/settings";
 import { buildSessionTimetable } from "@/features/sessions/timetable-plan";
 import { formatTimeOfDay } from "@/lib/format";
 import { toSessionStatus, toSignupStatus } from "@/features/sessions/status";
@@ -14,6 +18,7 @@ import type { SessionAllocationMode } from "@/features/sessions";
 import { getSessionDayName } from "@/lib/sessions/schedule";
 import { getClubNow } from "@/features/sessions/club-clock";
 import { isSessionTimetableLocked } from "@/features/sessions/court-schedule";
+import { PLAYER_LEVELS } from "@/types/player";
 import type { PlayerLevel } from "@/types/player";
 import { isClubEmail } from "@/lib/validation";
 import { logError } from "@/lib/log";
@@ -323,6 +328,8 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
   }
 
   const timetableMap = await readPersistedTimetables(sessionIds);
+  const timetablePriorities = await readTimetablePriorities(sessionIds);
+  const matchingPriority = await readMatchingPriority(admin);
 
   return await Promise.all(sessions.map(async (session) => {
     const sessionSignups = (signups ?? []).filter(
@@ -384,6 +391,8 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
       })),
       persisted: timetableMap.get(session.id),
       seed: options?.allocationSeed,
+      priority: matchingPriority,
+      persistedPriority: timetablePriorities.get(session.id) ?? null,
     });
     const courtScheduleGames = timetablePlan.games;
 
@@ -451,12 +460,8 @@ function getLondonDateTime(date: Date) {
 }
 
 function parsePlayerLevel(playerLevel: string): PlayerLevel {
-  if (
-    playerLevel === "BEGINNER" ||
-    playerLevel === "INTERMEDIATE" ||
-    playerLevel === "PROFESSIONAL"
-  ) {
-    return playerLevel;
+  if ((PLAYER_LEVELS as readonly string[]).includes(playerLevel)) {
+    return playerLevel as PlayerLevel;
   }
 
   throw new Error("A club member has an unsupported player level.");

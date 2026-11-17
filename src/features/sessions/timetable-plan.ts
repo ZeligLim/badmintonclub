@@ -6,6 +6,7 @@ import {
   markCourtScheduleCurrent,
   shouldRefreshPersistedCourtSchedule,
   type CourtRosterPlayer,
+  type MatchingPriorityKey,
   type PersistedCourtGame,
   type PlayerLevel,
 } from "@/features/sessions/court-schedule";
@@ -60,6 +61,8 @@ export function buildSessionTimetable({
   seed,
   forceRefresh = false,
   now,
+  priority,
+  persistedPriority,
 }: {
   session: TimetableSession;
   players: TimetablePlayer[];
@@ -74,6 +77,10 @@ export function buildSessionTimetable({
   forceRefresh?: boolean;
   /** The club's clock. Defaults to the server's clock. */
   now?: Date;
+  /** The club's current matching order. */
+  priority?: readonly MatchingPriorityKey[];
+  /** The order the saved timetable was built with, if it is known. */
+  persistedPriority?: readonly MatchingPriorityKey[] | null;
 }): SessionTimetablePlan {
   const isLocked = isSessionTimetableLocked(
     {
@@ -82,8 +89,15 @@ export function buildSessionTimetable({
     },
     now,
   );
+  const priorityChanged =
+    priority !== undefined &&
+    persistedPriority != null &&
+    priority.join(",") !== persistedPriority.join(",");
   const needsRebuild =
     forceRefresh ||
+    // A priority change only affects the next generation: released and
+    // confirmed timetables keep the order they were built with.
+    (priorityChanged && !isLocked && !session.isConfirmed) ||
     shouldRefreshPersistedCourtSchedule(persisted, {
       isLocked,
       isConfirmed: session.isConfirmed,
@@ -120,7 +134,7 @@ export function buildSessionTimetable({
           courtCount: session.courtCount ?? getCourtCount(session.capacity),
         },
         roster,
-        seed ? { seed } : undefined,
+        { ...(seed ? { seed } : {}), ...(priority ? { priority } : {}) },
       ),
     ),
     needsPersisting: true,

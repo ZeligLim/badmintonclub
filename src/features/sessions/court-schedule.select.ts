@@ -15,7 +15,11 @@ import {
   type ScheduleTrackingState,
   type CourtRosterPlayer,
 } from "./court-schedule.shared";
-import { levelSpreadWithin, levelValue } from "./court-schedule.levels";
+import {
+  levelCompositionPenalty,
+  levelSpreadWithin,
+  levelValue,
+} from "./court-schedule.levels";
 
 export type AnchorCycle = {
   eligibleAnchorIds: Set<string>;
@@ -549,6 +553,11 @@ export function buildCourtGroup(args: {
     .filter((player) => availableIds.has(player.id))
     .sort(
       (a, b) =>
+        // The court's shape comes first: a filler should keep the group in a
+        // better composition class before it chases one more friend edge.
+        levelCompositionPenalty([...group, a]) -
+          levelCompositionPenalty([...group, b]) ||
+        levelSpreadWithin([...group, a]) - levelSpreadWithin([...group, b]) ||
         group.reduce(
           (total, other) => total + countFriendEdgesBetween(b.id, other.id, friendMap),
           0,
@@ -559,7 +568,6 @@ export function buildCourtGroup(args: {
           ) ||
         Number(a.normalizedFriendIds.length > 0) -
           Number(b.normalizedFriendIds.length > 0) ||
-        levelSpreadWithin([...group, a]) - levelSpreadWithin([...group, b]) ||
         compareGameFairness(a, b, state),
     );
 

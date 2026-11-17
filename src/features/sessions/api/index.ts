@@ -57,7 +57,7 @@ export async function saveSessionFriendPreferences(
 }
 
 export async function updatePlayerLevelForCurrentUser(
-  playerLevel: "BEGINNER" | "INTERMEDIATE" | "PROFESSIONAL",
+  playerLevel: "BEGINNER" | "INTERMEDIATE" | "ADVANCED" | "PROFESSIONAL",
 ): Promise<void> {
   await updatePlayerLevel(playerLevel);
 }

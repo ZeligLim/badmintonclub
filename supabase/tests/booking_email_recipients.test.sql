@@ -18,6 +18,11 @@ select
   now(),
   now()
 from generate_series(1, 3) as n;
+-- Fixtures are members who answered the level picker before this run.
+update public.profiles
+set level_confirmed_at = now()
+where level_confirmed_at is null;
+
 
 insert into public.sessions (
   id, event_date, starts_at, duration_minutes, capacity,

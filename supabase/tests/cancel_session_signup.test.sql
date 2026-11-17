@@ -26,6 +26,11 @@ values (
   now(),
   now()
 );
+-- Fixtures are members who answered the level picker before this run.
+update public.profiles
+set level_confirmed_at = now()
+where level_confirmed_at is null;
+
 
 insert into public.sessions (
   id,

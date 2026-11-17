@@ -20,6 +20,11 @@ select
   now(),
   now()
 from generate_series(1, 5) as n;
+-- Fixtures are members who answered the level picker before this run.
+update public.profiles
+set level_confirmed_at = now()
+where level_confirmed_at is null;
+
 
 update public.profiles
 set last_played_at = '2026-01-01T00:00:00Z',

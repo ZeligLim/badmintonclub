@@ -3,29 +3,28 @@
  * readable in one place.
  */
 
-export type PlayerLevel = "BEGINNER" | "INTERMEDIATE" | "PROFESSIONAL";
+export type PlayerLevel = "BEGINNER" | "INTERMEDIATE" | "ADVANCED" | "PROFESSIONAL";
 
 export const LEVEL_VALUE: Record<PlayerLevel, number> = {
   BEGINNER: 1,
   INTERMEDIATE: 2,
-  PROFESSIONAL: 3,
+  ADVANCED: 3,
+  PROFESSIONAL: 4,
 };
 
 /** Reads a stored level, falling back to the club default for unknown text. */
 export function toPlayerLevel(value: string | null | undefined): PlayerLevel {
-  if (value === "BEGINNER" || value === "INTERMEDIATE" || value === "PROFESSIONAL") {
-    return value;
-  }
+  if (value === "BEGINNER" || value === "INTERMEDIATE") return value;
+  if (value === "ADVANCED" || value === "PROFESSIONAL") return value;
   return "INTERMEDIATE";
 }
 
-export function levelValue(
-  level: PlayerLevel | null | undefined,
-): number {
-  // Rows written before the level migration can still carry a value outside
-  // PlayerLevel (for example "ADVANCED"); treat anything unknown as the
-  // default rather than letting NaN leak into every score comparison.
-  return (level ? LEVEL_VALUE[level] : undefined) ?? LEVEL_VALUE.INTERMEDIATE;
+export function levelValue(level: PlayerLevel | string | null | undefined): number {
+  if (level === "BEGINNER") return LEVEL_VALUE.BEGINNER;
+  if (level === "INTERMEDIATE") return LEVEL_VALUE.INTERMEDIATE;
+  if (level === "ADVANCED") return LEVEL_VALUE.ADVANCED;
+  if (level === "PROFESSIONAL") return LEVEL_VALUE.PROFESSIONAL;
+  return LEVEL_VALUE.INTERMEDIATE;
 }
 
 /** Higher levels rank first when every fairness and friendship tie is equal. */
@@ -37,9 +36,43 @@ export function compareLevelRank(
 }
 
 /**
- * Total level spread inside a group. Courts with a smaller spread keep
- * professionals, intermediates and beginners together where the club can.
+ * How mixed a court is, as a rankable penalty. The club prefers, in order:
+ * all the same level, two and two, three stronger with one weaker,
+ * two plus two different, three weaker with one stronger, four different.
+ * Level distance inside a class is a tie-break, not a stronger rule.
  */
+export function levelCompositionPenalty(
+  players: Array<{ level?: PlayerLevel | null }>,
+): number {
+  const counts = new Map<number, number>();
+  for (const player of players) {
+    const value = levelValue(player.level);
+    counts.set(value, (counts.get(value) ?? 0) + 1);
+  }
+  const groups = [...counts.values()].sort((a, b) => b - a);
+
+  if (groups.length === 1) return 0;
+  if (players.length === 4) {
+    if (groups[0] === 2 && groups[1] === 2) return 10;
+    if (groups[0] === 3) {
+      const [[strongLevel], [singleLevel]] = [...counts.entries()].sort(
+        (a, b) => b[1] - a[1],
+      );
+      // Three stronger with one weaker is fine; three weaker with one
+      // stronger strands the strongest player.
+      return singleLevel > strongLevel ? 40 : 20;
+    }
+    if (groups[0] === 1) return 50;
+    return 30;
+  }
+  if (players.length === 3) {
+    if (groups[0] === 2) return 25;
+    return 50;
+  }
+  return levelSpreadWithin(players) * 10;
+}
+
+/** Total level spread inside a group, used only to break ties inside a class. */
 export function levelSpreadWithin(
   players: Array<{ level?: PlayerLevel | null }>,
 ): number {

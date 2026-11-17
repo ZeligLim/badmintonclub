@@ -21,6 +21,42 @@ export const COURT_ALLOCATION_VERSION = 9;
 
 export type { PlayerLevel } from "./court-schedule.levels";
 
+/** Which preference outranks which when two schedules are compared. */
+export type MatchingPriorityKey = "committee" | "level" | "friends";
+
+export const MATCHING_PRIORITY_KEYS: readonly MatchingPriorityKey[] = [
+  "committee",
+  "level",
+  "friends",
+];
+
+export const DEFAULT_MATCHING_PRIORITY: MatchingPriorityKey[] = [
+  "committee",
+  "level",
+  "friends",
+];
+
+export function isMatchingPriority(
+  value: unknown,
+): value is MatchingPriorityKey[] {
+  if (!Array.isArray(value) || value.length !== MATCHING_PRIORITY_KEYS.length) {
+    return false;
+  }
+  const seen = new Set<string>();
+  for (const item of value) {
+    if (typeof item !== "string" || !MATCHING_PRIORITY_KEYS.includes(item as MatchingPriorityKey)) {
+      return false;
+    }
+    if (seen.has(item)) return false;
+    seen.add(item);
+  }
+  return true;
+}
+
+export function toMatchingPriority(value: unknown): MatchingPriorityKey[] {
+  return isMatchingPriority(value) ? value : [...DEFAULT_MATCHING_PRIORITY];
+}
+
 export type CourtRosterPlayer = {
   id: string;
   displayName: string;
