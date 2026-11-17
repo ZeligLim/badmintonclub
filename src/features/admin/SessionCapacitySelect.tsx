@@ -24,7 +24,7 @@ export function SessionCapacitySelect({
       Capacity
       <select
         aria-label="Capacity for this session"
-        className="h-10 rounded-lg border border-border bg-white py-2 pl-3 pr-9 text-foreground"
+        className="h-10 rounded-lg border border-border bg-card py-2 pl-3 pr-9 text-foreground"
         value={capacity}
         disabled={disabled || pending}
         onChange={(event) => {

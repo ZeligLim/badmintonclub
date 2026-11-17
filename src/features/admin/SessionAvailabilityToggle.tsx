@@ -55,7 +55,7 @@ export function SessionAvailabilityToggle({
 
   return (
     <div className="flex flex-col items-start gap-1">
-      <div className="inline-flex h-10 items-center gap-2 rounded-lg bg-white px-3">
+      <div className="inline-flex h-10 items-center gap-2 rounded-lg bg-card px-3">
         <label
           className="cursor-pointer whitespace-nowrap text-xs font-medium"
           htmlFor={`session-happening-${sessionId}`}

@@ -110,7 +110,7 @@ export function TimetablePngDownload({ session }: { session: AdminSession }) {
   }
 
   return (
-    <Button className="h-10 rounded-lg bg-white" type="button" size="lg" variant="outline" onClick={download}>
+    <Button className="h-10 rounded-lg bg-card" type="button" size="lg" variant="outline" onClick={download}>
       <Download aria-hidden="true" />
       PNG
     </Button>
