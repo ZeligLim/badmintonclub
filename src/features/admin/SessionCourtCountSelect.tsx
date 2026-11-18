@@ -9,7 +9,7 @@ export function SessionCourtCountSelect({ sessionId, courtCount, disabled }: { s
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState("");
   return <label className="inline-flex items-center gap-2 text-xs text-muted-foreground">Courts
-    <select aria-label="Courts for this session" className="h-10 rounded-lg border border-border bg-white py-2 pl-3 pr-9 text-foreground" value={courtCount} disabled={disabled || pending}
+    <select aria-label="Courts for this session" className="h-10 rounded-lg border border-border bg-card py-2 pl-3 pr-9 text-foreground" value={courtCount} disabled={disabled || pending}
       onChange={(event) => { const value = Number(event.target.value); setError(""); startTransition(async () => { try { await updateSessionCourtCount(sessionId, value); router.refresh(); } catch (e) { setError(e instanceof Error ? e.message : "Could not update courts."); } }); }}>
       {[1, 2, 3, 4].map((count) => <option key={count} value={count}>{count}</option>)}
     </select>{error && <span role="alert" className="text-destructive">{error}</span>}

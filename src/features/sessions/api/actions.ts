@@ -4,12 +4,11 @@ import { logError } from "@/lib/log";
 
 import { hasSupabaseConfig } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import {
   finalizeDueSessionsAndEmail,
   sendBookingConfirmationEmailBestEffort,
 } from "./booking-confirmation-email";
-import { isSessionTimetableLocked } from "../court-schedule";
+import { rebuildSessionTimetable } from "./timetable";
 import type { FriendCandidate } from "../types";
 
 export async function finalizeDueSessions(): Promise<number> {
@@ -45,45 +44,9 @@ export async function updateSessionFriendPreferences(
     throw new Error("Could not save your friend choices.");
   }
 
-  await invalidateSessionTimetable(sessionId);
+  await rebuildSessionTimetable(supabase, sessionId);
 }
 
-async function invalidateSessionTimetable(sessionId: string): Promise<void> {
-  const admin = createAdminClient();
-  const { data: session, error: sessionError } = await admin
-    .from("sessions")
-    .select("event_date, starts_at")
-    .eq("id", sessionId)
-    .maybeSingle();
-  if (sessionError || !session) {
-    logError("Could not check the session timetable lock.", {
-      code: sessionError?.code,
-    });
-    return;
-  }
-  if (
-    isSessionTimetableLocked({
-      eventDate: session.event_date,
-      startsAt: session.starts_at,
-    })
-  ) {
-    // The timetable is public from this point. The database already rejects
-    // signup and preference changes, so keep the saved timetable untouched.
-    return;
-  }
-
-  const { error } = await admin
-    .from("session_timetables")
-    .delete()
-    .eq("session_id", sessionId);
-
-  if (error) {
-    logError("Could not invalidate session timetable.", {
-      code: error.code,
-    });
-    throw new Error("Could not refresh this session’s court matching.");
-  }
-}
 export async function searchClubMembers(
   query: string,
   sessionId?: string,
@@ -218,14 +181,55 @@ export async function joinConfirmedSession(sessionId: string): Promise<void> {
     throw new Error("Could not join this session.");
   }
 
-  // The confirmed roster changed, so rebuild the saved timetable while the
-  // session is still unlocked. After the 30-minute release it is frozen.
-  await invalidateSessionTimetable(sessionId);
+  // The confirmed roster changed, so rebuild the saved timetable. This bumps
+  // its version, which is how players learn their games moved.
+  await rebuildSessionTimetable(supabase, sessionId);
   await sendBookingConfirmationEmailBestEffort(supabase, sessionId);
 }
 
 export async function cancelSignup(sessionId: string): Promise<void> {
   await updateSignup(sessionId, "cancel_session_signup");
+}
+
+/**
+ * "I am not coming." Allowed once the session has started, when cancelling is
+ * too late. It marks the player on the court; it never re-draws the evening.
+ */
+export async function setSessionNoShow(
+  sessionId: string,
+  noShow: boolean,
+): Promise<void> {
+  validateSessionId(sessionId);
+  const supabase = await requireAuthenticatedClient();
+  const { error } = await supabase.rpc("set_session_no_show", {
+    p_session_id: sessionId,
+    p_no_show: noShow,
+  });
+
+  if (error) {
+    logError("Could not update attendance for this session.", {
+      code: error.code,
+    });
+    throw new Error("Could not update your attendance.");
+  }
+}
+
+/** Acknowledge the latest published timetable, so the change notice stops. */
+export async function markTimetableSeen(sessionIds: string[]): Promise<void> {
+  if (sessionIds.length === 0) {
+    return;
+  }
+  sessionIds.forEach(validateSessionId);
+  const supabase = await requireAuthenticatedClient();
+  const { error } = await supabase.rpc("mark_session_timetable_seen", {
+    p_session_ids: sessionIds,
+  });
+
+  if (error) {
+    logError("Could not record that the timetable was seen.", {
+      code: error.code,
+    });
+  }
 }
 
 export async function signOut(): Promise<void> {
@@ -278,7 +282,7 @@ async function updateSignup(
     );
   }
 
-  await invalidateSessionTimetable(sessionId);
+  await rebuildSessionTimetable(supabase, sessionId);
 }
 
 async function requireAuthenticatedClient() {

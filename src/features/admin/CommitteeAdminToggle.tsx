@@ -62,7 +62,7 @@ export function CommitteeAdminToggle({
       ) : (
         <select
           aria-label={`${displayName} administrator access`}
-          className="h-7 rounded-md border-0 bg-white px-2 py-0 outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="h-7 rounded-md border-0 bg-card px-2 py-0 outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           onChange={(event) => changeAdminStatus(event.target.value)}
           value={isCommitteeAdmin ? "true" : "false"}
         >

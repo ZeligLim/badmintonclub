@@ -313,7 +313,7 @@ select set_config(
 select throws_ok(
   $$select public.cancel_session_signup('10000000-0000-4000-8000-0000000000ff')$$,
   'P0001',
-  'The cancellation window for this session has passed.',
+  'This session has already started. Mark yourself as not showing instead.',
   'authenticated users cannot cancel once the timetable has been released'
 );
 reset role;

@@ -138,7 +138,7 @@ confirmed session (already announced by email or dashboard):
     signup / cancellation / friend change may still delete it before release
     admin may still regenerate it before release
 
-published session (30 minutes before start):
+published session (15 minutes before start):
     the saved row is frozen
     regeneration is rejected
     deletion is a no-op

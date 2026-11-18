@@ -196,30 +196,36 @@ export type Database = {
       session_signups: {
         Row: {
           confirmation_email_sent_at: string | null;
+          no_show_at: string | null;
           payment_status: string;
           session_id: string;
           signed_up_at: string;
           slot_number: number | null;
           status: string;
+          timetable_seen_version: number;
           user_id: string;
         };
         ComputedFields: never;
         Insert: {
           confirmation_email_sent_at?: string | null;
+          no_show_at?: string | null;
           payment_status?: string;
           session_id: string;
           signed_up_at?: string;
           slot_number?: number | null;
           status?: string;
+          timetable_seen_version?: number;
           user_id: string;
         };
         Update: {
           confirmation_email_sent_at?: string | null;
+          no_show_at?: string | null;
           payment_status?: string;
           session_id?: string;
           signed_up_at?: string;
           slot_number?: number | null;
           status?: string;
+          timetable_seen_version?: number;
           user_id?: string;
         };
         Relationships: [
@@ -309,6 +315,7 @@ export type Database = {
           generated_at: string;
           generated_by: string | null;
           session_id: string;
+          version: number;
         };
         ComputedFields: never;
         Insert: {
@@ -316,12 +323,14 @@ export type Database = {
           generated_at?: string;
           generated_by?: string | null;
           session_id: string;
+          version?: number;
         };
         Update: {
           court_schedule?: NonNullable<Json>;
           generated_at?: string;
           generated_by?: string | null;
           session_id?: string;
+          version?: number;
         };
         Relationships: [
           {
@@ -618,6 +627,7 @@ export type Database = {
           display_name: string;
           friend_ids: string[];
           is_committee: boolean;
+          no_show: boolean;
           player_level: string;
           session_id: string;
           slot_number: number;
@@ -672,6 +682,7 @@ export type Database = {
           player_level: string;
         }[];
       };
+      mark_session_timetable_seen: { Args: { p_session_ids: string[] }; Returns: undefined };
       now: { Args: Record<PropertyKey, never>; Returns: string };
       remove_my_friend: { Args: { p_friend_user_id: string }; Returns: undefined };
       request_session_signup: {
@@ -680,7 +691,15 @@ export type Database = {
       };
       reset_virtual_now: { Args: Record<PropertyKey, never>; Returns: undefined };
       revert_session_finalizations: { Args: { p_cutoff: string }; Returns: undefined };
+      save_session_timetable: {
+        Args: { p_court_schedule: Json; p_generated_by?: string; p_session_id: string };
+        Returns: number;
+      };
       set_my_committee_auto_signup: { Args: { p_enabled: boolean }; Returns: undefined };
+      set_session_no_show: {
+        Args: { p_no_show?: boolean; p_session_id: string };
+        Returns: undefined;
+      };
       set_virtual_now: { Args: { p_virtual_now: string }; Returns: undefined };
       update_my_player_level: { Args: { p_player_level: string }; Returns: undefined };
       update_session_friend_preferences: {

@@ -189,7 +189,7 @@ To guarantee this:
 
 A timetable becomes **confirmed** when the session is confirmed and the first
 court assignment is announced (for example in the booking email). It becomes
-**published** 30 minutes before the session starts, when the full timetable is
+**published** 15 minutes before the session starts, when the full timetable is
 shown to players.
 
 - The saved `session_timetables` row is the single source of truth. The admin

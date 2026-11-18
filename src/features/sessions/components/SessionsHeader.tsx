@@ -12,9 +12,11 @@ import {
   Check,
   LoaderCircle,
   LogOut,
+  MoreVertical,
   Pencil,
   X,
 } from "lucide-react";
+import { ThemeToggle } from "./ThemeToggle";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -55,6 +57,7 @@ export function SessionsHeader({
   const [isUpdatingAutoSignup, startAutoSignupTransition] = useTransition();
   const [autoSignupError, setAutoSignupError] = useState("");
   const [isEditingName, setIsEditingName] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [isSavingName, setIsSavingName] = useState(false);
   const [draftDisplayName, setDraftDisplayName] = useState(displayName ?? "");
   const [nameError, setNameError] = useState("");
@@ -175,10 +178,10 @@ export function SessionsHeader({
 
         {displayName ? (
           <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 items-center gap-1 sm:gap-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-1 sm:flex-nowrap sm:gap-2">
               {!isEditingName ? (
                 <h1
-                  className="relative min-w-0 flex-1 truncate text-lg font-semibold tracking-tight text-foreground sm:text-2xl"
+                  className="relative w-full min-w-0 truncate text-lg font-semibold tracking-tight text-foreground sm:w-auto sm:flex-1 sm:text-2xl"
                   ref={displayNameRef}
                   title={displayName}
                 >
@@ -221,7 +224,7 @@ export function SessionsHeader({
                     </button>
                     <button
                       aria-label="Cancel editing name"
-                      className="inline-flex size-10 shrink-0 items-center justify-center rounded-md bg-white hover:bg-white"
+                      className="inline-flex size-10 shrink-0 items-center justify-center rounded-md bg-card hover:bg-card"
                       disabled={isSavingName}
                       onClick={() => {
                         setIsEditingName(false);
@@ -243,7 +246,7 @@ export function SessionsHeader({
               {!isEditingName && (
                 <button
                   aria-label="Edit name"
-                  className="inline-flex size-10 shrink-0 items-center justify-center rounded-md bg-white text-sm font-medium text-foreground transition-colors hover:bg-white hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="inline-flex size-10 shrink-0 items-center justify-center rounded-md bg-card text-sm font-medium text-foreground transition-colors hover:bg-card hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   onClick={() => {
                     setDraftDisplayName(displayName);
                     setNameError("");
@@ -260,7 +263,7 @@ export function SessionsHeader({
                     Playing level
                   </label>
                   <select
-                    className="h-10 min-w-0 flex-1 rounded-md border-0 bg-white px-2 text-xs outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-auto sm:flex-none sm:px-3 sm:text-sm"
+                    className="h-10 min-w-0 flex-1 rounded-md border-0 bg-card px-2 text-xs outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-auto sm:flex-none sm:px-3 sm:text-sm"
                     disabled={isUpdatingLevel}
                     id="player-level"
                     onChange={(event) => changePlayerLevel(event.target.value)}
@@ -272,6 +275,35 @@ export function SessionsHeader({
                       <option value="PROFESSIONAL">Professional</option>
                     )}
                   </select>
+                  <div className="relative shrink-0">
+                    <button
+                      aria-expanded={menuOpen}
+                      aria-haspopup="menu"
+                      aria-label="More options"
+                      className="flex size-10 items-center justify-center rounded-md bg-card text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      onClick={() => setMenuOpen((open) => !open)}
+                      type="button"
+                    >
+                      <MoreVertical aria-hidden="true" className="size-4" />
+                    </button>
+                    {menuOpen && (
+                      <>
+                        <button
+                          aria-label="Close menu"
+                          className="fixed inset-0 z-20 cursor-default"
+                          onClick={() => setMenuOpen(false)}
+                          tabIndex={-1}
+                          type="button"
+                        />
+                        <div
+                          className="absolute right-0 z-30 mt-2 w-52 rounded-xl border border-border bg-background p-1 shadow-lg"
+                          role="menu"
+                        >
+                          <ThemeToggle onDone={() => setMenuOpen(false)} />
+                        </div>
+                      </>
+                    )}
+                  </div>
                   <form
                     action={signOutFromClub}
                     className="shrink-0"
@@ -313,7 +345,7 @@ export function SessionsHeader({
             <span className="inline-flex h-10 shrink-0 items-center rounded-full bg-primary/10 px-3 text-[0.65rem] font-medium text-primary sm:text-xs">
               Committee
             </span>
-            <div className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md bg-white px-3 text-xs text-foreground">
+            <div className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md bg-card px-3 text-xs text-foreground">
               <label
                 className="whitespace-nowrap"
                 htmlFor="committee-auto-signup"
@@ -344,7 +376,7 @@ export function SessionsHeader({
               Admin
             </span>
             <Button
-              className="h-10 rounded-md bg-white px-3 text-xs font-normal hover:bg-white"
+              className="h-10 rounded-md bg-card px-3 text-xs font-normal hover:bg-card"
               nativeButton={false}
               render={<Link href="/admin" />}
               variant="outline"

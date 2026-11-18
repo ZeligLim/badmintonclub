@@ -15,7 +15,7 @@ export const CAPACITY_PER_COURT = PLAYERS_PER_COURT * 2;
 export const MAX_COURTS = 4;
 
 /** Players see the timetable this long before the session starts. */
-export const TIMETABLE_RELEASE_MINUTES = 30;
+export const TIMETABLE_RELEASE_MINUTES = 15;
 
 export const COURT_ALLOCATION_VERSION = 9;
 

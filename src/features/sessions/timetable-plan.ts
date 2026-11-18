@@ -131,12 +131,20 @@ export function buildSessionTimetable({
   players,
   persisted,
   seed,
+  forceRefresh = false,
   now,
 }: {
   session: TimetableSession;
   players: TimetablePlayer[];
   persisted?: PersistedCourtGame[] | null;
   seed?: string;
+  /**
+   * Rebuild even though the timetable is released. Used when the roster
+   * genuinely changed (a late cancellation) and the published schedule is now
+   * wrong — a locked schedule must never be refreshed just because the
+   * allocator changed.
+   */
+  forceRefresh?: boolean;
   /** The club's clock. Defaults to the server's clock. */
   now?: Date;
 }): SessionTimetablePlan {
@@ -147,10 +155,12 @@ export function buildSessionTimetable({
     },
     now,
   );
-  const needsRebuild = shouldRefreshPersistedCourtSchedule(persisted, {
-    isLocked,
-    isConfirmed: session.isConfirmed,
-  });
+  const needsRebuild =
+    forceRefresh ||
+    shouldRefreshPersistedCourtSchedule(persisted, {
+      isLocked,
+      isConfirmed: session.isConfirmed,
+    });
 
   if (!needsRebuild && !isLocked && !session.isConfirmed) {
     if (isTimetableCompatibleWithRoster({ session, players, games: persisted })) {

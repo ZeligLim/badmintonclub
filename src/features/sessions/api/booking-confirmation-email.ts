@@ -55,7 +55,7 @@ export async function finalizeDueSessionsAndEmail(
   if (dueSessionIds.length > 0) {
     // These sessions were open when the read started, so any saved timetable
     // is an open-session preview from the previous roster. Finalization may
-    // happen after the 30-minute release if nobody opened the app earlier;
+    // happen after the 15-minute release if nobody opened the app earlier;
     // use the trusted backend to discard the preview so the confirmed
     // timetable is built from the final roster.
     const admin = createAdminClient();

@@ -64,7 +64,7 @@ export function SessionsSignIn() {
           <input
             aria-label="Email address"
             autoComplete="email"
-            className="h-11 w-full rounded-lg bg-white px-3 text-base text-foreground outline-none transition-shadow placeholder:text-muted-foreground/70 focus-visible:ring-3 focus-visible:ring-ring/25"
+            className="h-11 w-full rounded-lg bg-card px-3 text-base text-foreground outline-none transition-shadow placeholder:text-muted-foreground/70 focus-visible:ring-3 focus-visible:ring-ring/25"
             onChange={(event) => setEmail(event.target.value)}
             placeholder="you@atu.ie"
             required

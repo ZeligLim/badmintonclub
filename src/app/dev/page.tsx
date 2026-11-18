@@ -84,20 +84,20 @@ export default async function DevPage() {
           className="mb-6 grid gap-3 rounded-xl bg-muted/40 p-4 sm:grid-cols-4"
         >
           <input
-            className="h-9 rounded-md bg-white px-2.5 text-sm"
+            className="h-9 rounded-md bg-card px-2.5 text-sm"
             name="email"
             placeholder="email@atu.ie"
             required
             type="email"
           />
           <input
-            className="h-9 rounded-md bg-white px-2.5 text-sm"
+            className="h-9 rounded-md bg-card px-2.5 text-sm"
             name="displayName"
             placeholder="Display name"
             type="text"
           />
           <select
-            className="h-9 rounded-md bg-white px-2.5 text-sm"
+            className="h-9 rounded-md bg-card px-2.5 text-sm"
             name="role"
           >
             <option value="player">Player</option>
@@ -119,7 +119,7 @@ export default async function DevPage() {
           <label className="flex flex-col gap-1 text-sm font-medium">
             Accounts to seed
             <input
-              className="h-9 rounded-md bg-white px-2.5 text-sm"
+              className="h-9 rounded-md bg-card px-2.5 text-sm"
               defaultValue="40"
               max="200"
               min="1"
@@ -128,7 +128,7 @@ export default async function DevPage() {
             />
           </label>
           <button
-            className="h-9 rounded-md bg-white px-4 text-sm font-medium text-secondary-foreground"
+            className="h-9 rounded-md bg-card px-4 text-sm font-medium text-secondary-foreground"
             type="submit"
           >
             Seed accounts
@@ -207,7 +207,7 @@ export default async function DevPage() {
                         value={row.email}
                       />
                       <select
-                        className="h-8 min-w-48 rounded-md bg-white px-2 text-xs"
+                        className="h-8 min-w-48 rounded-md bg-card px-2 text-xs"
                         name="friendEmail"
                         required
                       >
@@ -251,7 +251,7 @@ export default async function DevPage() {
           <label className="flex flex-col gap-1 text-sm font-medium">
             Players per open session
             <input
-              className="h-9 rounded-md bg-white px-2.5 text-sm"
+              className="h-9 rounded-md bg-card px-2.5 text-sm"
               defaultValue="8"
               max="100"
               min="1"
@@ -260,7 +260,7 @@ export default async function DevPage() {
             />
           </label>
           <button
-            className="h-9 rounded-md bg-white px-4 text-sm font-medium text-secondary-foreground"
+            className="h-9 rounded-md bg-card px-4 text-sm font-medium text-secondary-foreground"
             type="submit"
           >
             Randomly sign up test players
