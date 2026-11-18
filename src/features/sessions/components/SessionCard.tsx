@@ -37,10 +37,10 @@ type SessionCardProps = {
   isSessionInProgress: boolean;
   isSessionOver: boolean;
   signupWindowStatus: "not-open" | "open" | "closed";
-  /** True once the clock passes session start − 30 min. The timetable is released at that point and no further changes are accepted. */
+  /** True once the clock passes session start − 15 min. The timetable is released at that point and no further changes are accepted. */
   /** The session has started; places are locked but cancel stays open until then. */
   hasStarted: boolean;
-  /** Sign-ups and friend preferences are locked 30 minutes before the start. */
+  /** Sign-ups and friend preferences are locked 15 minutes before the start. */
   isPastSignupLock: boolean;
   /** London wall-clock time, `HH:MM`, used to pick the current game. */
   currentLondonTime: string;

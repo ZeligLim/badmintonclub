@@ -24,35 +24,35 @@ function savedSchedule() {
 }
 
 describe("timetable release lock", () => {
-  it("locks exactly 30 minutes before the start, in GMT", () => {
+  it("locks exactly 15 minutes before the start, in GMT", () => {
     // London is UTC in November, so 19:30 local is 19:30Z.
     expect(
-      isSessionTimetableLocked(novemberSession, new Date("2026-11-04T18:59:59Z")),
+      isSessionTimetableLocked(novemberSession, new Date("2026-11-04T19:14:59Z")),
     ).toBe(false);
     expect(
-      isSessionTimetableLocked(novemberSession, new Date("2026-11-04T19:00:00Z")),
+      isSessionTimetableLocked(novemberSession, new Date("2026-11-04T19:15:00Z")),
     ).toBe(true);
     expect(
       isSessionTimetableLocked(novemberSession, new Date("2026-11-04T19:31:00Z")),
     ).toBe(true);
   });
 
-  it("locks exactly 30 minutes before the start, in BST", () => {
+  it("locks exactly 15 minutes before the start, in BST", () => {
     // London is UTC+1 in July, so 19:30 local is 18:30Z.
     expect(
-      isSessionTimetableLocked(julySession, new Date("2026-07-15T17:59:59Z")),
+      isSessionTimetableLocked(julySession, new Date("2026-07-15T18:14:59Z")),
     ).toBe(false);
     expect(
-      isSessionTimetableLocked(julySession, new Date("2026-07-15T18:00:00Z")),
+      isSessionTimetableLocked(julySession, new Date("2026-07-15T18:15:00Z")),
     ).toBe(true);
   });
 
   it("accepts an ISO timestamp instead of a clock time", () => {
     const iso = { eventDate: "2026-11-04", startsAt: "2026-11-04T19:30:00Z" };
-    expect(isSessionTimetableLocked(iso, new Date("2026-11-04T18:59:00Z"))).toBe(
+    expect(isSessionTimetableLocked(iso, new Date("2026-11-04T19:14:00Z"))).toBe(
       false,
     );
-    expect(isSessionTimetableLocked(iso, new Date("2026-11-04T19:00:00Z"))).toBe(
+    expect(isSessionTimetableLocked(iso, new Date("2026-11-04T19:15:00Z"))).toBe(
       true,
     );
   });

@@ -10,7 +10,7 @@ import { finalizeDueSessionsAndEmail } from "@/features/sessions/api/booking-con
  *
  * `vercel.json` asks Vercel to call this once a day; the dashboard keeps its
  * client-side call as a fallback for the deadlines that fall between runs
- * (first-come-first-served sessions close 30 minutes before they start). This
+ * (first-come-first-served sessions close 15 minutes before they start). This
  * route is the only path that confirms a session without a browser being open.
  *
  * No `dynamic` export: this project runs `cacheComponents`, which forbids the
