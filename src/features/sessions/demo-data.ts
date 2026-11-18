@@ -125,6 +125,7 @@ export function createDemoAdminSessions(now = new Date()): AdminSession[] {
       availabilityCanChange: true,
       players,
       timetableNeedsSaving: false,
+      timetableNeedsRepair: false,
       timetableLocked: false,
       courtSchedule: buildDemoCourtSchedule(
         `demo-${dayName.toLowerCase()}-${date}`,

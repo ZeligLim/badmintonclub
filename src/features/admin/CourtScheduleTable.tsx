@@ -1,13 +1,12 @@
-import { isSessionTimetableLocked } from "@/features/sessions/court-schedule";
 import { formatDuration, formatFee, formatTimeOfDay } from "@/lib/format";
 import type { AdminSession } from "./data";
 import { SessionAvailabilityToggle } from "./SessionAvailabilityToggle";
 import { PromoteFromWaitlistButton } from "./PromoteFromWaitlistButton";
-import { PaymentStatusSelect } from "./PaymentStatusSelect";
 import { TimetableEditor } from "./TimetableEditor";
 import { SessionCourtCountSelect } from "./SessionCourtCountSelect";
 import { SessionCapacitySelect } from "./SessionCapacitySelect";
 import { TimetablePngDownload } from "./TimetablePngDownload";
+import { RegenerateCourtScheduleButton } from "./RegenerateCourtScheduleButton";
 
 export function CourtScheduleTable({ session }: { session: AdminSession }) {
   const selectedPlayers = session.players.filter(
@@ -35,10 +34,7 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
       ? "bg-primary/10 text-primary"
       : "bg-secondary text-secondary-foreground";
   const isCancelled = session.status === "cancelled";
-  const timetableLocked = isSessionTimetableLocked({
-    eventDate: session.date,
-    startsAt: session.startsAt,
-  });
+  const timetableLocked = session.timetableLocked;
 
   return (
     <section>
@@ -98,6 +94,24 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
           This schedule is a preview until the session is confirmed. It will
           stay the same while you review the timetable.
         </p>
+      ) : null}
+
+      {session.timetableNeedsRepair && !isCancelled ? (
+        <div
+          className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950"
+          role="alert"
+        >
+          <p>
+            This timetable doesn’t match the current roster, court setup, or fair game counts.
+          </p>
+          {timetableLocked ? (
+            <span className="text-xs">
+              It has been released. Use the seat editor below to correct individual assignments.
+            </span>
+          ) : (
+            <RegenerateCourtScheduleButton sessionId={session.id} />
+          )}
+        </div>
       ) : null}
 
       {/* Court schedule table */}
@@ -175,7 +189,7 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
                     Status
                   </th>
                   <th className="px-4 py-2 text-left font-medium text-muted-foreground">
-                    Payment
+                    Friend requests
                   </th>
                 </tr>
               </thead>
@@ -210,14 +224,20 @@ export function CourtScheduleTable({ session }: { session: AdminSession }) {
                         )}
                       </td>
                       <td className="px-4 py-2">
-                        {session.feeCents > 0 &&
-                        (player.status === "selected" || player.status === "played") ? (
-                          <PaymentStatusSelect
-                            displayName={player.displayName}
-                            paymentStatus={player.paymentStatus}
-                            sessionId={session.id}
-                            userId={player.userId}
-                          />
+                        {player.friendRequests?.length ? (
+                          <ul
+                            aria-label={`${player.displayName} friend requests`}
+                            className="flex min-w-48 flex-wrap gap-1.5"
+                          >
+                            {player.friendRequests.map((friend) => (
+                              <li
+                                key={friend.id}
+                                className="rounded-full bg-muted px-2.5 py-1 text-xs text-foreground"
+                              >
+                                {friend.displayName}
+                              </li>
+                            ))}
+                          </ul>
                         ) : (
                           <span className="text-muted-foreground">—</span>
                         )}

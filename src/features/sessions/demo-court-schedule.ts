@@ -21,8 +21,18 @@ export function buildDemoCourtSchedule(
     ...game,
     players: game.players.map((player) =>
       typeof player === "string"
-        ? { id: player, displayName: player }
-        : { id: player.id, displayName: player.displayName },
+        ? {
+            id: player,
+            displayName: player,
+            playerLevel: "INTERMEDIATE",
+            friendGroup: null,
+          }
+        : {
+            id: player.id,
+            displayName: player.displayName,
+            playerLevel: player.level ?? "INTERMEDIATE",
+            friendGroup: null,
+          },
     ),
   }));
 }
