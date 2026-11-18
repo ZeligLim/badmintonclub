@@ -444,6 +444,14 @@ refuses any session fixture that takes a date from `now()` without pinning
 
 ---
 
+### BC-57 · P1 · M — A published timetable can drift away from the night it describes
+
+**Problem.** A saved board is reused whenever it is merely *shaped* like a timetable (`shouldRefreshPersistedCourtSchedule` returns false for any valid array). Nothing compares it with the current roster, the current court count, or the games each player actually got — so a board built for an earlier set of sign-ups, or for 4 courts before the session was set to 3, is served unchanged. On 2026-11-18 the 19:30 board showed three players on 1–2 games while four played six; re-running today's allocator on today's roster gives everyone 4–5, so the board, not the allocator, was stale.
+
+**Fix.** `buildSessionTimetable` now describes the mismatch (`roster` / `courts` / `fairness`) and rebuilds before release when the saved board no longer matches the night: same people, same number of courts, and no player more than one game ahead of another. A released board is still frozen and repaired by hand.
+
+**Done when.** A board whose roster changed, whose court count changed, or whose game counts differ by more than one is rebuilt on the next load before release, and never after it. Covered by `src/features/sessions/court-schedule.persistence.test.ts` ("stale board repair before release").
+
 ## Ops / DX
 
 ### BC-34 · P2 · M — Playwright is installed but there are zero E2E tests

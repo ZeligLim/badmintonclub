@@ -48,6 +48,48 @@ export type SessionTimetablePlan = {
   isLocked: boolean;
 };
 
+type BoardMismatch = "roster" | "courts" | "fairness" | null;
+
+/**
+ * A saved board is only worth keeping if it still describes the night that is
+ * about to happen: the same people, the same number of courts, and games
+ * spread evenly. Anything else is a stale draw — the shape that let two
+ * players sit on one game while others played six.
+ */
+function describeBoardMismatch(
+  games: PersistedCourtGame[],
+  players: TimetablePlayer[],
+  courtCount: number,
+): BoardMismatch {
+  const boardIds = new Set<string>();
+  const courts = new Set<number>();
+  const gamesPerPlayer = new Map<string, number>();
+
+  for (const game of games) {
+    courts.add(game.courtNumber);
+    for (const player of game.players) {
+      boardIds.add(player.id);
+      gamesPerPlayer.set(player.id, (gamesPerPlayer.get(player.id) ?? 0) + 1);
+    }
+  }
+
+  if (boardIds.size !== players.length) return "roster";
+  for (const player of players) {
+    if (!boardIds.has(player.id)) return "roster";
+  }
+
+  if (courts.size !== courtCount) return "courts";
+
+  if (gamesPerPlayer.size > 0) {
+    const counts = [...gamesPerPlayer.values()];
+    const most = Math.max(...counts);
+    const fewest = Math.min(...counts);
+    if (most - fewest > 1) return "fairness";
+  }
+
+  return null;
+}
+
 /**
  * Decides what a session's timetable should look like without touching the
  * database. Read paths use this so a page render never writes; the one place
@@ -82,8 +124,16 @@ export function buildSessionTimetable({
     },
     now,
   );
+  const courtCount = session.courtCount ?? getCourtCount(session.capacity);
+  const boardMismatch = isPersistedCourtSchedule(persisted)
+    ? describeBoardMismatch(persisted, players, courtCount)
+    : null;
+  // A released board is frozen: players have seen it and the committee repairs
+  // it by hand. Before release, a board that no longer matches the night is
+  // rebuilt even when the session is confirmed.
   const needsRebuild =
     forceRefresh ||
+    (boardMismatch !== null && !isLocked) ||
     shouldRefreshPersistedCourtSchedule(persisted, {
       isLocked,
       isConfirmed: session.isConfirmed,

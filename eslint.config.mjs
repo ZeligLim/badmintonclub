@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Local-only scratch space: planning notes, scripts, credentials.
+    ".local/**",
   ]),
 ]);
 

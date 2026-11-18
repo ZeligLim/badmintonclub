@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   COURT_ALLOCATION_VERSION,
+  type CourtRosterPlayer,
+  type PersistedCourtGame,
   allocateCourtSchedule,
   createPlayerGameSchedule,
   getCourtCount,
@@ -289,5 +291,120 @@ describe("planning a timetable without writing", () => {
 
     expect(plan.needsPersisting).toBe(false);
     expect(plan.games).toEqual(stale);
+  });
+});
+
+describe("stale board repair before release", () => {
+  const players = (count: number) =>
+    Array.from({ length: count }, (_, index) => ({
+      id: `player-${index + 1}`,
+      displayName: `Player ${index + 1}`,
+    }));
+
+  const session = {
+    id: "session-1",
+    date: "2026-11-18",
+    startsAt: "19:30",
+    durationMinutes: 120,
+    capacity: 28,
+    courtCount: 3,
+    isConfirmed: true,
+  };
+
+  const seat = (player: { id: string; displayName: string }): CourtRosterPlayer => ({
+    ...player,
+    priority: 1,
+    friendIds: [],
+    isCommittee: false,
+    level: null,
+  });
+
+  /** A fair board: everyone plays the same number of games. */
+  function board(games: number, rosterSize: number): PersistedCourtGame[] {
+    const roster = players(rosterSize);
+    return Array.from({ length: games }, (_, index) => {
+      const line = Array.from({ length: 4 }, (_, offset) =>
+        seat(roster[(index * 4 + offset) % rosterSize]),
+      );
+      return {
+        courtNumber: (index % 3) + 1,
+        startAt: "19:30",
+        endAt: "19:45",
+        players: line,
+        teamA: [line[0], line[1]],
+        teamB: [line[2], line[3]],
+        allocationVersion: 9,
+      };
+    });
+  }
+
+  it("rebuilds a saved board whose players no longer match the roster", () => {
+    const saved = board(24, 24);
+    const roster = players(25); // one member joined after the draw
+    const plan = buildSessionTimetable({
+      session,
+      players: roster,
+      persisted: saved,
+      now: new Date("2026-11-18T19:00:00Z"),
+    });
+    expect(plan.needsPersisting).toBe(true);
+  });
+
+  it("rebuilds when the court count changed", () => {
+    const saved = board(18, 18); // three courts, 6 rounds, everyone plays 4
+    const plan = buildSessionTimetable({
+      session: { ...session, courtCount: 2 },
+      players: players(18),
+      persisted: saved,
+      now: new Date("2026-11-18T19:00:00Z"),
+    });
+    expect(plan.needsPersisting).toBe(true);
+  });
+
+  it("rebuilds an uneven board even though the session is confirmed", () => {
+    const even = board(24, 23);
+    let replaced = 0;
+    // Same people, different night: player-23 loses two games to player-1.
+    const uneven = even.map((game) => ({
+      ...game,
+      players: game.players.map((player) => {
+        if (player.id === "player-23" && replaced < 2) {
+          replaced += 1;
+          return { ...player, id: "player-1", displayName: "Player 1" };
+        }
+        return player;
+      }),
+    }));
+    const roster = players(23);
+    const plan = buildSessionTimetable({
+      session,
+      players: roster,
+      persisted: uneven,
+      now: new Date("2026-11-18T19:00:00Z"),
+    });
+    expect(plan.needsPersisting).toBe(true);
+  });
+
+  it("leaves a released board alone even when it is uneven", () => {
+    const saved = board(24, 24);
+    const plan = buildSessionTimetable({
+      session,
+      players: players(23),
+      persisted: saved,
+      now: new Date("2026-11-18T19:20:00Z"),
+    });
+    expect(plan.needsPersisting).toBe(false);
+    expect(plan.isLocked).toBe(true);
+  });
+
+  it("keeps a fair board that matches the night", () => {
+    const saved = board(24, 24);
+    const plan = buildSessionTimetable({
+      session,
+      players: players(24),
+      persisted: saved,
+      now: new Date("2026-11-18T19:00:00Z"),
+    });
+    expect(plan.needsPersisting).toBe(false);
   });
 });
