@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { ArrowLeftRight, LogOut, UserPlus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { playerLevelLabel } from "./player-level-label";
 import type { AdminCourtPlayer, AdminPlayer, AdminSession } from "./data";
 import {
   placeTimetablePlayer,
@@ -161,7 +162,7 @@ export function TimetableEditor({ session }: { session: AdminSession }) {
       >
         {session.timetableLocked
           ? "This timetable has already been released to players. Changes are saved immediately and recorded in the audit log."
-          : "Tap a player, then tap another player to swap just those two seats, or an empty seat to move them there. A player can play several rounds, but never two courts at once."}
+          : "Matching colour rings mark friend request groups. Player level appears by each name. Tap players to swap seats, or choose an empty seat to move someone."}
       </p>
 
       <p aria-live="polite" className="sr-only">
@@ -199,6 +200,7 @@ export function TimetableEditor({ session }: { session: AdminSession }) {
 
                   <ul className="grid gap-1.5">
                     {players.map((player) => {
+                      const friendGroup = player.friendGroup;
                       const isSelected =
                         selected?.id === player.id &&
                         selected.courtNumber === courtNumber &&
@@ -209,14 +211,22 @@ export function TimetableEditor({ session }: { session: AdminSession }) {
                             type="button"
                             onClick={() => selectPlayer(player, courtNumber, slot.startAt)}
                             aria-pressed={isSelected}
+                            aria-label={`${player.displayName}, ${playerLevelLabel(player.playerLevel)}${friendGroup ? `, ${friendGroup.label}` : ""}`}
+                            title={friendGroup?.label}
                             className={cn(
-                              "min-h-11 w-full truncate rounded-md border px-3 text-left text-sm transition-colors",
+                              "min-h-11 w-full rounded-full border px-3 text-left text-sm transition-colors",
+                              friendGroup && `ring-2 ${friendGroup.ring}`,
                               isSelected
                                 ? "border-primary bg-primary/10 font-semibold text-primary"
                                 : "border-border bg-background hover:bg-muted",
                             )}
                           >
-                            {player.displayName}
+                            <span className="flex min-w-0 items-center justify-between gap-2">
+                              <span className="truncate">{player.displayName}</span>
+                              <span className="shrink-0 rounded-full bg-muted/70 px-2 py-0.5 text-[0.65rem] text-muted-foreground">
+                                {playerLevelLabel(player.playerLevel)}
+                              </span>
+                            </span>
                           </button>
                         </li>
                       );

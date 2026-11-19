@@ -9,6 +9,9 @@ import {
   type PersistedCourtGame,
   type PlayerLevel,
 } from "@/features/sessions/court-schedule";
+import { GAME_DURATION_MINUTES } from "@/features/sessions/court-schedule.shared";
+import { getCourtSizes } from "@/features/sessions/court-schedule.validate";
+import { addMinutesToTime } from "@/lib/sessions/schedule";
 
 /**
  * Pure timetable planning.
@@ -47,6 +50,76 @@ export type SessionTimetablePlan = {
   /** True once the release cutoff has passed; the saved row then wins. */
   isLocked: boolean;
 };
+
+/** Checks that saved seat assignments still fit the live session roster. */
+export function isTimetableCompatibleWithRoster({
+  session,
+  players,
+  games,
+}: {
+  session: TimetableSession;
+  players: TimetablePlayer[];
+  games: unknown;
+}): boolean {
+  if (!isPersistedCourtSchedule(games)) return false;
+
+  const courtCount = session.courtCount ?? getCourtCount(session.capacity);
+  const expectedRounds = Math.ceil(session.durationMinutes / GAME_DURATION_MINUTES);
+  const rosterIds = new Set(players.map((player) => player.id));
+  const savedCounts = new Map(players.map((player) => [player.id, 0]));
+  const roundPlayers = new Map<string, Set<string>>();
+  const roundCourts = new Map<string, Set<number>>();
+  const courtSizes = getCourtSizes(players.length, courtCount);
+  const expectedCourtCount = courtSizes.length;
+  const expectedStartTimes = new Set(
+    Array.from({ length: expectedRounds }, (_, round) =>
+      addMinutesToTime(session.startsAt, round * GAME_DURATION_MINUTES),
+    ),
+  );
+  let compatible = games.length === expectedRounds * expectedCourtCount;
+
+  for (const game of games) {
+    if (
+      game.courtNumber < 1 ||
+      game.courtNumber > expectedCourtCount ||
+      game.players.length !== courtSizes[game.courtNumber - 1] ||
+      !expectedStartTimes.has(game.startAt)
+    ) {
+      compatible = false;
+    }
+    const courts = roundCourts.get(game.startAt) ?? new Set<number>();
+    if (courts.has(game.courtNumber)) compatible = false;
+    courts.add(game.courtNumber);
+    roundCourts.set(game.startAt, courts);
+
+    const round = roundPlayers.get(game.startAt) ?? new Set<string>();
+    for (const player of game.players) {
+      if (!rosterIds.has(player.id) || round.has(player.id)) {
+        compatible = false;
+      }
+      round.add(player.id);
+      if (savedCounts.has(player.id)) {
+        savedCounts.set(player.id, savedCounts.get(player.id)! + 1);
+      }
+    }
+    roundPlayers.set(game.startAt, round);
+  }
+
+  const gameCounts = [...savedCounts.values()];
+  const maxGames = Math.max(...gameCounts, 0);
+  const minGames = Math.min(...gameCounts, Number.POSITIVE_INFINITY);
+  if (gameCounts.length === 0 || maxGames - minGames > 1) {
+    compatible = false;
+  }
+  if (
+    roundPlayers.size !== expectedRounds ||
+    [...roundCourts.values()].some((courts) => courts.size !== expectedCourtCount)
+  ) {
+    compatible = false;
+  }
+
+  return compatible;
+}
 
 /**
  * Decides what a session's timetable should look like without touching the
@@ -88,6 +161,16 @@ export function buildSessionTimetable({
       isLocked,
       isConfirmed: session.isConfirmed,
     });
+
+  if (!needsRebuild && !isLocked && !session.isConfirmed) {
+    if (isTimetableCompatibleWithRoster({ session, players, games: persisted })) {
+      return {
+        games: isPersistedCourtSchedule(persisted) ? persisted : [],
+        needsPersisting: false,
+        isLocked,
+      };
+    }
+  }
 
   if (!needsRebuild) {
     return {

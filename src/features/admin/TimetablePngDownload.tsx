@@ -3,6 +3,7 @@
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatDuration, formatTimeOfDay } from "@/lib/format";
+import { playerLevelLabel } from "./player-level-label";
 import type { AdminSession } from "./data";
 
 const COLORS = {
@@ -62,7 +63,11 @@ export function TimetablePngDownload({ session }: { session: AdminSession }) {
           const playerRows = players
             .map((player, index) => {
               const playerY = y + 58 + index * 37;
-              return `<rect x="${x + 12}" y="${playerY}" width="${courtWidth - 24}" height="31" rx="8" fill="${COLORS.card}" stroke="${COLORS.border}"/><circle cx="${x + 27}" cy="${playerY + 15.5}" r="4" fill="${COLORS.primary}"/><text x="${x + 39}" y="${playerY + 20}" font-size="14" fill="${COLORS.foreground}">${escapeXml(player.displayName)}</text>`;
+              const friendGroup = player.friendGroup;
+              const stroke = friendGroup?.hex ?? COLORS.border;
+              const strokeWidth = friendGroup ? 2 : 1;
+              const dot = friendGroup?.hex ?? COLORS.primary;
+              return `<rect x="${x + 12}" y="${playerY}" width="${courtWidth - 24}" height="31" rx="15.5" fill="${COLORS.card}" stroke="${stroke}" stroke-width="${strokeWidth}"><title>${escapeXml(friendGroup?.label ?? "")}</title></rect><circle cx="${x + 27}" cy="${playerY + 15.5}" r="4" fill="${dot}"/><text x="${x + 39}" y="${playerY + 13}" font-size="12" fill="${COLORS.foreground}">${escapeXml(player.displayName)}</text><text x="${x + 39}" y="${playerY + 25}" font-size="9" fill="${COLORS.muted}">${escapeXml(playerLevelLabel(player.playerLevel))}</text>`;
             })
             .join("");
           const emptyLabel =
@@ -75,7 +80,7 @@ export function TimetablePngDownload({ session }: { session: AdminSession }) {
       return `${courtTitle}${games}`;
     }).join("");
 
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" font-family="Avenir Next, Avenir, Segoe UI, sans-serif"><rect width="100%" height="100%" fill="${COLORS.background}"/><text x="28" y="43" font-size="23" font-weight="700" fill="${COLORS.foreground}">${escapeXml(date)}</text><text x="28" y="69" font-size="13" fill="${COLORS.muted}">${escapeXml(formatTimeOfDay(session.startsAt))} · ${escapeXml(formatDuration(session.durationMinutes))} · ${session.courtCount} ${session.courtCount === 1 ? "court" : "courts"}</text>${timeLabels}${courtRows}</svg>`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" font-family="Avenir Next, Avenir, Segoe UI, sans-serif"><rect width="100%" height="100%" fill="${COLORS.background}"/><text x="28" y="43" font-size="23" font-weight="700" fill="${COLORS.foreground}">${escapeXml(date)}</text><text x="28" y="69" font-size="13" fill="${COLORS.muted}">${escapeXml(formatTimeOfDay(session.startsAt))} · ${escapeXml(formatDuration(session.durationMinutes))} · ${session.courtCount} ${session.courtCount === 1 ? "court" : "courts"}</text>${timeLabels}${courtRows}<text x="28" y="${height - 12}" font-size="11" fill="${COLORS.muted}">Matching outline colours show friend request groups · Playing level appears beneath each name</text></svg>`;
     const svgBlob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
     const svgUrl = URL.createObjectURL(svgBlob);
     const image = new Image();

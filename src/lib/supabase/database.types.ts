@@ -129,6 +129,7 @@ export type Database = {
           is_committee: boolean;
           is_committee_admin: boolean;
           last_played_at: string | null;
+          level_confirmed_at: string;
           player_level: string;
         };
         ComputedFields: never;
@@ -141,6 +142,7 @@ export type Database = {
           is_committee?: boolean;
           is_committee_admin?: boolean;
           last_played_at?: string | null;
+          level_confirmed_at?: string;
           player_level?: string;
         };
         Update: {
@@ -152,6 +154,7 @@ export type Database = {
           is_committee?: boolean;
           is_committee_admin?: boolean;
           last_played_at?: string | null;
+          level_confirmed_at?: string;
           player_level?: string;
         };
         Relationships: [];

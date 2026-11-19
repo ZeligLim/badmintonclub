@@ -2,7 +2,10 @@ import "server-only";
 
 import { connection } from "next/server";
 import { readPersistedTimetables } from "@/features/sessions/api/timetable";
-import { buildSessionTimetable } from "@/features/sessions/timetable-plan";
+import {
+  buildSessionTimetable,
+  isTimetableCompatibleWithRoster,
+} from "@/features/sessions/timetable-plan";
 import { formatTimeOfDay } from "@/lib/format";
 import { toSessionStatus, toSignupStatus } from "@/features/sessions/status";
 import type {
@@ -15,6 +18,7 @@ import { getSessionDayName } from "@/lib/sessions/schedule";
 import { getClubNow } from "@/features/sessions/club-clock";
 import { isSessionTimetableLocked } from "@/features/sessions/court-schedule";
 import type { PlayerLevel } from "@/types/player";
+import { getFriendGroups, type CourtFriendGroup } from "./friend-groups";
 import { isClubEmail } from "@/lib/validation";
 import { logError } from "@/lib/log";
 
@@ -34,12 +38,15 @@ export type AdminPlayer = {
   slotNumber: number | null;
   isCommittee?: boolean;
   playerLevel?: PlayerLevel;
+  friendRequests?: { id: string; displayName: string }[];
   paymentStatus: PaymentStatus;
 };
 
 export type AdminCourtPlayer = {
   id: string;
   displayName: string;
+  playerLevel: PlayerLevel;
+  friendGroup: CourtFriendGroup | null;
 };
 
 export type AdminCourtGame = {
@@ -62,6 +69,8 @@ export type AdminSession = {
   availabilityCanChange: boolean;
   players: AdminPlayer[];
   courtSchedule: AdminCourtGame[];
+  /** True when the saved schedule disagrees with the live roster or session setup. */
+  timetableNeedsRepair: boolean;
   /** True when the shown schedule exists only in memory and nothing is saved. */
   timetableNeedsSaving: boolean;
   /** True once the timetable has been released, so only administrators may edit it. */
@@ -302,15 +311,26 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
         .in("user_id", userIds)
     : { data: [] };
 
+  const preferenceRows = [
+    ...(sessionFriendPrefs ?? []),
+    ...(clubFriendPrefs ?? []),
+  ];
+  const profileIds = [
+    ...new Set([
+      ...userIds,
+      ...preferenceRows.map((preference) => preference.friend_user_id),
+    ]),
+  ];
+
   const profileMap = new Map<
     string,
     { displayName: string; isCommittee: boolean; playerLevel: PlayerLevel }
   >();
-  if (userIds.length) {
+  if (profileIds.length) {
     const { data: profiles, error: profilesErr } = await admin
       .from("profiles")
       .select("id, display_name, is_committee, player_level")
-      .in("id", userIds);
+      .in("id", profileIds);
 
     if (profilesErr) throw new Error(`Could not load profiles: ${profilesErr.message}`);
     for (const p of profiles ?? []) {
@@ -352,54 +372,85 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
       slotNumber: s.slot_number,
       isCommittee: profileMap.get(s.user_id)?.isCommittee ?? false,
       playerLevel: profileMap.get(s.user_id)?.playerLevel ?? "INTERMEDIATE",
+      friendRequests: [
+        ...new Set(sessionFriendMap.get(s.user_id) ?? []),
+      ]
+        .filter((friendId) => friendId !== s.user_id)
+        .map((friendId) => ({
+          id: friendId,
+          displayName: profileMap.get(friendId)?.displayName ?? friendId.slice(0, 8),
+        })),
       paymentStatus: toPaymentStatus(s.payment_status),
     }));
+    const playersById = new Map(players.map((player) => [player.userId, player]));
 
     const courtCount = session.court_count;
     const selectedPlayers = players
       .filter((p) => p.status === "selected" || p.status === "played")
       .sort((a, b) => (a.slotNumber ?? 99) - (b.slotNumber ?? 99));
+    const friendGroupsByPlayer = getFriendGroups(
+      selectedPlayers.map((player) => ({
+        id: player.userId,
+        friendIds: sessionFriendMap.get(player.userId) ?? [],
+      })),
+    );
 
     // Reading the admin page must never write. If a timetable is missing or
     // stale, this plans one for display and flags it so a committee member can
     // save it deliberately.
+    const timetableSession = {
+      id: session.id,
+      date: session.event_date,
+      startsAt: session.starts_at,
+      durationMinutes: session.duration_minutes,
+      capacity: session.capacity,
+      courtCount,
+      isConfirmed: session.status === "confirmed",
+    };
+    const timetablePlayers = selectedPlayers.map((player) => ({
+      id: player.userId,
+      displayName: player.displayName,
+      priority: player.slotNumber ?? 1,
+      friendIds: sessionFriendMap.get(player.userId) ?? [],
+      isCommittee: player.isCommittee,
+      level: player.playerLevel,
+    }));
     const timetablePlan = buildSessionTimetable({
-      session: {
-        id: session.id,
-        date: session.event_date,
-        startsAt: session.starts_at,
-        durationMinutes: session.duration_minutes,
-        capacity: session.capacity,
-        courtCount,
-        isConfirmed: session.status === "confirmed",
-      },
+      session: timetableSession,
       now: clubNow,
-      players: selectedPlayers.map((player) => ({
-        id: player.userId,
-        displayName: player.displayName,
-        priority: player.slotNumber ?? 1,
-        friendIds: sessionFriendMap.get(player.userId) ?? [],
-        isCommittee: player.isCommittee,
-        level: player.playerLevel,
-      })),
+      players: timetablePlayers,
       persisted: timetableMap.get(session.id),
       seed: options?.allocationSeed,
     });
     const courtScheduleGames = timetablePlan.games;
+    const timetableNeedsRepair =
+      session.status !== "cancelled" &&
+      selectedPlayers.length > 0 &&
+      courtScheduleGames.length > 0 &&
+      !isTimetableCompatibleWithRoster({
+        session: timetableSession,
+        players: timetablePlayers,
+        games: courtScheduleGames,
+      });
 
     const courtSchedule = courtScheduleGames.map((game) => ({
       ...game,
-      players: game.players.map((player) =>
-        typeof player === "string"
-          ? {
-              id: player,
-              displayName: profileMap.get(player)?.displayName ?? "Unknown player",
-            }
-          : {
-              id: player.id,
-              displayName: player.displayName,
-            },
-      ),
+      players: game.players.map((player) => {
+        const id = typeof player === "string" ? player : player.id;
+        const rosterPlayer = playersById.get(id);
+        return {
+          id,
+          displayName:
+            rosterPlayer?.displayName ??
+            profileMap.get(id)?.displayName ??
+            (typeof player === "string" ? "Unknown player" : player.displayName),
+          playerLevel:
+            rosterPlayer?.playerLevel ??
+            profileMap.get(id)?.playerLevel ??
+            "INTERMEDIATE",
+          friendGroup: friendGroupsByPlayer.get(id) ?? null,
+        };
+      }),
     }));
 
 
@@ -419,6 +470,7 @@ export async function loadAdminData(options?: { allocationSeed?: string }): Prom
           session.starts_at.slice(0, 5) > londonNow.time),
       players,
       courtSchedule,
+      timetableNeedsRepair,
       timetableNeedsSaving: timetablePlan.needsPersisting,
       timetableLocked: isSessionTimetableLocked(
         {
