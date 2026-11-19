@@ -23,7 +23,7 @@ const DEMO_FRIEND_CANDIDATES: FriendCandidate[] = [
     userId: "demo-friend-ciaran",
     displayName: "Ciarán Kelly",
     studentId: "g00440630",
-    playerLevel: "INTERMEDIATE",
+    playerLevel: "ADVANCED",
     isSelected: false,
     isSignedUp: true,
   },
