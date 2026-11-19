@@ -89,6 +89,7 @@ export function SessionsHeader({
     if (
       value !== "BEGINNER" &&
       value !== "INTERMEDIATE" &&
+      value !== "ADVANCED" &&
       value !== "PROFESSIONAL"
     ) {
       return;
@@ -271,6 +272,7 @@ export function SessionsHeader({
                   >
                     <option value="BEGINNER">Beginner</option>
                     <option value="INTERMEDIATE">Intermediate</option>
+                  <option value="ADVANCED">Advanced</option>
                     {canChooseProfessional && (
                       <option value="PROFESSIONAL">Professional</option>
                     )}

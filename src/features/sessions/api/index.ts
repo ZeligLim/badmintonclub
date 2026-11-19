@@ -21,6 +21,7 @@ import {
 } from "./actions";
 import { loadDashboardData } from "./dashboard";
 import type { DashboardData } from "../types";
+import type { PlayerLevel } from "@/types/player";
 
 export async function getDashboardData(): Promise<DashboardData> {
   return loadDashboardData();
@@ -57,7 +58,7 @@ export async function saveSessionFriendPreferences(
 }
 
 export async function updatePlayerLevelForCurrentUser(
-  playerLevel: "BEGINNER" | "INTERMEDIATE" | "PROFESSIONAL",
+  playerLevel: PlayerLevel,
 ): Promise<void> {
   await updatePlayerLevel(playerLevel);
 }

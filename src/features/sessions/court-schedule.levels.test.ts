@@ -72,13 +72,19 @@ describe("level matching", () => {
     }
   });
 
-  // Regression: the old type union listed ADVANCED, and rows written before the
-  // level migration can still carry it. An unknown value must not poison the
-  // scoring with NaN.
+  // Unknown legacy values must not poison the scoring with NaN.
   it("falls back to intermediate for an unrecognised stored level", () => {
-    const legacyLevel = "ADVANCED" as unknown as PlayerLevel;
+    const legacyLevel = "LEGACY_CUSTOM_LEVEL" as unknown as PlayerLevel;
     const effectiveValue = (level: CourtRosterPlayer["level"]) =>
-      level === "BEGINNER" ? 1 : level === "PROFESSIONAL" ? 3 : 2;
+      level === "BEGINNER"
+        ? 1
+        : level === "INTERMEDIATE"
+          ? 2
+          : level === "ADVANCED"
+            ? 3
+            : level === "PROFESSIONAL"
+              ? 4
+              : 2;
 
     const roster: CourtRosterPlayer[] = [
       { id: "legacy", displayName: "legacy", level: legacyLevel },
@@ -93,11 +99,11 @@ describe("level matching", () => {
     );
 
     expect(game!.players).toHaveLength(4);
-    // With the legacy value read as intermediate, the only balanced split is
-    // professional + beginner against intermediate + legacy.
+    // The legacy value falls back to intermediate; the optimizer still returns
+    // a finite, near-balanced split across the four ranks.
     const teamValue = (team: CourtRosterPlayer[]) =>
       team.reduce((sum, player) => sum + effectiveValue(player.level), 0);
-    expect(teamValue(game!.teamA!)).toBe(teamValue(game!.teamB!));
+    expect(Math.abs(teamValue(game!.teamA!) - teamValue(game!.teamB!))).toBeLessThanOrEqual(1);
   });
 
   it("does not let level matching break playing-time fairness", () => {
