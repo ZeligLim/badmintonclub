@@ -1,1 +1,5 @@
-export type PlayerLevel = "BEGINNER" | "INTERMEDIATE" | "PROFESSIONAL";
+export type PlayerLevel =
+  | "BEGINNER"
+  | "INTERMEDIATE"
+  | "ADVANCED"
+  | "PROFESSIONAL";

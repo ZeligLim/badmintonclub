@@ -389,10 +389,13 @@ function formatSessionDate(date: string): string {
   }).format(new Date(`${date}T12:00:00Z`));
 }
 
-function parsePlayerLevel(value: string): "BEGINNER" | "INTERMEDIATE" | "PROFESSIONAL" {
+function parsePlayerLevel(
+  value: string,
+): "BEGINNER" | "INTERMEDIATE" | "ADVANCED" | "PROFESSIONAL" {
   if (
     value === "BEGINNER" ||
     value === "INTERMEDIATE" ||
+    value === "ADVANCED" ||
     value === "PROFESSIONAL"
   ) {
     return value;

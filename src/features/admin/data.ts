@@ -506,6 +506,7 @@ function parsePlayerLevel(playerLevel: string): PlayerLevel {
   if (
     playerLevel === "BEGINNER" ||
     playerLevel === "INTERMEDIATE" ||
+    playerLevel === "ADVANCED" ||
     playerLevel === "PROFESSIONAL"
   ) {
     return playerLevel;

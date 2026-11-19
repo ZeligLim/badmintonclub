@@ -3,17 +3,27 @@
  * readable in one place.
  */
 
-export type PlayerLevel = "BEGINNER" | "INTERMEDIATE" | "PROFESSIONAL";
+export type PlayerLevel =
+  | "BEGINNER"
+  | "INTERMEDIATE"
+  | "ADVANCED"
+  | "PROFESSIONAL";
 
 export const LEVEL_VALUE: Record<PlayerLevel, number> = {
   BEGINNER: 1,
   INTERMEDIATE: 2,
-  PROFESSIONAL: 3,
+  ADVANCED: 3,
+  PROFESSIONAL: 4,
 };
 
 /** Reads a stored level, falling back to the club default for unknown text. */
 export function toPlayerLevel(value: string | null | undefined): PlayerLevel {
-  if (value === "BEGINNER" || value === "INTERMEDIATE" || value === "PROFESSIONAL") {
+  if (
+    value === "BEGINNER" ||
+    value === "INTERMEDIATE" ||
+    value === "ADVANCED" ||
+    value === "PROFESSIONAL"
+  ) {
     return value;
   }
   return "INTERMEDIATE";
@@ -23,7 +33,7 @@ export function levelValue(
   level: PlayerLevel | null | undefined,
 ): number {
   // Rows written before the level migration can still carry a value outside
-  // PlayerLevel (for example "ADVANCED"); treat anything unknown as the
+  // PlayerLevel (for example a legacy custom value); treat anything unknown as the
   // default rather than letting NaN leak into every score comparison.
   return (level ? LEVEL_VALUE[level] : undefined) ?? LEVEL_VALUE.INTERMEDIATE;
 }

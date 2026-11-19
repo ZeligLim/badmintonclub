@@ -10,6 +10,7 @@ import {
 } from "./booking-confirmation-email";
 import { rebuildSessionTimetable } from "./timetable";
 import type { FriendCandidate } from "../types";
+import type { PlayerLevel } from "@/types/player";
 
 export async function finalizeDueSessions(): Promise<number> {
   const supabase = await requireAuthenticatedClient();
@@ -71,6 +72,7 @@ export async function searchClubMembers(
     if (
       friend.player_level !== "BEGINNER" &&
       friend.player_level !== "INTERMEDIATE" &&
+      friend.player_level !== "ADVANCED" &&
       friend.player_level !== "PROFESSIONAL"
     ) {
       throw new Error("A club member has an unsupported player level.");
@@ -115,7 +117,7 @@ export async function removeClubFriend(friendId: string): Promise<void> {
 }
 
 export async function updatePlayerLevel(
-  playerLevel: "BEGINNER" | "INTERMEDIATE" | "PROFESSIONAL",
+  playerLevel: PlayerLevel,
 ): Promise<void> {
   const supabase = await requireAuthenticatedClient();
   const { error } = await supabase.rpc("update_my_player_level", {
